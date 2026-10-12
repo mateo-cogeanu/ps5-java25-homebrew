@@ -1,0 +1,13 @@
+{
+  "repository": "https://github.com/mateo-cogeanu/ps5-java25-homebrew",
+  "checkout": ".tools/github-publish/ps5-java25-homebrew",
+  "development_folder": "Development",
+  "milestones": {
+    "JVM_Startup": {
+      "version": "01.000.023",
+      "console": "ALL PASS",
+      "release_tag": "JVM_Startup-v01.000.023"
+    }
+  },
+  "publication_rule": "Sync completed source changes after each working turn; create a passing milestone folder only after user-confirmed ALL PASS on PS5. IO_Probe is pending."
+}
