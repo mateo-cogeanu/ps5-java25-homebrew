@@ -1,0 +1,67 @@
+/* SPDX-License-Identifier: GPL-2.0-only
+ * Test the actual diagnostic helper with interrupted/partial host writes.
+ * This tests trace reliability, not PS5 JVM startup.
+ */
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+#include <errno.h>
+#include <cassert>
+#include <cstdio>
+#include <fstream>
+#include <string>
+static bool interrupt_once=true;
+static bool deny_open=false;
+static int trace_open(const char *,int flags,int mode) {
+ if(deny_open) {errno=EACCES;return -1;}
+ return ::open("build/java25/trace-helper-test.log",flags,mode);
+}
+static ssize_t trace_write(int fd,const void *bytes,size_t length) {
+ if(interrupt_once) {interrupt_once=false;errno=EINTR;return -1;}
+ return ::write(fd,bytes,length>3?3:length);
+}
+#define __PROSPERO__ 1
+#define open trace_open
+#define write trace_write
+#include "runtime/ps5StartupTrace.hpp"
+#undef open
+#undef write
+
+int main() {
+ ::unlink("build/java25/trace-helper-test.log");
+ errno=EBUSY;
+ ps5_vm_trace("ENTER: output stream initialization");
+ assert(errno==EBUSY);
+ ps5_vm_trace("DONE: output stream initialization");
+ assert(errno==EBUSY);
+ deny_open=true;
+ ps5_vm_trace("This line must not be written");
+ assert(errno==EBUSY);
+ std::ifstream file("build/java25/trace-helper-test.log");
+ std::string content((std::istreambuf_iterator<char>(file)),{});
+ assert(content=="ENTER: output stream initialization\nDONE: output stream initialization\n");
+ deny_open=false;
+ ps5_vm_trace_memory("TEST MEMORY",nullptr,16384,3,0);
+ assert(errno==EBUSY);
+ std::ifstream updated("build/java25/trace-helper-test.log");
+ std::string with_memory((std::istreambuf_iterator<char>(updated)),{});
+ assert(with_memory.find("bytes=16384 mode=3 errno=0")!=std::string::npos);
+ ps5_vm_trace_hex("SIGNAL: pc=",0x1234abcdefULL);
+ assert(errno==EBUSY);
+ std::ifstream hex_file("build/java25/trace-helper-test.log");
+ std::string with_hex((std::istreambuf_iterator<char>(hex_file)),{});
+ assert(with_hex.find("SIGNAL: pc=0x0000001234abcdef\n")!=std::string::npos);
+ assert(std::string(ps5_vm_last_stage()).find("TEST MEMORY") == 0);
+ ps5_vm_trace(ps5_vm_last_stage());
+ assert(errno==EBUSY);
+ ps5_vm_trace_values("SIGNAL: RDI=",1," RSI=",2," RDX=",3);
+ assert(errno==EBUSY);
+ std::ifstream context_file("build/java25/trace-helper-test.log");
+ std::string context((std::istreambuf_iterator<char>(context_file)),{});
+ assert(context.find("SIGNAL: RDI=0x0000000000000001 RSI=0x0000000000000002 RDX=0x0000000000000003\n")!=std::string::npos);
+ assert(std::string(ps5_vm_last_stage()).find("TEST MEMORY") == 0);
+ std::string long_label(200,'x');
+ ps5_vm_trace_values(long_label.c_str(),1,long_label.c_str(),2,long_label.c_str(),3);
+ assert(errno==EBUSY);
+ std::puts("Startup trace helper PASS: EINTR, partial writes, append, denied open, memory fields, fault hex formatting, errno preservation");
+}

@@ -1,0 +1,41 @@
+diff --git a/src/hotspot/share/memory/metaspace.cpp b/src/hotspot/share/memory/metaspace.cpp
+--- a/src/hotspot/share/memory/metaspace.cpp
++++ b/src/hotspot/share/memory/metaspace.cpp
+@@ -33,6 +33,7 @@
+ #include "memory/classLoaderMetaspace.hpp"
+ #include "memory/memoryReserver.hpp"
+ #include "memory/metaspace.hpp"
++#include "runtime/ps5StartupTrace.hpp"
+ #include "memory/metaspace/chunkHeaderPool.hpp"
+ #include "memory/metaspace/chunkManager.hpp"
+ #include "memory/metaspace/commitLimiter.hpp"
+@@ -881,7 +882,9 @@
+   MetadataType mdtype = (type == MetaspaceObj::ClassType) ? ClassType : NonClassType;
+ 
+   // Try to allocate metadata.
++  ps5_vm_trace("ENTER: Metadata arena allocation");
+   MetaWord* result = loader_data->metaspace_non_null()->allocate(word_size, mdtype);
++  ps5_vm_trace_memory("DONE: Metadata arena allocation", result, word_size * BytesPerWord, mdtype, 0);
+ 
+   if (result != nullptr) {
+ #ifdef ASSERT
+@@ -894,7 +897,9 @@
+     }
+ #endif
+     // Zero initialize.
++    ps5_vm_trace_memory("ENTER: Metadata zeroing", result, word_size * BytesPerWord, type, 0);
+     Copy::fill_to_words((HeapWord*)result, word_size, 0);
++    ps5_vm_trace("DONE: Metadata zeroing");
+     log_trace(metaspace)("Metaspace::allocate: type %d return " PTR_FORMAT ".", (int)type, p2i(result));
+   }
+ 
+@@ -931,7 +936,9 @@
+     }
+ 
+     // Zero initialize.
++    ps5_vm_trace_memory("ENTER: Metadata zeroing", result, word_size * BytesPerWord, type, 0);
+     Copy::fill_to_words((HeapWord*)result, word_size, 0);
++    ps5_vm_trace("DONE: Metadata zeroing");
+ 
+     log_trace(metaspace)("Metaspace::allocate: type %d return " PTR_FORMAT ".", (int)type, p2i(result));
+   }

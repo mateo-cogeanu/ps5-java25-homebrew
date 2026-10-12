@@ -1,0 +1,26 @@
+diff --git a/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c b/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c
+index f82caa1bd..42a80db42 100644
+--- a/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c
++++ b/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c
+@@ -222,6 +222,13 @@ Java_java_lang_ProcessHandleImpl_waitForProcessExit0(JNIEnv* env,
+             return status;
+         }
+      } else {
++#ifdef __PROSPERO__
++        // The SDK has waitpid but no waitid. Reaping here would violate
++        // this operation's contract; fail explicitly instead.
++        JNU_ThrowByName(env, "java/lang/UnsupportedOperationException",
++                       "Non-reaping process waits are unsupported on PS5");
++        return -1;
++#else
+         /*
+          * Wait for the child process to exit without reaping the exitValue.
+          * waitid() is standard on all POSIX platforms.
+@@ -253,6 +260,7 @@ Java_java_lang_ProcessHandleImpl_waitForProcessExit0(JNIEnv* env,
+               */
+              return siginfo.si_status;
+         }
++#endif // __PROSPERO__
+     }
+ }
+ 

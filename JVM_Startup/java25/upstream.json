@@ -1,0 +1,12 @@
+{
+  "project": "native PS5 OpenJDK 25 / Minecraft Java Edition",
+  "repository": "https://github.com/freebsd/openjdk.git",
+  "tag": "jdk-25.0.4+7-freebsd-1",
+  "commit": "b219cdec88ca2e165711f63b8158ab78303facc8",
+  "cache": ".tools/java25/openjdk",
+  "target": "x86_64-sie-ps5",
+  "bootstrap_vm_candidate": "HotSpot server; first console startup with -Xint pending native loader adaptation",
+  "build_status": "HotSpot and java.base classes/native libraries build successfully; console JVM startup not tested",
+  "production_vm_goal": "HotSpot server with JIT, JNI and java.base",
+  "license": "GPL-2.0 with Classpath Exception where specified upstream"
+}
