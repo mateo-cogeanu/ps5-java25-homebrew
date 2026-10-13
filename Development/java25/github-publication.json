@@ -12,6 +12,11 @@
       "version": "01.000.004",
       "console": "ALL PASS",
       "release_tag": "IO_Probe-v01.000.004"
+    },
+    "ZIP_JAR_Probe": {
+      "version": "01.000.000",
+      "console": "ALL PASS",
+      "release_tag": "ZIP_JAR_Probe-v01.000.000"
     }
   },
   "publication_rule": "Sync every completed set of development changes; freeze a new milestone only after user confirms ALL PASS on PS5."

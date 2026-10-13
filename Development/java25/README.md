@@ -980,3 +980,14 @@ stored bytes, wrong JAR resource bytes and a missing payload class at the
 expected stages. Native packaging, signed integrity, ZIP CRC, title/version
 and JAR-only payload checks pass. PS5 results are pending: do not freeze a
 ZIP/JAR milestone until the user reports ALL PASS for this exact package.
+
+### Console milestone: ZIP/JAR 01.000.000 ALL PASS
+
+On 2026-10-13 the user reports ALL PASS for PPSA99867 01.000.000 on the PS5.
+This establishes stored and deflated ZIP reads, manifest parsing, real
+URLClassLoader loading/execution of the JAR-only Java 25 payload, its UTF-8
+resource, and successful VM lifecycle. ZIP_JAR_Probe preserves this source
+snapshot; its release includes the exact passing package, checksum and record.
+Signed archives, complex dependencies, network I/O, JIT stability and Minecraft
+remain further work. The JNI-defined test harness is not proof of automatic
+system application class-path discovery.

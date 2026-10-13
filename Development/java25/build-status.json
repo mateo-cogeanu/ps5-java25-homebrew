@@ -13,7 +13,7 @@
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
   "next_console_title": "PPSA99867",
-  "next_console_probe": "Java 25 ZIP / JAR 01.000.000: stored/deflated ZIP reads, manifest, URLClassLoader class and UTF-8 resource",
+  "next_console_probe": "Not yet selected; Java network I/O is a remaining server prerequisite",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -75,10 +75,11 @@
     "console": "ALL PASS, human report 2026-10-13"
   },
   "zipjar_01_000_000_validation": {
-    "console": "pending",
+    "console": "ALL PASS on PS5, human report 2026-10-13",
     "target_package": "PASS: native build/signature integrity, ZIP CRC/title/version, JAR-only payload asset audit",
     "host_fixture": "PASS: actual packaged ZipFile/JarFile/URLClassLoader test under -Xint",
     "host_negative_cases": "PASS: wrong stored bytes, wrong resource bytes and missing JAR class fail at expected stages",
     "zip_sha256": "af883f85f5452e7203aae2a8c8501aaa9c4a62f716225a0d44e9374b55e20672"
-  }
+  },
+  "console_zipjar": "ALL PASS: ZIP data/Inflater, JarFile manifest, URLClassLoader class execution and UTF-8 resource"
 }
