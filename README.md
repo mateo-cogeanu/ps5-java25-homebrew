@@ -13,9 +13,11 @@
 
 An experimental **native OpenJDK 25 port for PlayStation 5 homebrew**, built and tested in small, reproducible steps.
 
-This repository owns the **Java runtime port and its acceptance probes**. Minecraft-specific work has its own [ps5-minecraft-java repository](https://github.com/mateo-cogeanu/ps5-minecraft-java), which depends on this runtime. The long-term goal is server support first, followed by the client, graphics and mod loaders such as Fabric and Forge. Today, Java 25 bytecode, file I/O and JAR class loading have passed their acceptance tests on a real console.
+This repository contains the **Java runtime port, platform adaptations and acceptance probes**. Java 25 bytecode execution, file I/O and JAR class loading have passed their tests on a real console.
 
-> **Current progress:** three passing milestones on PS5 firmware **13.60**, using interpreter mode. Minecraft itself is a future milestone.
+> **Current progress:** three passing milestones on PS5 firmware **13.60**, using interpreter mode. Networking is the current development probe.
+
+**Related project:** [ps5-minecraft-java](https://github.com/mateo-cogeanu/ps5-minecraft-java) tracks Minecraft-specific work separately and will use this Java runtime.
 
 ## Milestones
 
@@ -55,11 +57,8 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 - [ ] Test Java networking.
 - [ ] Expand class-path/dependency loading and filesystem coverage.
 - [ ] Validate JIT execution, garbage collection and sustained workloads.
-- [ ] Bring up a Minecraft Java server and test world saves and connections.
-- [ ] Explore client dependencies, controller input and graphics.
-- [ ] Test Fabric/Forge and specific mods against a working game build.
-
-OpenGL, Vulkan and renderer mods are future graphics work. Backend availability and compatibility still need to be established on PS5.
+- [ ] Improve JNI and native-library compatibility for Java applications.
+- [ ] Test broader Java APIs, error handling and repeated application runs.
 
 **Current development probe:** [Java Networking](Development/java25/tests/Network25.java), `PPSA99868` version `01.000.001`. TCP/UDP loopback and NIO selector tests pass on the host; PS5 validation is pending. Build it with `make java25-network` from the Development folder after preparing the toolchain.
 

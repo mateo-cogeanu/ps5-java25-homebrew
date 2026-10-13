@@ -14,7 +14,7 @@
   <g font-family="Inter,Segoe UI,Arial,sans-serif">
     <text x="69" y="63" font-size="15" font-weight="600" letter-spacing="3" fill="#a5b9d7">NATIVE HOMEBREW · OPENJDK PORT</text>
     <text x="48" y="144" font-size="70" font-weight="700" letter-spacing="-2" fill="#f1f5fc">Java 25 <tspan fill="#91aaff">on PS5</tspan></text>
-    <text x="51" y="183" font-size="21" fill="#b1bfd5">Building toward Minecraft Java Edition, one console test at a time.</text>
+    <text x="51" y="183" font-size="21" fill="#b1bfd5">A native Java runtime, tested on console one milestone at a time.</text>
     <g font-size="14" font-weight="600">
       <rect x="50" y="225" width="100" height="35" rx="17" fill="#132e32" stroke="#28504e"/>
       <text x="72" y="247" fill="#92e4cb">JVM ✓</text>

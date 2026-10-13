@@ -1,10 +1,11 @@
 # Java 25 on native PS5 homebrew
 
-Target: Minecraft Java Edition, Minecraft server, Fabric/Forge compatibility,
-and eventually accelerated OpenGL or Vulkan rendering. The user has confirmed
-that the native Interface Lab 01.001.002 works on firmware 13.60 with their
-existing loader. This is a separate port project; a working menu does not
-establish that a JVM or Minecraft can run.
+Scope: the native OpenJDK 25 runtime, PS5 platform adaptations and Java
+acceptance probes. VM startup, Java file I/O and ZIP/JAR loading have passing
+console milestones on firmware 13.60. Networking 01.000.001 awaits its test.
+The sections below retain the port's build and diagnostic history.
+
+Related application project: [ps5-minecraft-java](https://github.com/mateo-cogeanu/ps5-minecraft-java).
 
 ## Current deliverable
 
@@ -22,8 +23,8 @@ selected and whether its RUN status appeared. Exit using the PS menu.
 | Clock | Monotonic clock advances after a short sleep | Timing accuracy under load |
 | Memory | Reserve 64 MiB, commit/write 16 KiB, release | JVM-sized heaps, decommit, protection faults |
 | Thread | Create/join one thread, mutex, thread-local storage | Signals, safepoints, condition variables, many threads |
-| Socket | TCP socket can bind/listen on loopback | Accept/connect, LAN reachability, Minecraft protocol |
-| Files | Exclusive temporary file write/read/delete in `/download0` | World saves, durability, other mount permissions |
+| Socket | TCP socket can bind/listen on loopback | Accept/connect, LAN reachability, application protocols |
+| Files | Exclusive temporary file write/read/delete in `/download0` | Data durability, other mount permissions |
 | Executable page | Change one mapping from RW to RX | Execution, JIT allocation policy, dual mappings |
 
 The last test executes no generated code. A PASS does not prove HotSpot JIT
@@ -436,7 +437,7 @@ disabled. CPUID feature discovery still runs. The existing feature-selection
 logic clears AVX/AVX2/AVX512 from the VM's usable feature set in this mode; the
 port does not claim those vector features or signal recovery work. AVX-enabled
 modes retain the original probe and remain unvalidated. This is a conservative
-bootstrap configuration, not the intended final Minecraft performance profile.
+bootstrap configuration, not the final runtime performance target.
 
 Checkpoints now separate CPU ResourceMark, code-blob allocation, assembler
 setup, CPU-info code generation, helper-stub generation, generated-stub
@@ -458,7 +459,7 @@ It does not establish that the console has exhausted physical RAM.
 The launcher now requests `-XX:CompressedClassSpaceSize=32m`. This limits the
 reserved range for compressed class metadata while retaining `-Xms16m
 -Xmx128m`, Serial GC and the conservative CPU settings. This is a bootstrap
-test budget; Minecraft and large mod sets need separate memory sizing tests.
+test budget; larger Java applications need separate memory sizing tests.
 No HotSpot source change is needed for this option. The native package builds
 and passes integrity, ZIP, version and embedded-option checks. Host Java 25
 runs Hello25 successfully with the 32 MiB class-space and 128 MiB heap limits;
@@ -756,7 +757,7 @@ the actual Java system class loader, and calls JNI DefineClass with those real
 bytes. It then performs the unchanged main/version/arithmetic/thread checks.
 This tests application bytecode execution independently of desktop filesystem
 class-path discovery. It does not fix ordinary directory/JAR class-path loading;
-that remains necessary for Minecraft and mod loaders.
+that remains necessary for general Java applications.
 
 Failure rows now report phase, Java exception.toString text and the numeric
 code. The original exception is retained while extracting its text, then its
@@ -780,7 +781,7 @@ The first passing package is preserved at
 `dist/PPSA99865-first-java-pass-01.000.023.zip`; the original PPSA99865 title
 folder remains intact. This establishes real application-bytecode execution
 through JNI DefineClass. It does not establish ordinary directory/JAR discovery,
-JIT stability, Minecraft or mod compatibility.
+JIT stability or general application compatibility.
 
 The next separate title is **Java 25 File I/O**, PPSA99866 01.000.000,
 built with `python3 tools/package_java25_jni.py --fileio`. It uses the same
@@ -809,29 +810,15 @@ checks an arithmetic result, and creates/joins a Java thread. It has compiled
 with `javac --release 25` and run on the **Mac only**, printing `THREAD_OK` and
 `HELLO_JAVA_25 49995000`. It has not run on PS5.
 
-## Milestones and acceptance
+## Runtime acceptance roadmap
 
-1. Establish console OS capabilities using the probe, then add condition
-   variable, signal and dynamic-library tests where the port requires them.
-2. Build a minimal VM plus `java.base`; run Hello25 on PS5, initially using
-   interpreter execution if feasible. Interpreter-only mode is a bootstrap
-   option, not the performance target for Minecraft.
-3. Add reliable JIT, garbage collection, native library loading, sockets and
-   file handling. Exercise repeated launches and controlled shutdown.
-4. Run a chosen Minecraft server version, create/reload a world, connect from
-   another device, and verify sustained ticking and save integrity.
-5. Port client dependencies: JNI bindings, LWJGL/window/input/audio interfaces,
-   and graphics. Test a vanilla client before individual Fabric/Forge builds.
-6. Validate each loader and mod set against a specific game and Java version;
-   native desktop dependencies in mods need their own PS5 adaptation.
+1. Verify console OS capabilities, VM initialization and Java thread behavior.
+2. Execute Java 25 bytecode with interpreter-mode acceptance fixtures.
+3. Test file I/O, ZIP/JAR loading, networking and class-path discovery.
+4. Validate JIT, garbage collection, JNI/native-library loading and larger heaps.
+5. Exercise repeated startup/shutdown, sustained workloads and API coverage.
 
-[ps5-opengl](https://github.com/blackbearreloaded/ps5-opengl) is an experimental
-native OpenGL candidate. It has not been built or tested in this project.
-[LWJGL](https://github.com/LWJGL/lwjgl3) exposes native bindings, so bringing
-up Java alone will not supply the client's platform libraries. Vulkan support
-and Vulkan renderer mods are separate feasibility work; there is no verified
-Vulkan backend here yet. Neither graphics route nor Fabric/Forge compatibility
-is promised by the current probe.
+Application-specific integration belongs in separate repositories.
 
 ### File I/O 01.000.001: resident library discovery
 
@@ -952,7 +939,7 @@ file creation, UTF-8 write/read equality, actual size, deletion and absence.
 The passing package is preserved as dist/PPSA99866-file-io-pass-01.000.004.zip.
 IO_Probe is the frozen source milestone; its release includes the matching
 package, SHA-256 checksum and validation record. Wider filesystem permissions,
-ZIP/JAR loading, sockets, JIT stability and Minecraft remain unvalidated.
+ZIP/JAR loading, sockets and JIT stability remain unvalidated.
 
 ### Next probe: ZIP/JAR 01.000.000 (console pending)
 
@@ -988,7 +975,7 @@ This establishes stored and deflated ZIP reads, manifest parsing, real
 URLClassLoader loading/execution of the JAR-only Java 25 payload, its UTF-8
 resource, and successful VM lifecycle. ZIP_JAR_Probe preserves this source
 snapshot; its release includes the exact passing package, checksum and record.
-Signed archives, complex dependencies, network I/O, JIT stability and Minecraft
+Signed archives, complex dependencies, network I/O and JIT stability
 remain further work. The JNI-defined test harness is not proof of automatic
 system application class-path discovery.
 
@@ -1021,7 +1008,7 @@ runs. A real host JNI test exercises the actual checkpoint callback and
 RegisterNatives with all four expected markers. Native target packaging,
 signed integrity, ZIP CRC, exact class bytes and title/version checks pass.
 PS5 validation is pending; this establishes no LAN, DNS, IPv6, TLS, internet
-or Minecraft server networking support yet. Freeze Network_Probe only after
+or application-level protocol support yet. Freeze Network_Probe only after
 the user's ALL PASS report for this actual build.
 
 ### Networking 01.000.001: package target runtime configuration

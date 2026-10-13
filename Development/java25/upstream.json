@@ -1,5 +1,5 @@
 {
-  "project": "native PS5 OpenJDK 25 / Minecraft Java Edition",
+  "project": "native PS5 OpenJDK 25 runtime port",
   "repository": "https://github.com/freebsd/openjdk.git",
   "tag": "jdk-25.0.4+7-freebsd-1",
   "commit": "b219cdec88ca2e165711f63b8158ab78303facc8",
