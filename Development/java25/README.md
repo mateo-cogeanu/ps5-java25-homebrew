@@ -856,3 +856,31 @@ lookup implementation with mocked function bodies: built-in discovery, original
 hooks, JNI version handling, real filesystem symbol entries and handle scope.
 The native build, signed binary integrity, ZIP CRC and version checks pass.
 Console file I/O remains pending; the original passing JVM_Startup is preserved.
+
+### File I/O 01.000.002: sandbox path resolution and current tracing
+
+The user confirms the 01.000.001 crash occurs in row three, the Java file test.
+IMG_0417 shows SIGSEGV at native PC 0x8000751d0. The handler anchor matches
+the supplied ELF at image base 0x400000. The retained caller 0x10965e6 is
+after memset in ThreadsSMRSupport::free_list, with 0x203c bytes completed.
+Tracing had stopped after VM creation, so that retained call and metadata
+stage cannot identify the subsequent Java file-test fault.
+
+The UnixFileSystem constructor calls UnixNativeDispatcher.getcwd unless
+`sun.nio.fs.chdirAllowed=true`. Native desktop getcwd had already been
+excluded from PS5 system-property initialization. The new probe explicitly
+sets `user.dir=/app0` and enables that standard resolution policy: all relative
+paths resolve against the supplied user.dir, without querying process cwd.
+This is a targeted workaround for a suspected sandbox path; the photograph
+does not prove getcwd caused the crash. Java Files operations remain real.
+
+Row three and VM destruction now each enable/reset native-call tracing with
+a scope that disables tracing on every return. Application stage messages
+also update the persistent signal-handler checkpoint, so future faults will
+identify the active Java operation instead of the old metadata checkpoint.
+The fixture now verifies relative-path resolution as well as UTF-8 file I/O.
+
+Native packaging, signature integrity, ZIP CRC/version, generated built-in
+lookup tests and AddressSanitizer native-trace tests pass. The real host JDK
+interpreter fixture passes with `/app0` as user.dir, chdirAllowed=true and an
+actual writable host temporary directory. PS5 01.000.002 validation is pending.

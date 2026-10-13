@@ -7,6 +7,10 @@ import java.util.Arrays;
 public class FileIO25 {
     public static void main(String[] args) throws Exception {
         if (Runtime.version().feature() != 25) throw new AssertionError("Need Java 25");
+        // Exercise the explicit user.dir resolution used by the PS5 sandbox.
+        Path relative = Path.of("java25-relative-check").toAbsolutePath();
+        Path resolved = Path.of(System.getProperty("user.dir"), "java25-relative-check");
+        if (!relative.equals(resolved)) throw new AssertionError("Wrong relative path resolution");
         Path directory = Path.of(System.getProperty("java.io.tmpdir"));
         Path file = directory.resolve("java25-file-probe-" + System.nanoTime() + ".txt");
         byte[] expected = "Java 25 on PS5: café / 日本語 / 🎮\n".getBytes(StandardCharsets.UTF_8);

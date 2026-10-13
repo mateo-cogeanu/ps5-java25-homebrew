@@ -36,7 +36,19 @@ JNIEnv *java_env=nullptr;
 FILE *startup_log=nullptr;
 char exception_detail[768]{};
 char previous_log[7][160]={{},{},{},{},{},{},"No previous startup log."};
+struct NativeTraceScope {
+ NativeTraceScope() {
+#ifdef __PROSPERO__
+  ps5_vm_native_call_record() = {nullptr,0,0,0,0,false};
+#endif
+  ps5_native_trace::enable();
+ }
+ ~NativeTraceScope() {ps5_native_trace::disable();}
+};
 void log_stage(const char *stage) {
+#ifdef __PROSPERO__
+ ps5_vm_trace(stage);
+#endif
  if(startup_log) {std::fprintf(startup_log,"STAGE: %s\n",stage);std::fflush(startup_log);}
 }
 int vm_print(FILE *,const char *format,va_list arguments) {
@@ -153,6 +165,10 @@ void run_test(int i) {
    {const_cast<char *>("-Djava.class.path=/app0/assets/java25/classes"),nullptr},
    {const_cast<char *>("-Djava.io.tmpdir=/download0"),nullptr},
    {const_cast<char *>("-Duser.home=/download0"),nullptr},
+   {const_cast<char *>("-Duser.dir=/app0"),nullptr},
+   // Always resolve relative paths against user.dir. UnixFileSystem then
+   // skips its desktop getcwd comparison in the native title sandbox.
+   {const_cast<char *>("-Dsun.nio.fs.chdirAllowed=true"),nullptr},
    {const_cast<char *>("-Duser.timezone=UTC"),nullptr},
    {const_cast<char *>("vfprintf"),reinterpret_cast<void *>(&vm_print)},
    {const_cast<char *>("exit"),reinterpret_cast<void *>(&vm_exit)},
@@ -179,6 +195,7 @@ void run_test(int i) {
  } else if(!java_vm||!java_env) {
   result(i,-1303,"Create the VM first; relaunch to retry");
  } else if(i==2) {
+  NativeTraceScope trace_scope;
   log_stage("Reading packaged FileIO25 bytecode directly");
   // Bootstrap bytecode execution independently of desktop class-path file discovery.
   static unsigned char class_bytes[64*1024];
@@ -218,6 +235,7 @@ void run_test(int i) {
   log_stage(failed?"FileIO25 threw exception":"FileIO25 returned normally");
   if(!failed) result(i,0,"FileIO25 write / read / UTF-8 / delete checks");
  } else {
+  NativeTraceScope trace_scope;
   log_stage("Calling DestroyJavaVM");
   int rc=java_vm->DestroyJavaVM();
   if(rc==JNI_OK) {java_vm=nullptr;java_env=nullptr;}
@@ -249,7 +267,7 @@ bool update() noexcept {
 }
 void draw(Canvas &c) noexcept {
  c.gradient(rgb(18,29,49),rgb(8,13,23));
- c.label(100,64,"Java 25 - File I/O 01.000.001",64,rgb(238,242,250));
+ c.label(100,64,"Java 25 - File I/O 01.000.002",64,rgb(238,242,250));
  c.label(103,163,"Experimental VM creation and FileIO25. Run one stage at a time.",24,rgb(139,153,178));
  for(int i=0;i<test_count;++i) {
   int y=248+i*112;

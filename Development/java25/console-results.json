@@ -260,5 +260,18 @@
     "file_io": "FAIL: main threw Java exception (-1307); native method signature truncated by UI",
     "destroy_vm": "PASS",
     "next_probe": "PPSA99866 01.000.001: resident-library JNI_OnLoad_<name> discovery and full exception panel"
+  },
+  "file_io_01_000_001": {
+    "evidence": "IMG_0417.JPG and user confirms crash occurred running Java file test (row 3)",
+    "file_io": "CRASH: SIGSEGV (11)",
+    "reported_handler_anchor": "0x0000000000defa70",
+    "fault_pc": "0x00000008000751d0",
+    "fault_address": "0x0000000100026c946",
+    "last_call_caller": "0x00000000010965e6",
+    "last_call_bytes": "0x203c",
+    "last_call_completed": true,
+    "symbol_resolution": "Matches build anchor at image base 0x400000; caller offset 0xc965e6 is after memset in ThreadsSMRSupport::free_list",
+    "limitation": "Native call tracing was disabled after VM creation; this retained call does not establish the Java I/O crash site",
+    "next_probe": "01.000.002 uses explicit /app0 relative-path resolution to avoid UnixFileSystem getcwd comparison; traces Java file test and shutdown"
   }
 }
