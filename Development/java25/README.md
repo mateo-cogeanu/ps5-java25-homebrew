@@ -991,3 +991,35 @@ snapshot; its release includes the exact passing package, checksum and record.
 Signed archives, complex dependencies, network I/O, JIT stability and Minecraft
 remain further work. The JNI-defined test harness is not proof of automatic
 system application class-path discovery.
+
+### Next probe: Java Networking 01.000.000 (console pending)
+
+`make java25-network` / `python3 tools/package_java25_jni.py --network` builds
+a separate PPSA99868 title, Java 25 Networking version 01.000.000. Run the
+four rows in order: runtime initialization, VM creation, networking and
+shutdown. Previously passing title folders and archives are preserved.
+
+Network25 uses an explicitly constructed numeric IPv4 loopback address and
+ephemeral ports. Its TCP test starts a Java echo worker, checks framed UTF-8
+bytes in both directions, closes the listener and joins the worker. UDP
+sends and checks both request and response datagrams and their source ports.
+NIO uses nonblocking SocketChannels, a ServerSocketChannel and real Selector
+connect/read readiness to exchange and check bytes. Socket reads, accepts
+and connects have 4-second timeouts; nonblocking loops have a deadline.
+Resources close through try-with-resources and the worker is daemonized as
+a shutdown fallback. These are real Java APIs, not native socket substitutes.
+
+Only a diagnostic checkpoint callback is registered with JNI. The probe
+enables it to persist numeric-address/TCP/UDP/NIO stage names for crash
+reports. Networking itself resolves through the real embedded net/nio
+implementations. IPv4 preference and existing tested filesystem policies
+are explicit VM options. Music remains at 35%; effects remain disabled.
+
+The exact packaged bytecode passes four host interpreter runs in one VM,
+with no remaining echo worker and descriptor count 5 before/after repeated
+runs. A real host JNI test exercises the actual checkpoint callback and
+RegisterNatives with all four expected markers. Native target packaging,
+signed integrity, ZIP CRC, exact class bytes and title/version checks pass.
+PS5 validation is pending; this establishes no LAN, DNS, IPv6, TLS, internet
+or Minecraft server networking support yet. Freeze Network_Probe only after
+the user's ALL PASS report for this actual build.

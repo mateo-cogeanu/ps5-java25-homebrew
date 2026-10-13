@@ -61,6 +61,8 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 
 OpenGL, Vulkan and renderer mods are future graphics work. Backend availability and compatibility still need to be established on PS5.
 
+**Current development probe:** [Java Networking](Development/java25/tests/Network25.java), `PPSA99868` version `01.000.000`. TCP/UDP loopback and NIO selector tests pass on the host; PS5 validation is pending. Build it with `make java25-network` from the Development folder after preparing the toolchain.
+
 ## Explore the source
 
 [Development](Development/) contains the current probe apps, Java fixtures, packaging tools and patches against a pinned FreeBSD OpenJDK source revision. The native UI grew out of a controller tester and Interface Lab prototype.

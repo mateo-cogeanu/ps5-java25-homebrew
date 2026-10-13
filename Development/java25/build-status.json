@@ -12,8 +12,8 @@
   "java_base_class_format_major": 69,
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
-  "next_console_title": "PPSA99867",
-  "next_console_probe": "Not yet selected; Java network I/O is a remaining server prerequisite",
+  "next_console_title": "PPSA99868",
+  "next_console_probe": "Java 25 Networking 01.000.000: IPv4 TCP/UDP loopback and NIO selector",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -81,5 +81,13 @@
     "host_negative_cases": "PASS: wrong stored bytes, wrong resource bytes and missing JAR class fail at expected stages",
     "zip_sha256": "af883f85f5452e7203aae2a8c8501aaa9c4a62f716225a0d44e9374b55e20672"
   },
-  "console_zipjar": "ALL PASS: ZIP data/Inflater, JarFile manifest, URLClassLoader class execution and UTF-8 resource"
+  "console_zipjar": "ALL PASS: ZIP data/Inflater, JarFile manifest, URLClassLoader class execution and UTF-8 resource",
+  "network_01_000_000_validation": {
+    "console": "pending",
+    "target_package": "PASS: native build/signature integrity, ZIP CRC/title/version and exact fixture bytecode",
+    "host_fixture": "PASS: four interpreter-mode TCP/UDP/NIO runs in one VM; worker terminated; descriptor count unchanged (5 -> 5)",
+    "host_trace": "PASS: actual checkpoint callback and real JNI registration with all four stage markers",
+    "zip_sha256": "5a2ccf746be8744cb988f0355749b97312cc358f1dbba01bc5342305baa71672",
+    "scope": "loopback only; no LAN, DNS, TLS, internet or Minecraft networking proven"
+  }
 }
