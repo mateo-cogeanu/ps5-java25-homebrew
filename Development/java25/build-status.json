@@ -13,7 +13,7 @@
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
   "next_console_title": "PPSA99868",
-  "next_console_probe": "Java Networking 01.000.003: PS5 socket blocking-mode fallback, labeled server phase and first failure retention",
+  "next_console_probe": "Not yet selected; LAN/DNS and further runtime coverage remain",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -90,7 +90,7 @@
     "zip_sha256": "5a2ccf746be8744cb988f0355749b97312cc358f1dbba01bc5342305baa71672",
     "scope": "loopback only; no LAN, DNS, TLS, internet or application protocols proven"
   },
-  "console_network": "01.000.002 reaches TCP worker but fails Permission denied; security configuration now passes; 01.000.003 pending",
+  "console_network": "ALL PASS on PS5: 01.000.003 TCP/UDP IPv4 loopback, NIO selector, security config and VM lifecycle",
   "network_01_000_001_validation": {
     "console": "FAIL: IMG_0422 security-file access Operation not permitted",
     "runtime_configuration": "target OpenJDK java.base-gendata configuration; included through jmod --config and jlink",
@@ -108,7 +108,7 @@
     "zip_sha256": "3ce33538c9f5763695fe448512908b48edb9f7cac6af73c289cb2b769f543991"
   },
   "network_01_000_003_validation": {
-    "console": "pending",
+    "console": "ALL PASS, user report 2026-10-13",
     "target_package": "PASS: java.base native rebuild, native signing/integrity, ZIP CRC/version and exact fixture bytecode",
     "host_socket_control": "PASS under ASan: actual configureBlocking function, GET/SET failures, both modes, socket identity, no false success",
     "host_network": "PASS: repeated TCP/UDP/NIO, no worker/descriptor leaks",

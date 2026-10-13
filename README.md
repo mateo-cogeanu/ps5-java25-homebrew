@@ -15,7 +15,7 @@ An experimental **native OpenJDK 25 port for PlayStation 5 homebrew**, built and
 
 This repository contains the **Java runtime port, platform adaptations and acceptance probes**. Java 25 bytecode execution, file I/O and JAR class loading have passed their tests on a real console.
 
-> **Current progress:** three passing milestones on PS5 firmware **13.60**, using interpreter mode. Networking is the current development probe.
+> **Current progress:** four passing milestones on PS5 firmware **13.60**, using interpreter mode. IPv4 loopback networking is now console-tested.
 
 **Related project:** [ps5-minecraft-java](https://github.com/mateo-cogeanu/ps5-minecraft-java) tracks Minecraft-specific work separately and will use this Java runtime.
 
@@ -28,13 +28,14 @@ Each milestone is a **frozen source snapshot** of a build that received **ALL PA
 | [JVM_Startup](JVM_Startup/) | **ALL PASS** | `01.000.023` | Real VM startup, Java 25 arithmetic, Java thread start/join and VM shutdown | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/JVM_Startup-v01.000.023) |
 | [IO_Probe](IO_Probe/) | **ALL PASS** | `01.000.004` | Relative paths, private-file creation, UTF-8 write/read, file size and deletion | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/IO_Probe-v01.000.004) |
 | [ZIP_JAR_Probe](ZIP_JAR_Probe/) | **ALL PASS** | `01.000.000` | Stored/deflated ZIP entries, JAR manifest, JAR class loading and UTF-8 resources | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/ZIP_JAR_Probe-v01.000.000) |
+| [Network_Probe](Network_Probe/) | **ALL PASS** | `01.000.003` | TCP/UDP IPv4 loopback, Java worker echo, nonblocking NIO channels and selector readiness | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Network_Probe-v01.000.003) |
 | [Development](Development/) | **In progress** | — | Current source and upcoming probes; updated as changes are completed | [Browse source](Development/) |
 
 Passing folders stay unchanged. New work goes into `Development`; a new milestone is frozen only after its console tests pass. A successful host build alone does not qualify a milestone.
 
 ## Try a passing build
 
-1. Choose a milestone release above and download its **app ZIP**. The latest passing probe is **ZIP_JAR_Probe**.
+1. Choose a milestone release above and download its **app ZIP**. The latest passing probe is **Network_Probe**.
 2. Extract it and copy the **entire title folder** into the homebrew scan location used by your existing ShadowLoader setup.
 3. Let the loader register the app, then launch it from the home screen.
 4. Run the four test rows **in order**. Use the **D-pad** to select and **X** to run a test. Close the app through the PS menu.
@@ -44,6 +45,7 @@ Passing folders stay unchanged. New work goes into `Development`; a new mileston
 | JVM startup | `PPSA99865` |
 | File I/O | `PPSA99866` |
 | ZIP / JAR | `PPSA99867` |
+| Networking | `PPSA99868` |
 
 The apps use separate title IDs, so you can keep the passing probes installed side by side. Keep all files inside each extracted folder, including its assets, runtime and licenses. Compare the ZIP against the checksum supplied in its release.
 
@@ -54,13 +56,14 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 - [x] Start the native Java 25 VM and execute Java bytecode.
 - [x] Test Java file I/O and controlled VM shutdown.
 - [x] Read ZIP/JAR archives and load a Java class and resource from a JAR.
-- [ ] Test Java networking.
+- [x] Test Java TCP/UDP loopback and NIO selector readiness.
+- [ ] Validate LAN reachability, name resolution and further socket behavior.
 - [ ] Expand class-path/dependency loading and filesystem coverage.
 - [ ] Validate JIT execution, garbage collection and sustained workloads.
 - [ ] Improve JNI and native-library compatibility for Java applications.
 - [ ] Test broader Java APIs, error handling and repeated application runs.
 
-**Current development probe:** [Java Networking](Development/java25/tests/Network25.java), `PPSA99868` version `01.000.003`. TCP/UDP loopback and NIO selector tests pass on the host; PS5 validation is pending. Build it with `make java25-network` from the Development folder after preparing the toolchain.
+**Latest passing networking probe:** [Network_Probe](Network_Probe/), `PPSA99868` version `01.000.003`. Its console result covers IPv4 loopback; LAN connections, DNS and TLS remain separate tests.
 
 ## Explore the source
 

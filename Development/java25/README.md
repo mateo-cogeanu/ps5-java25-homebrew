@@ -1091,3 +1091,17 @@ SO_NBIO. Target java.base-libs and the native package rebuild successfully.
 Actual packaged host TCP/UDP/NIO repeat tests and real JNI checkpoint tests
 pass, with descriptor counts stable and workers terminated. ZIP CRC, version
 and exact fixture checks pass. PS5 01.000.003 validation remains pending.
+
+### Console milestone: Networking 01.000.003 ALL PASS
+
+On 2026-10-13 the user confirms ALL PASS for PPSA99868 01.000.003. Native
+setup, real Java VM creation, Network25 and VM destruction pass on PS5
+firmware 13.60. The fixture validates bundled security initialization, numeric
+IPv4 loopback, framed TCP echo with a Java worker, two-way UDP and source
+ports, nonblocking NIO channel I/O and selector readiness. This validates the
+combined accepted build; it does not isolate which adaptation resolved the
+previous permission error.
+
+Network_Probe freezes this source, with an exact passing package and checksum
+in its release. LAN/remote connections, DNS, IPv6, TLS, concurrent/sustained
+traffic and virtual-thread polling remain separate acceptance work.

@@ -1,0 +1,33 @@
+{
+  "title_id": "PPSA99868",
+  "version": "01.000.003",
+  "tested_date": "2026-10-13",
+  "console": "PS5 firmware 13.60",
+  "results": {
+    "native_initialization": "PASS",
+    "JNI_CreateJavaVM": "PASS",
+    "Network25_TCP_UDP_NIO_loopback": "PASS",
+    "DestroyJavaVM": "PASS"
+  },
+  "evidence": "Human console report: ALL PASS! lets go, following supplied Networking 01.000.003",
+  "checks": [
+    "Bundled native security configuration read",
+    "Java security configuration initialization",
+    "Numeric IPv4 loopback",
+    "Java TCP listener/client/worker framed UTF-8 echo",
+    "Two-way UDP datagrams and source ports",
+    "Nonblocking NIO channels and selector readiness",
+    "Worker termination and VM shutdown"
+  ],
+  "network_scope": "IPv4 loopback on ephemeral ports; no external device or DNS used",
+  "package_file": "PPSA99868-network-pass-01.000.003.zip",
+  "sha256": "9765536f274f3b3e35922b29564ac67afc7cfe979df5d8f3cf5f2a3b3649ebc2",
+  "unverified": [
+    "LAN and remote connectivity",
+    "DNS and IPv6",
+    "TLS/HTTPS",
+    "Sustained load and concurrent connections",
+    "Virtual-thread socket polling",
+    "JIT stability"
+  ]
+}

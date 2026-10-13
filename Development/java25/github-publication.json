@@ -17,11 +17,16 @@
       "version": "01.000.000",
       "console": "ALL PASS",
       "release_tag": "ZIP_JAR_Probe-v01.000.000"
+    },
+    "Network_Probe": {
+      "version": "01.000.003",
+      "console": "ALL PASS",
+      "release_tag": "Network_Probe-v01.000.003"
     }
   },
   "publication_rule": "Sync every completed set of development changes; freeze a new milestone only after user confirms ALL PASS on PS5.",
   "minecraft_repository": {
     "repository": "https://github.com/mateo-cogeanu/ps5-minecraft-java",
-    "scope": "Minecraft-specific project; deliberately empty for now; runtime stays in this Java port repository"
+    "scope": "Minecraft-specific project; currently project documentation; runtime development stays here"
   }
 }
