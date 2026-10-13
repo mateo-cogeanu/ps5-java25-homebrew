@@ -910,3 +910,35 @@ wrapper with mocked platform calls under AddressSanitizer.
 The actual host Java interpreter fixture, wrapper test, target native build,
 signed integrity, ZIP CRC and 01.000.003 metadata checks pass. PS5 validation
 is pending. The original JVM_Startup milestone is unchanged.
+
+### File I/O 01.000.004: sandbox metadata and deletion
+
+IMG_0420 reports `File I/O stage delete` / Operation not permitted. Exclusive
+Java creation completed, but the old finally block could replace a preceding
+write/read/size exception with the delete failure. The fixture now retains the
+first failure and adds failed cleanup as a suppressed exception. No new console
+PASS milestone is established by this photograph.
+
+The pinned native boilerplate's docs/SANDBOX_ELEVATION.md describes native-title
+files opening/writing while directory listing and lstat are denied with EPERM.
+UnixFileSystemProvider normally calls lstat before deletion. Patch 0028 adds an
+explicit `sun.nio.fs.ps5Sandbox=true` policy for this probe: try real unlink,
+then real rmdir if unlink indicates a directory/permission error. A regular-file
+EPERM stays the unlink error when rmdir returns ENOTDIR. Missing paths and
+nonempty directories keep their Java exception semantics. Unlink does not
+follow symlinks. The normal provider path remains unchanged without the flag.
+
+Patch 0029 adapts stat0 only under __PROSPERO__: when real stat returns EPERM,
+it attempts read-only/nonblocking open, real fstat and close. Success requires
+real descriptor metadata; denied opens and failed fstat remain errors. This
+retains stat's link-following policy and never substitutes for lstat. Files
+without read access may still lack pathname metadata support in this sandbox.
+Directory listing and wider filesystem privileges remain separate work.
+
+Target java.base classes/native libraries rebuilt successfully. The actual
+patched provider class passes host file, directory, nonempty directory, link,
+dangling-link and missing-path tests, plus the real FileIO25 fixture. The actual
+stat0 function (C parameter renamed for the C++ host harness) passes ASan tests
+with mocked platform results, including descriptor data and errno/close handling.
+The target native package, signed integrity, ZIP CRC and 01.000.004 metadata
+checks pass. Host tests are not PS5 proof; console validation is pending.

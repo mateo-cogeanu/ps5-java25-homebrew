@@ -190,6 +190,7 @@ void run_test(int i) {
    // Always resolve relative paths against user.dir. UnixFileSystem then
    // skips its desktop getcwd comparison in the native title sandbox.
    {const_cast<char *>("-Dsun.nio.fs.chdirAllowed=true"),nullptr},
+   {const_cast<char *>("-Dsun.nio.fs.ps5Sandbox=true"),nullptr},
    {const_cast<char *>("-Duser.timezone=UTC"),nullptr},
    {const_cast<char *>("vfprintf"),reinterpret_cast<void *>(&vm_print)},
    {const_cast<char *>("exit"),reinterpret_cast<void *>(&vm_exit)},
@@ -288,7 +289,7 @@ bool update() noexcept {
 }
 void draw(Canvas &c) noexcept {
  c.gradient(rgb(18,29,49),rgb(8,13,23));
- c.label(100,64,"Java 25 - File I/O 01.000.003",64,rgb(238,242,250));
+ c.label(100,64,"Java 25 - File I/O 01.000.004",64,rgb(238,242,250));
  c.label(103,163,"Experimental VM creation and FileIO25. Run one stage at a time.",24,rgb(139,153,178));
  for(int i=0;i<test_count;++i) {
   int y=248+i*112;

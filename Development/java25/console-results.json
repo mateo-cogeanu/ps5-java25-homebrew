@@ -282,5 +282,14 @@
     "established": "Java file test returns a managed exception; no crash reported in this run",
     "not_established": "Exact failed operation or native errno; the old fixture did not label each operation",
     "next_probe": "01.000.003 private exclusive Java file creation at mode 0600, operation labels, native open diagnostics"
+  },
+  "file_io_01_000_003": {
+    "evidence": "IMG_0420.jpg",
+    "vm_creation": "PASS: visible code 00000000",
+    "file_io": "FAIL: File I/O stage delete, FileSystemException Operation not permitted; code FFFFFAE5",
+    "destroy_vm": "PASS: visible code 00000000",
+    "established": "Exclusive Java createFile returned successfully before the guarded body and cleanup ran",
+    "not_established": "Write/read/size may have failed first; the cleanup exception could replace their error in 01.000.003",
+    "next_probe": "01.000.004 sandbox unlink/rmdir deletion, descriptor-backed stat on EPERM, preserve primary failure with suppressed cleanup"
   }
 }

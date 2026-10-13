@@ -28,6 +28,7 @@ public class FileIO25 {
             throw failure("create (0600)", error);
         }
         String stage = "write";
+        Throwable primary = null;
         try {
             Files.write(file, expected, StandardOpenOption.WRITE);
             stage = "read";
@@ -37,12 +38,18 @@ public class FileIO25 {
             stage = "size";
             if (Files.size(file) != expected.length) throw new AssertionError("Wrong file size");
         } catch (IOException error) {
-            throw failure(stage, error);
+            primary = failure(stage, error);
+            throw (IOException) primary;
+        } catch (RuntimeException | Error error) {
+            primary = error;
+            throw error;
         } finally {
             try {
                 Files.delete(file);
             } catch (IOException error) {
-                throw failure("delete", error);
+                IOException cleanup = failure("delete", error);
+                if (primary != null) primary.addSuppressed(cleanup);
+                else throw cleanup;
             }
         }
         if (Files.exists(file)) throw new AssertionError("Probe file still exists");

@@ -13,7 +13,7 @@
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
   "next_console_title": "PPSA99866",
-  "next_console_probe": "Java 25 File I/O 01.000.003: exclusive 0600 Java file creation, operation labels and native open diagnostics",
+  "next_console_probe": "Java 25 File I/O 01.000.004: sandbox metadata/delete adaptations and primary error preservation",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -50,7 +50,7 @@
   "sandbox_properties": "Target java.base rebuild PASS; props object omits uname/getpwuid/getcwd/tzset and strdup dependencies; console pending",
   "console_hello25": "PASS on PS5: Java 25, arithmetic and worker-thread start/join through direct class definition",
   "direct_class_definition": "Real host JVM integration PASS with class-path discovery unavailable: DefineClass, Hello25 arithmetic/thread and DestroyJavaVM; console pending",
-  "console_file_io": "01.000.002 row 3 FileSystemException Operation not permitted; VM creation and shutdown PASS; 01.000.003 pending",
+  "console_file_io": "01.000.003 creation reached cleanup; delete reported EPERM; VM creation/shutdown PASS; full file I/O not yet passed",
   "embedded_library_discovery": "Five JNI_OnLoad_<name> adapters advertise resident libraries, invoke three existing native load hooks, preserve negative hook failures; generated host lookup test PASS",
   "file_io_01_000_002_validation": {
     "target_package": "PASS; native build/signature integrity, ZIP CRC and version",
@@ -64,6 +64,14 @@
     "host_fixture": "PASS: actual Java create(0600)/write/read/size/delete and relative path resolution",
     "host_open_trace": "PASS under AddressSanitizer: real wrapper extracted, mock platform flags/mode/result forwarding, errno preservation and recursion guard",
     "zip_sha256": "02a9897bb6cf3013b1167e78927fb964aa6ad61c64d8a0ecdb65256a6e6e9849",
+    "console": "pending"
+  },
+  "file_io_01_000_004_validation": {
+    "java_base_build": "PASS: rebuilt target Java provider and native libnio",
+    "host_provider": "PASS: actual patched class against host JNI; files, directories, nonempty dirs, symlinks, missing paths and FileIO25",
+    "host_stat_fallback": "PASS: actual JNI function with mock syscalls under ASan; descriptor attributes, errors, close cleanup",
+    "target_package": "PASS: signature integrity, ZIP CRC and version",
+    "zip_sha256": "a9a0159806034da9dc5f1164046c9c05e9d86340172fca9a071b8ee497304b15",
     "console": "pending"
   }
 }
