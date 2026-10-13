@@ -1105,3 +1105,40 @@ previous permission error.
 Network_Probe freezes this source, with an exact passing package and checksum
 in its release. LAN/remote connections, DNS, IPv6, TLS, concurrent/sustained
 traffic and virtual-thread polling remain separate acceptance work.
+
+### Next probe: LAN / DNS 01.000.000 (console pending)
+
+PPSA99869 is a separate five-row title: runtime initialization, VM creation,
+LAN TCP/UDP echo, DNS resolution and VM shutdown. LAN and DNS rows can be
+tested independently after VM creation. The passing Network_Probe remains
+frozen. Host fixtures pass; PS5 results are pending.
+
+Start the local Python helper on the Mac's user-confirmed LAN address:
+
+```sh
+python3 tools/java25_lan_server.py --bind YOUR_MAC_IP --port 38025 --background
+python3 tools/package_java25_jni.py --lan --lan-host YOUR_MAC_IP --lan-port 38025
+python3 tools/test_java25_lan.py
+```
+
+The helper binds TCP and UDP to that address only, limits frames to 4096
+bytes, echoes data, and uses bounded connection reads. Keep the Mac awake
+and on the same network. Its log and PID are under build/java25. The user's
+IP is stored only in the generated packaged assets, not tracked source.
+Lan25 rejects loopback addresses by default and verifies framed UTF-8 TCP
+bytes, UDP bytes and peer address/port against the external endpoint. Socket
+connect/read waits have 4-second timeouts. Host self-address checks do not
+prove communication between the PS5 and another device.
+
+Dns25 resolves example.com using real InetAddress lookup. A daemon resolver
+worker has an 8-second UI wait; timeout does not forcibly cancel the native
+resolver. On timeout, close the app before retrying. DNS exchanges no web
+request and asserts nonempty, non-local addresses. This checks forward DNS
+only, not IPv6 reachability, TLS or an internet TCP connection.
+
+The native probe registers stage callbacks for both fixtures, preserves
+exception text and current crash checkpoints, and uses the tested runtime
+security/socket policies. Local helper readiness, actual packaged host Java
+fixtures, rejected-loopback guard, native packaging/signature, ZIP CRC,
+metadata and exact class/config bytes all pass. No LAN/DNS milestone is
+frozen until the user's console results pass.

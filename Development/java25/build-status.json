@@ -12,8 +12,8 @@
   "java_base_class_format_major": 69,
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
-  "next_console_title": "PPSA99868",
-  "next_console_probe": "Not yet selected; LAN/DNS and further runtime coverage remain",
+  "next_console_title": "PPSA99869",
+  "next_console_probe": "Java 25 LAN / DNS 01.000.000: separate LAN TCP/UDP echo and DNS rows",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -114,5 +114,13 @@
     "host_network": "PASS: repeated TCP/UDP/NIO, no worker/descriptor leaks",
     "host_trace": "PASS: real JNI and five stage markers",
     "zip_sha256": "9765536f274f3b3e35922b29564ac67afc7cfe979df5d8f3cf5f2a3b3649ebc2"
+  },
+  "lan_dns_01_000_000_validation": {
+    "console": "pending",
+    "host_fixtures": "PASS: packaged Java LAN/DNS and rejected loopback config; host self-address checks are not two-device evidence",
+    "helper": "running locally; generated endpoint config and helper logs/pid are excluded from Git",
+    "target_package": "PASS: native signature/integrity, ZIP CRC/title/version, exact class and endpoint-config checks",
+    "zip_sha256": "3cfeed2f321334e742fa93070e6983bed201332f7837d907af2db52d547c11cc",
+    "scope": "outbound IPv4 LAN echo and forward DNS only; no TLS, inbound server or concurrent-load proof"
   }
 }

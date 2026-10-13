@@ -65,6 +65,8 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 
 **Latest passing networking probe:** [Network_Probe](Network_Probe/), `PPSA99868` version `01.000.003`. Its console result covers IPv4 loopback; LAN connections, DNS and TLS remain separate tests.
 
+**Current development probe:** [LAN / DNS](Development/java25/probe/lan.cpp), `PPSA99869` version `01.000.000`. Separate LAN echo and DNS rows await PS5 validation; LAN needs the [Mac helper](Development/tools/java25_lan_server.py) running at the configured address.
+
 ## Explore the source
 
 [Development](Development/) contains the current probe apps, Java fixtures, packaging tools and patches against a pinned FreeBSD OpenJDK source revision. The native UI grew out of a controller tester and Interface Lab prototype.
