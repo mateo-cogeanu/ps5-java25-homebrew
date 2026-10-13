@@ -1,0 +1,72 @@
+diff --git a/src/java.base/unix/native/libjava/java_props_md.c b/src/java.base/unix/native/libjava/java_props_md.c
+--- a/src/java.base/unix/native/libjava/java_props_md.c
++++ b/src/java.base/unix/native/libjava/java_props_md.c
+@@ -371,7 +371,11 @@
+     }
+ 
+     /* tmp dir */
++#ifdef __PROSPERO__
++    sprops.tmp_dir = "/download0";
++#else
+     sprops.tmp_dir = P_tmpdir;
++#endif
+ #ifdef MACOSX
+     /* darwin has a per-user temp dir */
+     static char tmp_path[PATH_MAX];
+@@ -414,7 +418,11 @@
+ 
+     /* os properties */
+     {
+-#ifdef MACOSX
++#ifdef __PROSPERO__
++        /* The native console title has no desktop BSD uname ABI contract. */
++        sprops.os_name = "PS5";
++        sprops.os_version = "unknown";
++#elif defined(MACOSX)
+         setOSNameAndVersion(&sprops);
+ #else
+         struct utsname name;
+@@ -517,6 +525,11 @@
+ 
+     /* user properties */
+     {
++#ifdef __PROSPERO__
++        /* Bootstrap defaults for the tested native title sandbox. */
++        sprops.user_name = "ps5";
++        sprops.user_home = "/download0";
++#else
+         struct passwd *pwent = getpwuid(getuid());
+         sprops.user_name = pwent ? strdup(pwent->pw_name) : "?";
+ #ifdef MACOSX
+@@ -535,6 +548,7 @@
+                 sprops.user_home = "?";
+             }
+         }
++#endif
+     }
+ 
+     /* User TIMEZONE
+@@ -542,10 +556,15 @@
+      * Refer to TimeZone.getDefault(). The system property
+      * is able to be set by the command line interface -Duser.timezone.
+      */
++#ifndef __PROSPERO__
+     tzset();        /* for compatibility */
++#endif
+ 
+     /* Current directory */
+     {
++#ifdef __PROSPERO__
++        sprops.user_dir = "/app0";
++#else
+         char buf[MAXPATHLEN];
+         errno = 0;
+         if (getcwd(buf, sizeof(buf)) == NULL) {
+@@ -556,6 +575,7 @@
+         else {
+             sprops.user_dir = strdup(buf);
+         }
++#endif
+     }
+ 
+     sprops.file_separator = "/";

@@ -1,0 +1,97 @@
+diff --git a/src/hotspot/os/bsd/os_bsd.cpp b/src/hotspot/os/bsd/os_bsd.cpp
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -1907,9 +1907,17 @@
+                          os::strerror(ep.saved_errno()));
+     }
+   } else {
++#ifdef __PROSPERO__
++    // The native title already owns this anonymous reservation. Change its
++    // protections without replacing it through a second fixed-address mapping.
++    // Decommit still replaces pages with fresh anonymous PROT_NONE mappings.
++    const bool committed = (::mprotect(addr, size, prot) == 0);
++#else
+     uintptr_t res = (uintptr_t) ::mmap(addr, size, prot,
+                                        MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0);
+-    if (res != (uintptr_t) MAP_FAILED) {
++    const bool committed = (res != (uintptr_t) MAP_FAILED);
++#endif
++    if (committed) {
+       ps5_vm_trace_memory("DONE: Native RW memory commit", addr, size, prot, 0);
+       return true;
+     } else {
+diff --git a/src/hotspot/share/runtime/ps5StartupTrace.hpp b/src/hotspot/share/runtime/ps5StartupTrace.hpp
+--- a/src/hotspot/share/runtime/ps5StartupTrace.hpp
++++ b/src/hotspot/share/runtime/ps5StartupTrace.hpp
+@@ -26,6 +26,17 @@
+   (void)::close(fd);
+   errno = saved_errno;
+ }
++// Fixed-size stack formatting for fault context; avoids stdio formatting.
++inline void ps5_vm_trace_hex(const char* label, unsigned long long value) {
++  char line[144];
++  size_t n = 0;
++  while (label[n] && n < sizeof(line) - 20) { line[n] = label[n]; ++n; }
++  line[n++] = '0'; line[n++] = 'x';
++  const char* digits = "0123456789abcdef";
++  for (int shift = 60; shift >= 0; shift -= 4) line[n++] = digits[(value >> shift) & 15];
++  line[n] = 0;
++  ps5_vm_trace(line);
++}
+ inline void ps5_vm_trace_memory(const char *operation, const void *address,
+                                 size_t bytes, int mode, int error) {
+   int saved_errno = errno;
+@@ -36,6 +47,7 @@
+   errno = saved_errno;
+ }
+ #else
++inline void ps5_vm_trace_hex(const char *, unsigned long long) {}
+ inline void ps5_vm_trace_memory(const char *, const void *, size_t, int, int) {}
+ inline void ps5_vm_trace(const char *) {}
+ #endif
+diff --git a/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp b/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
+--- a/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
++++ b/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
+@@ -42,6 +42,7 @@
+ #include "runtime/javaThread.hpp"
+ #include "runtime/mutexLocker.hpp"
+ #include "runtime/osThread.hpp"
++#include "runtime/ps5StartupTrace.hpp"
+ #include "runtime/safepointMechanism.hpp"
+ #include "runtime/sharedRuntime.hpp"
+ #include "runtime/stubRoutines.hpp"
+@@ -404,6 +405,13 @@
+ 
+ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
+                                              ucontext_t* uc, JavaThread* thread) {
++#ifdef __PROSPERO__
++  if (sig == SIGSEGV || sig == SIGBUS || sig == SIGILL || sig == SIGFPE) {
++    ps5_vm_trace_hex("SIGNAL: number=", (unsigned long long)sig);
++    ps5_vm_trace_hex("SIGNAL: pc=", uc ? (unsigned long long)os::Posix::ucontext_get_pc(uc) : 0);
++    ps5_vm_trace_hex("SIGNAL: fault address=", info ? (unsigned long long)info->si_addr : 0);
++  }
++#endif
+   // decide if this trap can be handled by a stub
+   address stub = nullptr;
+ 
+diff --git a/src/hotspot/share/memory/metaspace/metachunk.cpp b/src/hotspot/share/memory/metaspace/metachunk.cpp
+--- a/src/hotspot/share/memory/metaspace/metachunk.cpp
++++ b/src/hotspot/share/memory/metaspace/metachunk.cpp
+@@ -24,6 +24,7 @@
+  */
+ 
+ #include "logging/log.hpp"
++#include "runtime/ps5StartupTrace.hpp"
+ #include "memory/metaspace/metachunk.hpp"
+ #include "memory/metaspace/metaspaceCommon.hpp"
+ #include "memory/metaspace/metaspaceSettings.hpp"
+@@ -109,7 +110,9 @@
+   }
+ 
+   // Remember how far we have committed.
++  ps5_vm_trace("ENTER: Metachunk commit boundary");
+   _committed_words = commit_to;
++  ps5_vm_trace("DONE: Metachunk commit boundary");
+   DEBUG_ONLY(verify();)
+   return true;
+ }
