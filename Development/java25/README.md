@@ -1037,3 +1037,27 @@ Minecraft work has a separate public repository,
 https://github.com/mateo-cogeanu/ps5-minecraft-java, intentionally empty for
 now. Its description links to this runtime port; Java development remains
 in ps5-java25-homebrew.
+
+### Networking 01.000.002: bundled security master path policy
+
+IMG_0422 shows FileSystemException /app0/assets/java25/conf/security/java.security:
+Operation not permitted, before socket tests. The configuration is packaged;
+the photograph does not identify whether pathname inspection or reading failed.
+Security's regular-file loader calls toRealPath before opening its input stream.
+
+Patch 0030 adds a narrow policy when sun.nio.fs.ps5Sandbox=true: the exact
+normalized java.home/conf/security/java.security master path uses its bundled
+absolute path instead of toRealPath. Regular-file checks, actual input reads,
+property parsing and active-path cycle checks remain. Extra files and include
+paths keep normal canonicalization unless they identify that exact master.
+This is not a global realpath fallback or a replacement security configuration.
+The native probe also tests fopen/read of the master header before executing
+the Java fixture, to separate native read permission from Java path handling.
+
+A real host JNI regression replaces realpath0 with an EPERM exception. The
+actual patched Security class fails with the normal policy, loads SUN master
+properties in PS5 sandbox mode, and still rejects denied extra-file resolution.
+Host TCP/UDP/NIO passes with the patched Security class and packaged config.
+Repeated fixture and JNI stage-callback tests pass. Rebuilt java.base, native
+package integrity, ZIP CRC/version and exact config checks pass. Console
+validation remains pending; no networking milestone is frozen.

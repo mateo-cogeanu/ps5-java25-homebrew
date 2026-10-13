@@ -13,7 +13,7 @@
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
   "next_console_title": "PPSA99868",
-  "next_console_probe": "Java Networking 01.000.001: generated java.security/policies/net.properties and explicit security preflight",
+  "next_console_probe": "Java Networking 01.000.002: exact bundled security master skips realpath inspection in PS5 sandbox mode",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -90,13 +90,21 @@
     "zip_sha256": "5a2ccf746be8744cb988f0355749b97312cc358f1dbba01bc5342305baa71672",
     "scope": "loopback only; no LAN, DNS, TLS, internet or application protocols proven"
   },
-  "console_network": "01.000.000 fails before socket tests loading java.security; 01.000.001 pending",
+  "console_network": "01.000.001 security file access EPERM before sockets; 01.000.002 pending",
   "network_01_000_001_validation": {
-    "console": "pending",
+    "console": "FAIL: IMG_0422 security-file access Operation not permitted",
     "runtime_configuration": "target OpenJDK java.base-gendata configuration; included through jmod --config and jlink",
     "package_audit": "PASS: ZIP CRC/version and byte-exact generated security, crypto-policy and net.properties files; matched fixture",
     "host_network": "PASS: four TCP/UDP/NIO runs with packaged security configuration override; no descriptor/worker leaks",
     "host_jni_trace": "PASS: actual callback and five stage checkpoints",
     "zip_sha256": "01206b228d0a2ad3d2af7df26227fa1ddeff1e6913e39edd89392514b4aada78"
+  },
+  "network_01_000_002_validation": {
+    "console": "pending",
+    "target_package": "PASS: rebuilt java.base, signed integrity, ZIP CRC/version, security config exact match",
+    "host_security_regression": "PASS: actual patched Security class with real JNI denying realpath0; normal policy fails, PS5 bundled master loads, extra path still fails",
+    "host_network": "PASS with patched Security class and packaged configuration; repeated normal-fixture runs show no descriptor/thread leaks",
+    "host_trace": "PASS: real JNI trace registration and five stage callbacks",
+    "zip_sha256": "3ce33538c9f5763695fe448512908b48edb9f7cac6af73c289cb2b769f543991"
   }
 }

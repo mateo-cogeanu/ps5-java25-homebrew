@@ -226,6 +226,17 @@ void run_test(int i) {
   result(i,-1303,"Create the VM first; relaunch to retry");
  } else if(i==2) {
   NativeTraceScope trace_scope;
+  log_stage("Reading bundled java.security through native file API");
+  FILE *security=std::fopen("/app0/assets/java25/conf/security/java.security","rb");
+  if(!security) {result(i,errno?errno:-1318,"Native java.security open failed");return;}
+  unsigned char security_header=0;
+  size_t security_read=std::fread(&security_header,1,1,security);
+  int security_error=std::ferror(security)?errno:0;
+  std::fclose(security);
+  if(security_read!=1 || security_error || security_header!='#') {
+   result(i,security_error?security_error:-1319,"Native java.security read/header failed");return;
+  }
+  log_stage("Native bundled security configuration read PASS");
   log_stage("Reading packaged Network25 bytecode directly");
   // Bootstrap bytecode execution independently of desktop class-path file discovery.
   static unsigned char class_bytes[64*1024];
@@ -301,7 +312,7 @@ bool update() noexcept {
 }
 void draw(Canvas &c) noexcept {
  c.gradient(rgb(18,29,49),rgb(8,13,23));
- c.label(100,64,"Java 25 - Networking 01.000.001",64,rgb(238,242,250));
+ c.label(100,64,"Java 25 - Networking 01.000.002",64,rgb(238,242,250));
  c.label(103,163,"Experimental VM creation and Network25. Run one stage at a time.",24,rgb(139,153,178));
  for(int i=0;i<test_count;++i) {
   int y=248+i*112;

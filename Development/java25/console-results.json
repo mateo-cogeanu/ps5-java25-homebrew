@@ -357,5 +357,12 @@
     "established": "Failure before TCP, UDP or NIO exchanges; no networking console success established",
     "packaging_finding": "Packaged classes-only image lacked conf/security/java.security",
     "next_probe": "01.000.001 includes target-generated security/network configuration and displays nested error causes"
+  },
+  "network_01_000_001": {
+    "evidence": "IMG_0422.JPG",
+    "networking": "FAIL before socket exchanges: security configuration -> InternalError loading java.security -> FileSystemException /app0/assets/java25/conf/security/java.security: Operation not permitted; FFFFFAE5",
+    "destroy_vm": "PASS, code 00000000 visible",
+    "established": "Packaging includes config; Java access still refused; photograph alone does not distinguish canonicalization from file read",
+    "next_probe": "01.000.002 restricted bundled-master path policy and native read preflight"
   }
 }
