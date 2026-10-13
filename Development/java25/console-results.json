@@ -407,5 +407,37 @@
       "Virtual-thread socket polling",
       "JIT stability"
     ]
+  },
+  "lan_dns_01_000_000": {
+    "title_id": "PPSA99869",
+    "version": "01.000.000",
+    "tested_date": "2026-10-13",
+    "console": "PS5 firmware 13.60",
+    "results": {
+      "native_initialization": "PASS",
+      "JNI_CreateJavaVM": "PASS",
+      "Lan25_external_TCP_UDP_echo": "PASS",
+      "Dns25_forward_lookup": "PASS",
+      "DestroyJavaVM": "PASS"
+    },
+    "evidence": "Human console report: ALL PASS! no problemo; local helper log also records TCP and UDP exchanges from the PS5 peer",
+    "checks": [
+      "Native security configuration read",
+      "TCP framed UTF-8 echo between PS5 and Mac",
+      "UDP echoed UTF-8 bytes and peer address/port",
+      "Forward DNS resolution of example.com",
+      "VM shutdown"
+    ],
+    "package_file": "PPSA99869-lan-dns-pass-01.000.000.zip",
+    "sha256": "3cfeed2f321334e742fa93070e6983bed201332f7837d907af2db52d547c11cc",
+    "configuration": "Generated probe.properties contains the tested LAN endpoint; other users must set their own helper address/port",
+    "unverified": [
+      "Inbound LAN server acceptance on PS5",
+      "TLS/HTTPS",
+      "IPv6 reachability",
+      "Sustained or concurrent network load",
+      "General DNS failure/caching behavior",
+      "JIT stability"
+    ]
   }
 }

@@ -1142,3 +1142,17 @@ security/socket policies. Local helper readiness, actual packaged host Java
 fixtures, rejected-loopback guard, native packaging/signature, ZIP CRC,
 metadata and exact class/config bytes all pass. No LAN/DNS milestone is
 frozen until the user's console results pass.
+
+### Console milestone: LAN/DNS 01.000.000 ALL PASS
+
+The user reports ALL PASS on 2026-10-13 for PPSA99869 01.000.000. The
+Mac helper additionally logged TCP and UDP exchanges from the PS5 peer,
+distinct from host self-tests. This establishes Java outbound IPv4 LAN
+TCP/UDP UTF-8 echo, peer checks, forward DNS lookup of example.com, and
+VM lifecycle. The helper is stopped after the completed acceptance run.
+
+LAN_DNS_Probe freezes the source and the exact package/checksum. The
+passing package retains its tested endpoint in assets/java25/probe.properties;
+other users must supply their own Mac helper address and port before running
+the LAN row. Inbound LAN server acceptance, TLS, IPv6, DNS edge cases and
+sustained/concurrent loads remain separate work.

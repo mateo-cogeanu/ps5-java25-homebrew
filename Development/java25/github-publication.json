@@ -22,6 +22,11 @@
       "version": "01.000.003",
       "console": "ALL PASS",
       "release_tag": "Network_Probe-v01.000.003"
+    },
+    "LAN_DNS_Probe": {
+      "version": "01.000.000",
+      "console": "ALL PASS",
+      "release_tag": "LAN_DNS_Probe-v01.000.000"
     }
   },
   "publication_rule": "Sync every completed set of development changes; freeze a new milestone only after user confirms ALL PASS on PS5.",
