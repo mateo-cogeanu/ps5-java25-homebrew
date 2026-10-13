@@ -13,7 +13,7 @@
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
   "next_console_title": "PPSA99866",
-  "next_console_probe": "Java 25 File I/O 01.000.000: actual Java Files UTF-8 write/read/size/delete",
+  "next_console_probe": "Java 25 File I/O 01.000.001: resident library discovery fix; Java Files write/read/size/delete",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -49,5 +49,7 @@
   "bootstrap_locale": "Target java.base rebuild PASS; compiled properties object omits ParseLocale/setlocale; host interpreter Hello25 PASS with en/US/UTF-8 overrides; console pending",
   "sandbox_properties": "Target java.base rebuild PASS; props object omits uname/getpwuid/getcwd/tzset and strdup dependencies; console pending",
   "console_hello25": "PASS on PS5: Java 25, arithmetic and worker-thread start/join through direct class definition",
-  "direct_class_definition": "Real host JVM integration PASS with class-path discovery unavailable: DefineClass, Hello25 arithmetic/thread and DestroyJavaVM; console pending"
+  "direct_class_definition": "Real host JVM integration PASS with class-path discovery unavailable: DefineClass, Hello25 arithmetic/thread and DestroyJavaVM; console pending",
+  "console_file_io": "01.000.000 PASS PASS FAIL PASS; UnsatisfiedLinkError in FileIO25.main, FFFFFAE5; 01.000.001 pending",
+  "embedded_library_discovery": "Five JNI_OnLoad_<name> adapters advertise resident libraries, invoke three existing native load hooks, preserve negative hook failures; generated host lookup test PASS"
 }

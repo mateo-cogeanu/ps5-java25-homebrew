@@ -34,6 +34,7 @@ bool initialized=false;
 JavaVM *java_vm=nullptr;
 JNIEnv *java_env=nullptr;
 FILE *startup_log=nullptr;
+char exception_detail[768]{};
 char previous_log[7][160]={{},{},{},{},{},{},"No previous startup log."};
 void log_stage(const char *stage) {
  if(startup_log) {std::fprintf(startup_log,"STAGE: %s\n",stage);std::fflush(startup_log);}
@@ -73,14 +74,14 @@ void java_failure(int i,int code,const char* phase) {
  // Keep the original exception alive while obtaining its actual Java text.
  jthrowable original=java_env->ExceptionOccurred();
  java_env->ExceptionClear();
- char detail[80]="Java exception text unavailable";
+ char detail[768]="Java exception text unavailable";
  if(original) {
   jclass type=java_env->GetObjectClass(original);
   jmethodID method=type?java_env->GetMethodID(type,"toString","()Ljava/lang/String;"):nullptr;
   jstring text=method?static_cast<jstring>(java_env->CallObjectMethod(original,method)):nullptr;
   if(text&&!java_env->ExceptionCheck()) {
    const char* utf=java_env->GetStringUTFChars(text,nullptr);
-   if(utf) {std::snprintf(detail,sizeof(detail),"%.79s",utf);java_env->ReleaseStringUTFChars(text,utf);}
+   if(utf) {std::snprintf(detail,sizeof(detail),"%s",utf);java_env->ReleaseStringUTFChars(text,utf);}
   }
   if(java_env->ExceptionCheck()) java_env->ExceptionClear();
   if(text) java_env->DeleteLocalRef(text);
@@ -89,8 +90,9 @@ void java_failure(int i,int code,const char* phase) {
   java_env->ExceptionDescribe();java_env->ExceptionClear();
   java_env->DeleteLocalRef(original);
  }
+ std::snprintf(exception_detail,sizeof(exception_detail),"%s: %s",phase,detail);
  char message[80];std::snprintf(message,sizeof(message),"%.20s: %.48s",phase,detail);
- if(startup_log) {std::fprintf(startup_log,"HELLO FAILURE: %s: %s / code %08X\n",phase,detail,static_cast<unsigned>(code));std::fflush(startup_log);}
+ if(startup_log) {std::fprintf(startup_log,"FILE I/O FAILURE: %s: %s / code %08X\n",phase,detail,static_cast<unsigned>(code));std::fflush(startup_log);}
  result(i,code,message);
 }
 void skip_vm_dependents() {
@@ -247,7 +249,7 @@ bool update() noexcept {
 }
 void draw(Canvas &c) noexcept {
  c.gradient(rgb(18,29,49),rgb(8,13,23));
- c.label(100,64,"Java 25 - File I/O 01.000.000",64,rgb(238,242,250));
+ c.label(100,64,"Java 25 - File I/O 01.000.001",64,rgb(238,242,250));
  c.label(103,163,"Experimental VM creation and FileIO25. Run one stage at a time.",24,rgb(139,153,178));
  for(int i=0;i<test_count;++i) {
   int y=248+i*112;
@@ -262,8 +264,19 @@ void draw(Canvas &c) noexcept {
   char audio_error[80];std::snprintf(audio_error,sizeof(audio_error),"Audio: %s / code %08X",ps5::menu_audio::phase_name(),static_cast<unsigned>(audio_state));
   c.label(103,736,audio_error,20,rgb(230,176,91));
  }
- c.label(103,768,"Last startup checkpoints (oldest to newest):",24,rgb(139,153,178));
- for(int i=0;i<7;++i) c.label(103,800+i*21,previous_log[i],18,rgb(238,242,250));
+ if(exception_detail[0]) {
+  c.label(103,768,"Java exception (full message):",24,rgb(230,176,91));
+  // Fixed-width chunks keep native method signatures visible on the TV.
+  for(size_t offset=0,line=0;exception_detail[offset]&&line<7;++line) {
+   char chunk[105]{};
+   size_t count=std::strlen(exception_detail+offset);if(count>104) count=104;
+   std::memcpy(chunk,exception_detail+offset,count);offset+=count;
+   c.label(103,800+static_cast<int>(line)*21,chunk,18,rgb(238,242,250));
+  }
+ } else {
+  c.label(103,768,"Last startup checkpoints (oldest to newest):",24,rgb(139,153,178));
+  for(int i=0;i<7;++i) c.label(103,800+i*21,previous_log[i],18,rgb(238,242,250));
+ }
  c.label(103,954,"D-pad: select   X: run selected test   PS: close game",24,rgb(139,153,178));
  c.label(103,1004,"After a crash, relaunch and photograph the seven startup checkpoints shown above.",20,rgb(139,153,178));
 }

@@ -17,7 +17,7 @@ LLD = Path(subprocess.check_output(['brew','--prefix','lld'],text=True).strip())
 LIBRARIES = ['java','zip','jimage','net','nio']
 
 def main():
-    declarations=[]; tables=[]; mapped=[]; links=[]; alias_index=0
+    declarations=[]; tables=[]; mapped=[]; links=[]; alias_index=0; builtin_loaders=[]
     libraries=[('jvm',WORK/'embedded-jvm.o')]
     for name in LIBRARIES:
         objects=sorted((BUILD/'support/native/java.base'/('lib'+name)).glob('*.o'))
@@ -63,13 +63,27 @@ def main():
             alias='embedded_symbol_'+str(alias_index);alias_index+=1
             declarations.append('extern "C" void '+alias+'() __asm__("'+symbol+'");')
             entries.append('{"'+display+'", reinterpret_cast<void *>(&'+alias+')}')
+        if name in LIBRARIES:
+            # Advertise known resident libraries through OpenJDK's standard
+            # JNI_OnLoad_<name> discovery. This avoids File.exists/canonical
+            # path checks before their filesystem natives are registered.
+            original = next((entry for entry in entries if entry.startswith('{"JNI_OnLoad",')), None)
+            call = '0x00010008'
+            if original:
+                alias = re.search(r'&([A-Za-z_0-9]+)', original).group(1)
+                call = 'reinterpret_cast<int (*)(void *, void *)>(&'+alias+')(vm, reserved)'
+            loader = 'ps5_builtin_load_'+name
+            builtin_loaders.append('extern "C" int '+loader+'(void *vm, void *reserved) { '
+                'int version='+call+'; return version < 0 ? version : '
+                '(version < 0x00010008 ? 0x00010008 : version); }')
+            entries.append('{"JNI_OnLoad_'+name+'", reinterpret_cast<void *>(&'+loader+')}')
         tables.append('static const Symbol symbols_'+name+'[]={\n'+',\n'.join(entries)+'\n};')
         mapped.append('{"lib'+name+'.so", symbols_'+name+', sizeof(symbols_'+name+')/sizeof(Symbol)}')
     output='''/* Generated from real target native symbols; do not edit. */
 #include <cstddef>
 #include <cstring>
 #include <dlfcn.h>
-'''+ '\n'.join(declarations)+'''
+'''+ '\n'.join(declarations)+'\n'+'\n'.join(builtin_loaders)+'''
 struct Symbol { const char *name; void *address; };
 struct Library { const char *name; const Symbol *symbols; size_t count; };
 '''+ '\n'.join(tables)+'\nstatic const Library libraries[]={\n'+',\n'.join(mapped)+'''\n};

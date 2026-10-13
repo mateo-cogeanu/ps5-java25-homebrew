@@ -252,5 +252,13 @@
     "destroy_vm": "PASS",
     "class_loading_route": "Packaged bytes read natively and defined through real JNI DefineClass into the actual system class loader",
     "not_established": "Filesystem directory/JAR discovery, Minecraft, third-party native mods or JIT stability"
+  },
+  "file_io_01_000_000": {
+    "evidence": "User reports PASS PASS FAIL PASS with FileIO25.main java.lang.UnsatisfiedLinkError: int sun.nio.fs... / code FFFFFAE5",
+    "runtime_initialization": "PASS",
+    "vm_creation": "PASS",
+    "file_io": "FAIL: main threw Java exception (-1307); native method signature truncated by UI",
+    "destroy_vm": "PASS",
+    "next_probe": "PPSA99866 01.000.001: resident-library JNI_OnLoad_<name> discovery and full exception panel"
   }
 }

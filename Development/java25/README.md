@@ -832,3 +832,27 @@ up Java alone will not supply the client's platform libraries. Vulkan support
 and Vulkan renderer mods are separate feasibility work; there is no verified
 Vulkan backend here yet. Neither graphics route nor Fabric/Forge compatibility
 is promised by the current probe.
+
+### File I/O 01.000.001: resident library discovery
+
+The console reports PASS / PASS / FAIL / PASS for File I/O 01.000.000.
+FileIO25.main throws UnsatisfiedLinkError with code FFFFFAE5 (-1307).
+The row truncated the native method signature after `int sun.nio.fs...`,
+so its exact name is not established by that report.
+
+The Unix filesystem natives, including UnixNativeDispatcher.init, are already
+compiled and included in the resident libnio table. OpenJDK's Unix loader
+checks File.exists/canonical paths for ordinary libraries; a missing library
+returns null from BootLoader.loadLibrary and the following native invocation
+can fail. The adapter now exposes JNI_OnLoad_java/zip/jimage/net/nio so
+OpenJDK recognizes these libraries as built in before checking their files.
+The adapters invoke each original load hook when present, preserve negative
+failures, and advertise JNI 1.8 or later as required for built-in libraries.
+External libraries still require a separate loader implementation.
+
+PPSA99866 **01.000.001** contains this change and a seven-line full exception
+panel. `python3 tools/test_java25_builtin_lookup.py` tests the actual generated
+lookup implementation with mocked function bodies: built-in discovery, original
+hooks, JNI version handling, real filesystem symbol entries and handle scope.
+The native build, signed binary integrity, ZIP CRC and version checks pass.
+Console file I/O remains pending; the original passing JVM_Startup is preserved.
