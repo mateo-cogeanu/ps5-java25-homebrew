@@ -119,6 +119,8 @@ if args.startup:
         app_source="java25/probe/fileio.cpp"
         app_param="java25/probe/fileio-param.json"
 wrapped_calls=["--wrap="+name for name in ("memcpy","memmove","memcmp","strcmp","strlen","memset","strncmp","strncpy","strchr","memchr","strcpy","malloc","strdup")] if args.startup else []
+if args.fileio:
+    wrapped_calls.append("--wrap=open")
 response(link_response, [*wrapped_calls,*("--defsym=" + name + "=0" for name in absent_callbacks),
                         "-L" + str(SDK / "target/lib"), merged,*extra_objects, native_libc, SDK / "target/lib/libpthread.a",
                         SDK / "target/lib/libc++.a", SDK / "target/lib/libc++abi.a",

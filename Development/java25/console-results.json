@@ -273,5 +273,14 @@
     "symbol_resolution": "Matches build anchor at image base 0x400000; caller offset 0xc965e6 is after memset in ThreadsSMRSupport::free_list",
     "limitation": "Native call tracing was disabled after VM creation; this retained call does not establish the Java I/O crash site",
     "next_probe": "01.000.002 uses explicit /app0 relative-path resolution to avoid UnixFileSystem getcwd comparison; traces Java file test and shutdown"
+  },
+  "file_io_01_000_002": {
+    "evidence": "IMG_0418.JPG",
+    "vm_creation": "PASS: code 00000000 visible",
+    "file_io": "FAIL: FileIO25.main java.nio.file.FileSystemException: /download0/java25-file-probe-93679299343676.txt: Operation not permitted; code FFFFFAE5",
+    "destroy_vm": "PASS: code 00000000 visible",
+    "established": "Java file test returns a managed exception; no crash reported in this run",
+    "not_established": "Exact failed operation or native errno; the old fixture did not label each operation",
+    "next_probe": "01.000.003 private exclusive Java file creation at mode 0600, operation labels, native open diagnostics"
   }
 }

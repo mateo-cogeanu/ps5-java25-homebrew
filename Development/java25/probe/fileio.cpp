@@ -21,6 +21,27 @@ extern "C" Initializer __jvm_init_array_start[],__jvm_init_array_end[];
 #include <unistd.h>
 extern "C" std::uint64_t sceKernelGetProcessTime();
 extern "C" int sceKernelUsleep(std::uint32_t);
+// File-open diagnostics specific to this probe; the real platform API is used.
+static char native_open_error[192]{};
+#ifdef __PROSPERO__
+extern "C" int __real_open(const char *,int,...);
+extern "C" int __wrap_open(const char *path,int flags,...) {
+ mode_t mode=0;
+ if(flags&O_CREAT) {va_list args;va_start(args,flags);mode=static_cast<mode_t>(va_arg(args,int));va_end(args);}
+ int fd=__real_open(path,flags,mode);
+ int error=errno;
+ if(fd<0 && ps5_native_trace::enabled.load() &&
+    pthread_equal(ps5_native_trace::owner,pthread_self()) &&
+    !ps5_vm_trace_io_active() && path && std::strncmp(path,"/download0/",11)==0) {
+  // IO guard prevents the trace writer's own open from replacing this result.
+  Ps5TraceIOScope guard;
+  std::snprintf(native_open_error,sizeof(native_open_error),
+    "Native open: flags=0x%X mode=0%o fd=%d errno=%d",flags,static_cast<unsigned>(mode),fd,error);
+  ps5_vm_trace(native_open_error);
+ }
+ errno=error;return fd;
+}
+#endif
 namespace {
 using ps5::demo::Canvas;
 constexpr std::uint32_t rgb(unsigned r,unsigned g,unsigned b) {return 0xff000000u|r|(g<<8)|(b<<16);}
@@ -267,7 +288,7 @@ bool update() noexcept {
 }
 void draw(Canvas &c) noexcept {
  c.gradient(rgb(18,29,49),rgb(8,13,23));
- c.label(100,64,"Java 25 - File I/O 01.000.002",64,rgb(238,242,250));
+ c.label(100,64,"Java 25 - File I/O 01.000.003",64,rgb(238,242,250));
  c.label(103,163,"Experimental VM creation and FileIO25. Run one stage at a time.",24,rgb(139,153,178));
  for(int i=0;i<test_count;++i) {
   int y=248+i*112;
@@ -295,6 +316,7 @@ void draw(Canvas &c) noexcept {
   c.label(103,768,"Last startup checkpoints (oldest to newest):",24,rgb(139,153,178));
   for(int i=0;i<7;++i) c.label(103,800+i*21,previous_log[i],18,rgb(238,242,250));
  }
+ if(native_open_error[0]) c.label(103,925,native_open_error,18,rgb(230,176,91));
  c.label(103,954,"D-pad: select   X: run selected test   PS: close game",24,rgb(139,153,178));
  c.label(103,1004,"After a crash, relaunch and photograph the seven startup checkpoints shown above.",20,rgb(139,153,178));
 }

@@ -884,3 +884,29 @@ Native packaging, signature integrity, ZIP CRC/version, generated built-in
 lookup tests and AddressSanitizer native-trace tests pass. The real host JDK
 interpreter fixture passes with `/app0` as user.dir, chdirAllowed=true and an
 actual writable host temporary directory. PS5 01.000.002 validation is pending.
+
+### File I/O 01.000.003: private file permissions and operation diagnostics
+
+IMG_0418 shows successful VM creation and destruction around a managed Java
+FileSystemException: the /download0 probe file reports Operation not permitted.
+The old fixture did not identify which operation failed. This report confirms
+progress beyond the earlier crash, but does not prove the native error number
+or that file creation itself failed.
+
+Java's prior default create mode was 0666; the passing native platform probe
+uses 0600. The new fixture calls real Files.createFile with explicit POSIX
+`rw-------` permissions and exclusive creation, then real Files.write/read/size/
+delete on that uniquely owned file. Each IOException now names its operation.
+This tests private-file creation; ordinary default-0666 creation remains
+unvalidated. No native replacement supplies the Java fixture's file results.
+
+The File I/O package alone wraps open for diagnostics. It forwards unchanged
+flags/mode to the real native platform function. For failed /download0 opens
+on the traced test thread, the TV panel shows flags, mode, return value and
+numeric errno. The diagnostic writer's own open is guarded against recursion
+and errno is preserved. tools/test_java25_open_trace.py exercises the actual
+wrapper with mocked platform calls under AddressSanitizer.
+
+The actual host Java interpreter fixture, wrapper test, target native build,
+signed integrity, ZIP CRC and 01.000.003 metadata checks pass. PS5 validation
+is pending. The original JVM_Startup milestone is unchanged.

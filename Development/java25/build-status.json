@@ -13,7 +13,7 @@
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
   "next_console_title": "PPSA99866",
-  "next_console_probe": "Java 25 File I/O 01.000.002: explicit user.dir resolution and tracing through file-test/shutdown",
+  "next_console_probe": "Java 25 File I/O 01.000.003: exclusive 0600 Java file creation, operation labels and native open diagnostics",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -50,13 +50,20 @@
   "sandbox_properties": "Target java.base rebuild PASS; props object omits uname/getpwuid/getcwd/tzset and strdup dependencies; console pending",
   "console_hello25": "PASS on PS5: Java 25, arithmetic and worker-thread start/join through direct class definition",
   "direct_class_definition": "Real host JVM integration PASS with class-path discovery unavailable: DefineClass, Hello25 arithmetic/thread and DestroyJavaVM; console pending",
-  "console_file_io": "01.000.001 row 3 crashed (user confirms); 01.000.002 pending",
+  "console_file_io": "01.000.002 row 3 FileSystemException Operation not permitted; VM creation and shutdown PASS; 01.000.003 pending",
   "embedded_library_discovery": "Five JNI_OnLoad_<name> adapters advertise resident libraries, invoke three existing native load hooks, preserve negative hook failures; generated host lookup test PASS",
   "file_io_01_000_002_validation": {
     "target_package": "PASS; native build/signature integrity, ZIP CRC and version",
     "host_fixture": "PASS; interpreter UTF-8 write/read/size/delete and relative paths with user.dir=/app0 and chdirAllowed=true",
     "host_native_trace": "PASS; thirteen-operation semantics and retained-call/signal guards under AddressSanitizer",
     "zip_sha256": "eb71f778a91828c9925a22c93de61dd58033725dba54c79c48db3a77b2e94a21",
+    "console": "pending"
+  },
+  "file_io_01_000_003_validation": {
+    "target_package": "PASS: native build/signature integrity and ZIP CRC/version",
+    "host_fixture": "PASS: actual Java create(0600)/write/read/size/delete and relative path resolution",
+    "host_open_trace": "PASS under AddressSanitizer: real wrapper extracted, mock platform flags/mode/result forwarding, errno preservation and recursion guard",
+    "zip_sha256": "02a9897bb6cf3013b1167e78927fb964aa6ad61c64d8a0ecdb65256a6e6e9849",
     "console": "pending"
   }
 }
