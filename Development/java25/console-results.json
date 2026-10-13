@@ -364,5 +364,15 @@
     "destroy_vm": "PASS, code 00000000 visible",
     "established": "Packaging includes config; Java access still refused; photograph alone does not distinguish canonicalization from file read",
     "next_probe": "01.000.002 restricted bundled-master path policy and native read preflight"
+  },
+  "network_01_000_002": {
+    "evidence": "IMG_0423.JPG",
+    "native_initialization": "PASS, code 00000000",
+    "vm_creation": "PASS, code 00000000",
+    "networking": "FAIL: TCP server worker IOException Permission denied; FFFFFAE5",
+    "destroy_vm": "PASS, code 00000000",
+    "established": "Security configuration and numeric IPv4 construction reached TCP test; Java listener bind completed before worker started",
+    "not_established": "Specific worker operation, TCP echo, UDP or NIO; older fixture prioritized worker error and could conceal client failure",
+    "next_probe": "01.000.003 socket-only nonblocking-option fallback and phase/first-failure diagnostics"
   }
 }

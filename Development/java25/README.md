@@ -1061,3 +1061,33 @@ Host TCP/UDP/NIO passes with the patched Security class and packaged config.
 Repeated fixture and JNI stage-callback tests pass. Rebuilt java.base, native
 package integrity, ZIP CRC/version and exact config checks pass. Console
 validation remains pending; no networking milestone is frozen.
+
+### Networking 01.000.003: native socket blocking mode
+
+IMG_0423 confirms setup, VM creation and shutdown pass; Java security and
+numeric IPv4 construction advance to the TCP test. The worker reports an
+IOException Permission denied. Its exact operation was not labeled, and the
+fixture previously prioritized the worker error over a possible earlier
+client error. TCP echo, UDP and NIO are still not console-validated.
+
+The pinned native boilerplate's update-check/console_curl.c documents refused
+socket fcntl and uses PS5 SO_NBIO (0x1200) through setsockopt. Patch 0031
+adapts IOUtil.configureBlocking only on PS5: try normal fcntl; on EINVAL,
+EPERM or EACCES, require a successful SO_TYPE socket check before changing
+real nonblocking state through SO_NBIO. Failed socket checks retain the
+original fcntl error, and failed setsockopt stays a failure. Files and pipes
+receive no synthetic success. A failed F_GETFL no longer becomes a no-op
+nonblocking success from comparing -1 flags.
+
+The worker now labels accept/configure, request-header read, request-byte
+read and response write. A shared atomic keeps the first client/worker
+failure; later failures are suppressed and included in diagnostic text.
+This fix tests a documented socket-control incompatibility; the photograph
+alone does not establish fcntl as the actual cause.
+
+The actual C blocking-mode function passes ASan host tests with controlled
+platform results for both modes, GET/SET failures, socket identity and failed
+SO_NBIO. Target java.base-libs and the native package rebuild successfully.
+Actual packaged host TCP/UDP/NIO repeat tests and real JNI checkpoint tests
+pass, with descriptor counts stable and workers terminated. ZIP CRC, version
+and exact fixture checks pass. PS5 01.000.003 validation remains pending.

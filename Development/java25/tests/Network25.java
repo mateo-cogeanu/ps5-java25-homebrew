@@ -33,23 +33,30 @@ public class Network25 {
 
     private static void tcp(InetAddress loopback) throws Exception {
         AtomicReference<Throwable> workerFailure = new AtomicReference<>();
+        AtomicReference<Throwable> firstFailure = new AtomicReference<>();
         try (ServerSocket server = new ServerSocket()) {
             server.bind(new InetSocketAddress(loopback, 0), 1);
             server.setSoTimeout(TIMEOUT);
             Thread worker = new Thread(() -> {
+                String workerStage = "accept/configure accepted socket";
                 try (Socket peer = server.accept()) {
                     peer.setSoTimeout(TIMEOUT);
                     DataInputStream input = new DataInputStream(peer.getInputStream());
+                    workerStage = "read request header";
                     check(input.readInt() == PAYLOAD.length, "TCP server length");
                     byte[] actual = new byte[PAYLOAD.length];
+                    workerStage = "read request bytes";
                     input.readFully(actual);
                     check(Arrays.equals(actual, PAYLOAD), "TCP server bytes");
+                    workerStage = "write response";
                     DataOutputStream output = new DataOutputStream(peer.getOutputStream());
                     output.writeInt(actual.length);
                     output.write(actual);
                     output.flush();
                 } catch (Throwable error) {
-                    workerFailure.set(error);
+                    IOException tagged = new IOException("TCP server " + workerStage + ": " + error, error);
+                    workerFailure.set(tagged);
+                    firstFailure.compareAndSet(null, tagged);
                 }
             }, "Java25-TCP-echo");
             worker.setDaemon(true);
@@ -68,16 +75,21 @@ public class Network25 {
                 input.readFully(actual);
                 check(Arrays.equals(actual, PAYLOAD), "TCP client bytes");
             } catch (Throwable error) {
-                clientFailure = error;
+                clientFailure = new IOException("TCP client: " + error, error);
+                firstFailure.compareAndSet(null, clientFailure);
             } finally {
                 server.close(); // Release accept on every client failure.
                 worker.join(TIMEOUT + 1000L);
             }
             check(!worker.isAlive(), "TCP worker did not stop");
-            if (workerFailure.get() != null)
-                throw new IOException("TCP server worker: " + workerFailure.get(), workerFailure.get());
-            if (clientFailure != null)
-                throw new IOException("TCP client: " + clientFailure, clientFailure);
+            Throwable first = firstFailure.get();
+            if (first != null) {
+                if (workerFailure.get() != null && workerFailure.get() != first)
+                    first.addSuppressed(workerFailure.get());
+                if (clientFailure != null && clientFailure != first)
+                    first.addSuppressed(clientFailure);
+                throw new IOException("TCP first failure: " + describe(first), first);
+            }
         }
     }
 
@@ -166,6 +178,8 @@ public class Network25 {
 
     private static String describe(Throwable error) {
         StringBuilder text = new StringBuilder(error.toString());
+        for (Throwable secondary : error.getSuppressed())
+            text.append(" | secondary: ").append(secondary);
         Throwable cause = error.getCause();
         for (int depth = 0; cause != null && cause != error && depth < 3; depth++) {
             text.append(" | caused by: ").append(cause);

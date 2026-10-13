@@ -60,7 +60,7 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 - [ ] Improve JNI and native-library compatibility for Java applications.
 - [ ] Test broader Java APIs, error handling and repeated application runs.
 
-**Current development probe:** [Java Networking](Development/java25/tests/Network25.java), `PPSA99868` version `01.000.002`. TCP/UDP loopback and NIO selector tests pass on the host; PS5 validation is pending. Build it with `make java25-network` from the Development folder after preparing the toolchain.
+**Current development probe:** [Java Networking](Development/java25/tests/Network25.java), `PPSA99868` version `01.000.003`. TCP/UDP loopback and NIO selector tests pass on the host; PS5 validation is pending. Build it with `make java25-network` from the Development folder after preparing the toolchain.
 
 ## Explore the source
 

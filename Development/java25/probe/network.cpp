@@ -312,7 +312,7 @@ bool update() noexcept {
 }
 void draw(Canvas &c) noexcept {
  c.gradient(rgb(18,29,49),rgb(8,13,23));
- c.label(100,64,"Java 25 - Networking 01.000.002",64,rgb(238,242,250));
+ c.label(100,64,"Java 25 - Networking 01.000.003",64,rgb(238,242,250));
  c.label(103,163,"Experimental VM creation and Network25. Run one stage at a time.",24,rgb(139,153,178));
  for(int i=0;i<test_count;++i) {
   int y=248+i*112;
