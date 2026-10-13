@@ -22,6 +22,10 @@ failures. Do not wait for ALL PASS to upload development changes.
 The sync script also publishes this file as the GitHub repository's root
 `AGENTS.md`. Keep that copy consistent through the script.
 
+The workspace `README.md` is the canonical public project README; its banner
+is `docs/readme-banner.svg`. The sync script publishes both at repository root.
+Keep the milestone table and release links current when freezing a milestone.
+
 Verify the command succeeds and the push completes. Report failures and their
 reason; never claim an upload succeeded without evidence. Retry recoverable
 failures. Do not overwrite remote changes or force-push to resolve a conflict.

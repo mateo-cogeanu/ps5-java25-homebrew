@@ -18,7 +18,7 @@ if not (checkout / '.git').is_dir():
 
 # Only this explicit source allowlist is published. Dependency caches, build
 # outputs, local credentials, downloaded photos and generated logs stay local.
-items = ['assets', 'native', 'src', 'sce_sys', 'sounds', 'tools', 'java25',
+items = ['assets', 'docs', 'native', 'src', 'sce_sys', 'sounds', 'tools', 'java25',
          'Makefile', 'THIRD_PARTY_NOTICES.md', '.gitignore']
 development = checkout / 'Development'
 development.mkdir(exist_ok=True)
@@ -34,11 +34,14 @@ for name in items:
     else:
         shutil.copy2(source, target)
 if (ROOT / 'README.md').exists():
-    shutil.copy2(ROOT / 'README.md', development / 'WORKSPACE_README.md')
+    shutil.copy2(ROOT / 'README.md', checkout / 'README.md')
+    (development / 'WORKSPACE_README.md').write_text('See the [project README](../README.md) for milestones, downloads and setup.\n')
+(checkout / 'docs').mkdir(exist_ok=True)
+shutil.copy2(ROOT / 'docs/readme-banner.svg', checkout / 'docs/readme-banner.svg')
 # Keep publication instructions visible to future agents in the public repo.
 shutil.copy2(ROOT / 'AGENTS.md', checkout / 'AGENTS.md')
-subprocess.run(['git', 'add', '--', 'Development', 'AGENTS.md'], cwd=checkout, check=True)
-changed = subprocess.run(['git', 'diff', '--cached', '--quiet', '--', 'Development', 'AGENTS.md'], cwd=checkout)
+subprocess.run(['git', 'add', '--', 'Development', 'AGENTS.md', 'README.md', 'docs'], cwd=checkout, check=True)
+changed = subprocess.run(['git', 'diff', '--cached', '--quiet', '--', 'Development', 'AGENTS.md', 'README.md', 'docs'], cwd=checkout)
 if changed.returncode == 1:
     subprocess.run(['git', 'commit', '-m', args.message], cwd=checkout, check=True)
 elif changed.returncode != 0:
