@@ -6,7 +6,7 @@ include $(PS5_PAYLOAD_SDK)/toolchain/prospero.mk
 CFLAGS := -std=c11 -O2 -Wall -Wextra -Werror
 ELF := build/controller-tester.elf
 
-.PHONY: all clean package java25-probe java25-runtime-probe java25-jni-probe java25-startup
+.PHONY: all clean package java25-probe java25-runtime-probe java25-jni-probe java25-startup java25-fileio java25-zipjar
 all: $(ELF)
 
 build/payload.x: tools/linker_layout.py $(PS5_PAYLOAD_SDK)/ldscripts/elf_x86_64.x
@@ -34,3 +34,9 @@ java25-jni-probe:
 
 java25-startup:
 	python3 tools/package_java25_jni.py --startup
+
+java25-fileio:
+	python3 tools/package_java25_jni.py --fileio
+
+java25-zipjar:
+	python3 tools/package_java25_jni.py --zipjar

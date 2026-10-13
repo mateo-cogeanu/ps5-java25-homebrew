@@ -12,8 +12,11 @@ ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--startup", action="store_true", help="Package the experimental VM startup attempt")
 parser.add_argument("--fileio", action="store_true", help="Package the separate Java file I/O title")
+parser.add_argument("--zipjar", action="store_true", help="Package the separate ZIP/JAR and class-loading title")
 args = parser.parse_args()
-args.startup = args.startup or args.fileio
+if args.fileio and args.zipjar:
+    parser.error("Choose one probe: --fileio or --zipjar")
+args.startup = args.startup or args.fileio or args.zipjar
 WORK = ROOT / "build/java25"
 SDK = ROOT / ".tools/native-sdk/ps5-payload-sdk"
 JVM = ROOT / ".tools/java25/openjdk/build/ps5-bootstrap/hotspot/variant-server/libjvm/objs"
@@ -91,7 +94,7 @@ if args.startup:
     subprocess.run(["python3",str(ROOT/"tools/java25_builtin_runtime.py")],check=True)
     extra_objects=json.loads((WORK/"builtin-link-inputs.json").read_text())
     absent_callbacks=[name for name in absent_callbacks if not name.startswith("__dl")]
-    assets=WORK/"startup-assets/java25"
+    assets=WORK/("zipjar-assets/java25" if args.zipjar else "startup-assets/java25")
     shutil.copytree(WORK/"boot-image",assets,dirs_exist_ok=True)
     shutil.copy2(WORK/"boot-image-audit.json",assets/"boot-image-audit.json")
     legal=ROOT/".tools/java25/openjdk/src/java.base/share/legal"
@@ -107,6 +110,11 @@ if args.startup:
     subprocess.run(["/opt/homebrew/opt/openjdk@25/bin/javac","--release","25","-d",str(assets/"classes"),str(ROOT/"java25/tests/Hello25.java")],check=True)
     if args.fileio:
         subprocess.run(["/opt/homebrew/opt/openjdk@25/bin/javac","--release","25","-d",str(assets/"classes"),str(ROOT/"java25/tests/FileIO25.java")],check=True)
+    if args.zipjar:
+        subprocess.run(["/opt/homebrew/opt/openjdk@25/bin/javac","--release","25","-d",str(assets/"classes"),str(ROOT/"java25/tests/ZipJar25.java")],check=True)
+        subprocess.run(["python3",str(ROOT/"tools/java25_jar_fixture.py"),"--output",str(assets/"jars/probe.jar")],check=True)
+        if (assets/"classes/ps5probe/JarHello25.class").exists():
+            raise SystemExit("JAR payload must not be available as a loose class")
     sounds=assets.parent/"sounds"
     sounds.mkdir(exist_ok=True)
     for name in ("menu_music", "sel"):
@@ -118,8 +126,11 @@ if args.startup:
     if args.fileio:
         app_source="java25/probe/fileio.cpp"
         app_param="java25/probe/fileio-param.json"
+    if args.zipjar:
+        app_source="java25/probe/zipjar.cpp"
+        app_param="java25/probe/zipjar-param.json"
 wrapped_calls=["--wrap="+name for name in ("memcpy","memmove","memcmp","strcmp","strlen","memset","strncmp","strncpy","strchr","memchr","strcpy","malloc","strdup")] if args.startup else []
-if args.fileio:
+if args.fileio or args.zipjar:
     wrapped_calls.append("--wrap=open")
 response(link_response, [*wrapped_calls,*("--defsym=" + name + "=0" for name in absent_callbacks),
                         "-L" + str(SDK / "target/lib"), merged,*extra_objects, native_libc, SDK / "target/lib/libpthread.a",
@@ -167,6 +178,6 @@ report = {"source_commit": actual, "hotspot_object_count": len(objects),
           "absent_optional_sdk_callbacks": absent_callbacks,
           "memory_api_binding": "mmap/mprotect are undefined platform imports; SDK payload mman.o excluded",
           "console_execution": "pending",
-          "vm_creation_and_java_bytecode": "new file I/O title console execution pending" if args.fileio else ("package-specific console execution pending" if args.startup else "not attempted by this package")}
-(WORK / ("fileio-package-audit.json" if args.fileio else ("startup-package-audit.json" if args.startup else "jni-package-audit.json"))).write_text(json.dumps(report, indent=2)+"\n")
+          "vm_creation_and_java_bytecode": "new ZIP/JAR title console execution pending" if args.zipjar else ("new file I/O title console execution pending" if args.fileio else ("package-specific console execution pending" if args.startup else "not attempted by this package"))}
+(WORK / ("zipjar-package-audit.json" if args.zipjar else ("fileio-package-audit.json" if args.fileio else ("startup-package-audit.json" if args.startup else "jni-package-audit.json")))).write_text(json.dumps(report, indent=2)+"\n")
 print(f"Verified embedded HotSpot: {len(objects)} objects, {(last-first)//8} staged constructors")

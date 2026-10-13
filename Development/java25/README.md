@@ -953,3 +953,30 @@ The passing package is preserved as dist/PPSA99866-file-io-pass-01.000.004.zip.
 IO_Probe is the frozen source milestone; its release includes the matching
 package, SHA-256 checksum and validation record. Wider filesystem permissions,
 ZIP/JAR loading, sockets, JIT stability and Minecraft remain unvalidated.
+
+### Next probe: ZIP/JAR 01.000.000 (console pending)
+
+`make java25-zipjar` / `python3 tools/package_java25_jni.py --zipjar` builds
+PPSA99867 as a separate Java 25 ZIP / JAR title, version 01.000.000. Run the
+four rows in order: runtime initialization, VM creation, ZIP/JAR test, shutdown.
+The original PPSA99865/PPSA99866 titles and first-passing archives stay intact.
+
+The test verifies five ZIP entries, an uncompressed text entry, a 65536-byte
+deflated pattern through real ZipFile/Inflater code, and JarFile manifest
+reading. It creates a URLClassLoader, loads ps5probe.JarHello25 only from the
+packaged JAR, checks its defining loader, invokes its arithmetic/version check
+and verifies its UTF-8 resource through the JAR class loader. JNI DefineClass
+is used only to launch ZipJar25 itself, not to supply the JAR payload. The
+payload is deliberately absent from the loose class path. This unsigned JAR
+probe does not test signatures, complex dependency graphs or mods.
+
+The packager gives this title a separate zipjar-assets staging directory and
+uses the console-tested I/O sandbox policies. It supplies full stage-specific
+Java exceptions and current native crash traces. The deterministic archive
+fixture and Java 25 classes are generated from tracked source.
+
+Host packaged-fixture tests pass under -Xint. Negative tests detect wrong
+stored bytes, wrong JAR resource bytes and a missing payload class at the
+expected stages. Native packaging, signed integrity, ZIP CRC, title/version
+and JAR-only payload checks pass. PS5 results are pending: do not freeze a
+ZIP/JAR milestone until the user reports ALL PASS for this exact package.
