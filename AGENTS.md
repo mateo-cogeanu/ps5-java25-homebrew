@@ -1,1 +1,54 @@
-Keep Development current and commit/push each completed set of source changes. Preserve frozen passing milestone folders. Add IO_Probe or another milestone only after the human user confirms ALL PASS on the actual PS5. Never treat host tests or packaging success as console validation. Publish compiled packages as release assets; keep generated outputs and dependency caches out of Git.
+# Persistent GitHub publication rules
+
+These instructions apply to this entire workspace and future chats working here.
+The user authorized a public repository and explicitly requested updates with
+every change. Do not ask for upload permission again within this scope.
+
+Repository: https://github.com/mateo-cogeanu/ps5-java25-homebrew
+
+## Publish every completed change
+
+After every completed set of source, asset, documentation, build-script or
+configuration changes, perform the relevant checks, then run:
+
+```sh
+python3 tools/sync_github.py --message "Describe the completed changes"
+```
+
+Do this before ending the turn. Publish work in progress to `Development` even
+when console tests have not passed yet. Clearly record pending tests and known
+failures. Do not wait for ALL PASS to upload development changes.
+
+The sync script also publishes this file as the GitHub repository's root
+`AGENTS.md`. Keep that copy consistent through the script.
+
+Verify the command succeeds and the push completes. Report failures and their
+reason; never claim an upload succeeded without evidence. Retry recoverable
+failures. Do not overwrite remote changes or force-push to resolve a conflict.
+If no publishable files changed, no new commit is necessary.
+
+## Preserve passing milestones
+
+`JVM_Startup` is the frozen first passing PS5 milestone, version 01.000.023.
+Preserve its source snapshot and passing compiled package.
+
+Create `IO_Probe` and subsequent named milestone folders only after the user
+reports ALL PASS on the actual PS5 for that exact build. Record the title ID,
+version, console results and matching package checksum. Host tests, successful
+compilation and packaging checks do not establish a console pass.
+
+Freeze each passing snapshot. Continue later changes in `Development`; do not
+silently replace a previously passing snapshot with unvalidated work.
+
+Publish passing compiled packages as GitHub release assets, with a matching
+validation record and SHA-256 checksum. Verify each release upload succeeds.
+
+## Publication boundaries
+
+Use the sync script's source allowlist. Keep credentials, dependency caches,
+build outputs, generated logs, downloaded photos and unrelated personal files
+out of Git. Compiled packages belong in release assets, not source commits.
+
+In the final response, state whether GitHub was updated and identify any console
+validation still needed. These rules guide work during agent turns; they do not
+create a background file watcher or automatic uploads while no agent is working.

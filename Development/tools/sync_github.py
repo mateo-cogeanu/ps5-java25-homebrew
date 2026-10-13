@@ -35,8 +35,10 @@ for name in items:
         shutil.copy2(source, target)
 if (ROOT / 'README.md').exists():
     shutil.copy2(ROOT / 'README.md', development / 'WORKSPACE_README.md')
-subprocess.run(['git', 'add', '--', 'Development'], cwd=checkout, check=True)
-changed = subprocess.run(['git', 'diff', '--cached', '--quiet', '--', 'Development'], cwd=checkout)
+# Keep publication instructions visible to future agents in the public repo.
+shutil.copy2(ROOT / 'AGENTS.md', checkout / 'AGENTS.md')
+subprocess.run(['git', 'add', '--', 'Development', 'AGENTS.md'], cwd=checkout, check=True)
+changed = subprocess.run(['git', 'diff', '--cached', '--quiet', '--', 'Development', 'AGENTS.md'], cwd=checkout)
 if changed.returncode == 1:
     subprocess.run(['git', 'commit', '-m', args.message], cwd=checkout, check=True)
 elif changed.returncode != 0:
