@@ -1,0 +1,46 @@
+diff --git a/src/java.base/unix/native/libnio/ch/IOUtil.c b/src/java.base/unix/native/libnio/ch/IOUtil.c
+--- a/src/java.base/unix/native/libnio/ch/IOUtil.c
++++ b/src/java.base/unix/native/libnio/ch/IOUtil.c
+@@ -26,6 +26,10 @@
+ #include <sys/types.h>
+ #include <string.h>
+ #include <sys/resource.h>
++#ifdef __PROSPERO__
++#include <sys/socket.h>
++#include <errno.h>
++#endif
+ 
+ #include "jni.h"
+ #include "jni_util.h"
+@@ -71,9 +75,30 @@
+ configureBlocking(int fd, jboolean blocking)
+ {
+     int flags = fcntl(fd, F_GETFL);
++#ifdef __PROSPERO__
++    int result = -1;
++    if (flags >= 0) {
++        int newflags = blocking ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
++        result = (flags == newflags) ? 0 : fcntl(fd, F_SETFL, newflags);
++    }
++    if (result < 0 && (errno == EINVAL || errno == EPERM || errno == EACCES)) {
++        int original_error = errno;
++        int type;
++        socklen_t length = sizeof(type);
++        // Confirm socket identity; file and pipe descriptors keep fcntl errors.
++        if (getsockopt(fd, SOL_SOCKET, SO_TYPE, &type, &length) == 0) {
++            int on = blocking ? 0 : 1;
++            // PS5 SO_NBIO, also used by the native boilerplate socket adapter.
++            return setsockopt(fd, SOL_SOCKET, 0x1200, &on, sizeof(on));
++        }
++        errno = original_error;
++    }
++    return result;
++#else
++    if (flags < 0) return -1;
+     int newflags = blocking ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
+-
+     return (flags == newflags) ? 0 : fcntl(fd, F_SETFL, newflags);
++#endif
+ }
+ 
+ JNIEXPORT void JNICALL

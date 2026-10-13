@@ -1,0 +1,91 @@
+diff --git a/src/hotspot/os/bsd/os_bsd.cpp b/src/hotspot/os/bsd/os_bsd.cpp
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -449,6 +449,24 @@
+ #endif
+ 
+ void os::init_system_properties_values() {
++#ifdef __PROSPERO__
++  // Embedded native app layout: Java home is a packaged asset directory,
++  // not a desktop-loaded shared object's canonical location.
++  ps5_vm_trace("ENTER: PS5 packaged runtime properties");
++  Arguments::set_dll_dir("/app0/assets/java25/lib");
++  ps5_vm_trace("DONE: PS5 core library directory");
++  Arguments::set_java_home("/app0/assets/java25");
++  ps5_vm_trace("DONE: PS5 Java home");
++  Arguments::set_library_path("/app0/assets/java25/lib");
++  Arguments::set_ext_dirs("");
++  ps5_vm_trace("ENTER: PS5 boot image stat and path setup");
++  if (!set_boot_path('/', ':')) {
++    ps5_vm_trace("FAIL: PS5 boot image path validation");
++    vm_exit_during_initialization("Failed setting PS5 boot class path.", nullptr);
++  }
++  ps5_vm_trace("DONE: PS5 packaged runtime properties");
++  return;
++#endif
+   // The next steps are taken in the product version:
+   //
+   // Obtain the JAVA_HOME value from the location of libjvm.so.
+@@ -1775,6 +1793,17 @@
+ 
+ // Find the full path to the current module, libjvm
+ void os::jvm_path(char *buf, jint buflen) {
++#ifdef __PROSPERO__
++  // This is the actual packaged target library used as the embedded module's
++  // identity. No desktop realpath(NULL-buffer) contract is required.
++  const char *path = "/app0/assets/java25/lib/server/libjvm.so";
++  size_t length = strlen(path);
++  if (buflen > 0) {
++    if (length < static_cast<size_t>(buflen)) memcpy(buf, path, length + 1);
++    else buf[0] = '\0';
++  }
++  return;
++#endif
+   // Error checking.
+   if (buflen < MAXPATHLEN) {
+     assert(false, "must use a large-enough buffer");
+diff --git a/src/hotspot/share/runtime/arguments.cpp b/src/hotspot/share/runtime/arguments.cpp
+--- a/src/hotspot/share/runtime/arguments.cpp
++++ b/src/hotspot/share/runtime/arguments.cpp
+@@ -50,6 +50,7 @@
+ #include "prims/jvmtiAgentList.hpp"
+ #include "prims/jvmtiExport.hpp"
+ #include "runtime/arguments.hpp"
++#include "runtime/ps5StartupTrace.hpp"
+ #include "runtime/flags/jvmFlag.hpp"
+ #include "runtime/flags/jvmFlagAccess.hpp"
+ #include "runtime/flags/jvmFlagLimit.hpp"
+@@ -384,11 +385,13 @@
+ 
+ // Initialize system properties key and value.
+ void Arguments::init_system_properties() {
++  ps5_vm_trace("ENTER: System property allocation");
+ 
+   // Set up _boot_class_path which is not a property but
+   // relies heavily on argument processing and the jdk.boot.class.path.append
+   // property. It is used to store the underlying boot class path.
+   _boot_class_path = new PathString(nullptr);
++  ps5_vm_trace("DONE: Boot class PathString allocation");
+ 
+   PropertyList_add(&_system_properties, new SystemProperty("java.vm.specification.name",
+                                                            "Java Virtual Machine Specification",  false));
+@@ -398,6 +401,7 @@
+ 
+   // Initialize the vm.info now, but it will need updating after argument parsing.
+   _vm_info = new SystemProperty("java.vm.info", VM_Version::vm_info_string(), true);
++  ps5_vm_trace("DONE: VM identity properties");
+ 
+   // Following are JVMTI agent writable properties.
+   // Properties values are set to nullptr and they are
+@@ -420,8 +424,11 @@
+   PropertyList_add(&_system_properties, _jdk_boot_class_path_append);
+   PropertyList_add(&_system_properties, _vm_info);
+ 
++  ps5_vm_trace("DONE: System property allocation and list");
++  ps5_vm_trace("ENTER: OS-specific property values");
+   // Set OS specific system properties values
+   os::init_system_properties_values();
++  ps5_vm_trace("DONE: OS-specific property values");
+ }
+ 
+ // Update/Initialize System properties after JDK version number is known

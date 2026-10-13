@@ -1,0 +1,29 @@
+diff --git a/src/hotspot/os/posix/attachListener_posix.cpp b/src/hotspot/os/posix/attachListener_posix.cpp
+index a4bc49c6b..64f0ddd6d 100644
+--- a/src/hotspot/os/posix/attachListener_posix.cpp
++++ b/src/hotspot/os/posix/attachListener_posix.cpp
+@@ -183,6 +183,12 @@ extern "C" {
+ // Initialization - create a listener socket and bind it to a file
+ 
+ int PosixAttachListener::init() {
++#ifdef __PROSPERO__
++  // Peer credential authentication is unavailable in the SDK. Keep JVMTI
++  // and other services, but do not expose an unauthenticated attach socket.
++  log_debug(attach)("External attach is unsupported on PS5");
++  return -1;
++#endif
+   char path[UNIX_PATH_MAX];          // socket file
+   char initial_path[UNIX_PATH_MAX];  // socket file during setup
+   int listener;                      // listener socket (file descriptor)
+@@ -284,7 +290,10 @@ PosixAttachOperation* PosixAttachListener::dequeue() {
+       continue;
+     }
+ #endif
+-#ifdef BSD
++#ifdef __PROSPERO__
++    ::close(s);
++    continue;
++#elif defined(BSD)
+     uid_t puid;
+     gid_t pgid;
+     if (::getpeereid(s, &puid, &pgid) != 0) {

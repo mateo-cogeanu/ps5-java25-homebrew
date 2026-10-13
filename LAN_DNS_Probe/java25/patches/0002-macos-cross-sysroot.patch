@@ -1,0 +1,23 @@
+diff --git a/make/autoconf/basic.m4 b/make/autoconf/basic.m4
+index 2d3e071dd..1f6d5274c 100644
+--- a/make/autoconf/basic.m4
++++ b/make/autoconf/basic.m4
+@@ -390,7 +390,17 @@ AC_DEFUN_ONCE([BASIC_SETUP_DEVKIT],
+   )
+ 
+   if test "x$OPENJDK_BUILD_OS" = "xmacosx"; then
+-    BASIC_SETUP_XCODE_SYSROOT
++    if test "x$OPENJDK_TARGET_OS" = "xmacosx"; then
++      BASIC_SETUP_XCODE_SYSROOT
++    else
++      # Cross builds need separate target and host SDKs. Xcode is only
++      # the host SDK and must not leak into PS5/FreeBSD compiler flags.
++      target_sysroot="$SYSROOT"
++      SYSROOT=
++      BASIC_SETUP_XCODE_SYSROOT
++      BUILD_SYSROOT="$SYSROOT"
++      SYSROOT="$target_sysroot"
++    fi
+   fi
+ 
+   # Prepend the extra path to the global path
