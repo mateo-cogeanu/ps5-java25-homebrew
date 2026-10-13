@@ -7,7 +7,12 @@
       "version": "01.000.023",
       "console": "ALL PASS",
       "release_tag": "JVM_Startup-v01.000.023"
+    },
+    "IO_Probe": {
+      "version": "01.000.004",
+      "console": "ALL PASS",
+      "release_tag": "IO_Probe-v01.000.004"
     }
   },
-  "publication_rule": "Sync completed source changes after each working turn; create a passing milestone folder only after user-confirmed ALL PASS on PS5. IO_Probe is pending."
+  "publication_rule": "Sync every completed set of development changes; freeze a new milestone only after user confirms ALL PASS on PS5."
 }

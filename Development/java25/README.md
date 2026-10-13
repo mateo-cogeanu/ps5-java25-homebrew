@@ -942,3 +942,14 @@ stat0 function (C parameter renamed for the C++ host harness) passes ASan tests
 with mocked platform results, including descriptor data and errno/close handling.
 The target native package, signed integrity, ZIP CRC and 01.000.004 metadata
 checks pass. Host tests are not PS5 proof; console validation is pending.
+
+### Console milestone: File I/O 01.000.004 ALL PASS
+
+On 2026-10-13 the user reports ALL PASS on PS5 firmware 13.60 for the supplied
+PPSA99866 build: embedded initialization, real VM creation, FileIO25 and VM
+destruction. The fixture validates relative paths, exclusive private 0600
+file creation, UTF-8 write/read equality, actual size, deletion and absence.
+The passing package is preserved as dist/PPSA99866-file-io-pass-01.000.004.zip.
+IO_Probe is the frozen source milestone; its release includes the matching
+package, SHA-256 checksum and validation record. Wider filesystem permissions,
+ZIP/JAR loading, sockets, JIT stability and Minecraft remain unvalidated.
