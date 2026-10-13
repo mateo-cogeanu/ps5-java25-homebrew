@@ -349,5 +349,13 @@
       "JIT and long-running stability",
       "Minecraft compatibility"
     ]
+  },
+  "network_01_000_000": {
+    "evidence": "IMG_0421.JPG",
+    "networking": "FAIL: Network stage numeric IPv4 loopback, java.lang.InternalError: Error loading java.security file; code FFFFFAE5",
+    "destroy_vm": "PASS: visible code 00000000",
+    "established": "Failure before TCP, UDP or NIO exchanges; no networking console success established",
+    "packaging_finding": "Packaged classes-only image lacked conf/security/java.security",
+    "next_probe": "01.000.001 includes target-generated security/network configuration and displays nested error causes"
   }
 }

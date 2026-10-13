@@ -29,6 +29,7 @@ jdk=Path('/opt/homebrew/opt/openjdk@25/bin')
 subprocess.run([str(jdk/'javac'),'-cp',str(CLASSES),'-d',str(WORK),str(source)],check=True)
 result=subprocess.run([str(jdk/'java'),'-Xint','-Xms16m','-Xmx128m','-XX:+UseSerialGC',
                        '-XX:ActiveProcessorCount=2','-Djava.net.preferIPv4Stack=true',
+                       '-Djava.security.properties=='+str(CLASSES.parent/'conf/security/java.security'),
                        '-cp',str(WORK)+':'+str(CLASSES),'Network25HostTest'],
                       text=True,capture_output=True,timeout=60)
 print(result.stdout,end='')

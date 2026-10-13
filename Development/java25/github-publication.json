@@ -19,5 +19,9 @@
       "release_tag": "ZIP_JAR_Probe-v01.000.000"
     }
   },
-  "publication_rule": "Sync every completed set of development changes; freeze a new milestone only after user confirms ALL PASS on PS5."
+  "publication_rule": "Sync every completed set of development changes; freeze a new milestone only after user confirms ALL PASS on PS5.",
+  "minecraft_repository": {
+    "repository": "https://github.com/mateo-cogeanu/ps5-minecraft-java",
+    "scope": "Minecraft-specific project; deliberately empty for now; runtime stays in this Java port repository"
+  }
 }

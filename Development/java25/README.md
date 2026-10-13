@@ -1023,3 +1023,30 @@ signed integrity, ZIP CRC, exact class bytes and title/version checks pass.
 PS5 validation is pending; this establishes no LAN, DNS, IPv6, TLS, internet
 or Minecraft server networking support yet. Freeze Network_Probe only after
 the user's ALL PASS report for this actual build.
+
+### Networking 01.000.001: package target runtime configuration
+
+IMG_0421 shows a managed error before the socket exchanges: InetAddress
+initialization raises InternalError loading java.security. The packaged
+classes-only boot image lacked conf/security/java.security. VM destruction
+still passes; TCP/UDP/NIO console support remains unverified.
+
+The boot-image tool now runs the target java.base-gendata goal and passes
+the generated java.base configuration directory to jmod --config. jlink
+then preserves conf/security/java.security, crypto policies and net.properties.
+The raw source security file is a template, so copying it directly would
+leave provider/platform substitutions unresolved. The generated target
+configuration is used; security checks are not disabled.
+
+Network25 explicitly initializes Security configuration before numeric
+InetAddress construction. Managed errors now include up to three nested
+causes, and the native checkpoint records this new stage. Target packaging
+passes ZIP CRC/version, exact generated-file and fixture-byte checks. Host
+TCP/UDP/NIO tests pass with the packaged configuration as the Java security
+override, with no descriptor or echo-worker leaks. The actual native trace
+callback and five JNI checkpoints pass on the host. PS5 validation is pending.
+
+Minecraft work has a separate public repository,
+https://github.com/mateo-cogeanu/ps5-minecraft-java, intentionally empty for
+now. Its description links to this runtime port; Java development remains
+in ps5-java25-homebrew.

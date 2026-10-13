@@ -14,6 +14,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.security.Security;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class Network25 {
@@ -163,11 +164,24 @@ public class Network25 {
         }
     }
 
+    private static String describe(Throwable error) {
+        StringBuilder text = new StringBuilder(error.toString());
+        Throwable cause = error.getCause();
+        for (int depth = 0; cause != null && cause != error && depth < 3; depth++) {
+            text.append(" | caused by: ").append(cause);
+            cause = cause.getCause();
+        }
+        return text.toString();
+    }
+
     public static void main(String[] args) throws Exception {
-        String stage = "numeric IPv4 loopback";
+        String stage = "security configuration";
         try {
             trace(stage);
             check(Runtime.version().feature() == 25, "Need Java 25");
+            check(Security.getProperty("security.provider.1") != null, "Missing security provider configuration");
+            stage = "numeric IPv4 loopback";
+            trace(stage);
             InetAddress loopback = InetAddress.getByAddress(new byte[]{127, 0, 0, 1});
             stage = "TCP client/server echo";
             trace(stage);
@@ -180,7 +194,7 @@ public class Network25 {
             nio(loopback);
             System.out.println("JAVA_NETWORK_OK TCP UDP NIO");
         } catch (Throwable error) {
-            throw new Exception("Network stage " + stage + ": " + error, error);
+            throw new Exception("Network stage " + stage + ": " + describe(error), error);
         }
     }
 }

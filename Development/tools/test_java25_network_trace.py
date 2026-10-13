@@ -34,9 +34,9 @@ int main(int argc,char **argv){
  jobjectArray parameters=env->NewObjectArray(0,strings,nullptr);
  env->CallStaticVoidMethod(fixture,main,parameters);
  if(env->ExceptionCheck()){env->ExceptionDescribe();return 1;}
- assert((stages==std::vector<std::string>{"Network: numeric IPv4 loopback","Network: TCP client/server echo","Network: UDP two-way datagrams","Network: NIO channels and selector"}));
+ assert((stages==std::vector<std::string>{"Network: security configuration","Network: numeric IPv4 loopback","Network: TCP client/server echo","Network: UDP two-way datagrams","Network: NIO channels and selector"}));
  assert(vm->DestroyJavaVM()==JNI_OK);
- std::puts("PASS: real JNI trace registration and four networking stage callbacks");
+ std::puts("PASS: real JNI trace registration and five networking stage callbacks");
 }
 '''
 path=WORK/'test-network-trace.cpp';path.write_text(program)

@@ -13,7 +13,7 @@
 
 An experimental **native OpenJDK 25 port for PlayStation 5 homebrew**, built and tested in small, reproducible steps.
 
-The goal is to bring **Minecraft Java Edition** to PS5: server support first, then the client, graphics and mod loaders such as Fabric and Forge. Today, Java 25 bytecode, file I/O and JAR class loading have passed their acceptance tests on a real console.
+This repository owns the **Java runtime port and its acceptance probes**. Minecraft-specific work has its own [ps5-minecraft-java repository](https://github.com/mateo-cogeanu/ps5-minecraft-java), which depends on this runtime. The long-term goal is server support first, followed by the client, graphics and mod loaders such as Fabric and Forge. Today, Java 25 bytecode, file I/O and JAR class loading have passed their acceptance tests on a real console.
 
 > **Current progress:** three passing milestones on PS5 firmware **13.60**, using interpreter mode. Minecraft itself is a future milestone.
 
@@ -61,7 +61,7 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 
 OpenGL, Vulkan and renderer mods are future graphics work. Backend availability and compatibility still need to be established on PS5.
 
-**Current development probe:** [Java Networking](Development/java25/tests/Network25.java), `PPSA99868` version `01.000.000`. TCP/UDP loopback and NIO selector tests pass on the host; PS5 validation is pending. Build it with `make java25-network` from the Development folder after preparing the toolchain.
+**Current development probe:** [Java Networking](Development/java25/tests/Network25.java), `PPSA99868` version `01.000.001`. TCP/UDP loopback and NIO selector tests pass on the host; PS5 validation is pending. Build it with `make java25-network` from the Development folder after preparing the toolchain.
 
 ## Explore the source
 
