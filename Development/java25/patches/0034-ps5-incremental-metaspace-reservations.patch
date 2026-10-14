@@ -1,0 +1,18 @@
+diff --git a/src/hotspot/share/memory/metaspace/metaspaceSettings.hpp b/src/hotspot/share/memory/metaspace/metaspaceSettings.hpp
+--- a/src/hotspot/share/memory/metaspace/metaspaceSettings.hpp
++++ b/src/hotspot/share/memory/metaspace/metaspaceSettings.hpp
+@@ -47,7 +47,14 @@
+   // Note that this only affects the non-class metaspace. Class space ignores this size (it is one
+   //  single large mapping).
+   static const size_t _virtual_space_node_default_word_size =
++#ifdef __PROSPERO__
++      // Native reservations are scarce in the PS5 title sandbox even before
++      // commitment. Start with one root chunk; the existing VirtualSpaceList
++      // grows by adding nodes when metadata demand requires more space.
++      chunklevel::MAX_CHUNK_WORD_SIZE;
++#else
+       chunklevel::MAX_CHUNK_WORD_SIZE * NOT_LP64(1) LP64_ONLY(4); // 16MB (32-bit) / 64MB (64-bit)
++#endif
+ 
+   // Alignment of the base address of a virtual space node
+   static const size_t _virtual_space_node_reserve_alignment_words = chunklevel::MAX_CHUNK_WORD_SIZE;

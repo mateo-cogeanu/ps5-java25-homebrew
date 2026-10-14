@@ -1618,3 +1618,19 @@ enabled; real upstream verifier code is linked and its target library is
 packaged. Lookup/scope and target packaging checks pass. An external consumer’s
 bootstrap/help and VM lifecycle now pass on PS5 (01.000.002, human
 ALL PASS on 2026-10-14).
+
+### Incremental non-class metaspace reservations
+
+Patch `0034-ps5-incremental-metaspace-reservations.patch` starts each PS5
+non-class metaspace node with one 16 MiB root chunk instead of the desktop
+64 MiB node. Existing node-list growth, chunk alignment, commit granules
+and allocation failure checks remain intact. Non-PS5 defaults are unchanged.
+The 64 MiB node can need an 80 MiB transient alignment reservation; those
+sizes match consumer startup ENOMEM reports at larger Java heap budgets.
+That match supports this adaptation but does not establish the complete
+cause of the subsequent platform signal.
+
+ASan/UBSan checks compile the real Settings header, verify both platform
+branches and model constrained reservation pressure. The target HotSpot
+build and embedded 16 MiB node argument pass inspection. Consumer console
+validation is pending; frozen passing milestones remain unchanged.

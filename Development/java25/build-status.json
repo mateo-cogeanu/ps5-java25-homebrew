@@ -224,5 +224,13 @@
     "implementation": "Real target-built libverify/check_code.o linked into resident library adapter; VerifyClassForMajorVersion exposed globally and through libverify.so; real target library packaged",
     "checks": "PASS: generated lookup/discovery/library-scope tests, target link/signature/integrity and packaged target library byte equality",
     "console": "PASS: external consumer bootstrap/help and VM lifecycle; human ALL PASS for PPSA99874 01.000.002 on 2026-10-14"
+  },
+  "incremental_metaspace_reservation": {
+    "patch": "0034-ps5-incremental-metaspace-reservations.patch",
+    "implementation": "PS5-only non-class node starts with one 16 MiB root chunk instead of four / 64 MiB; existing list growth and allocation checks unchanged",
+    "evidence": "Consumer 192 MiB heap creation failed after 80 MiB reservation (64 MiB node + 16 MiB alignment); allocation match is an inference, not confirmed complete crash cause",
+    "host_checks": "PASS: actual Settings header under ASan/UBSan, PS5 and non-PS5 defaults, alignment and constrained reservation model",
+    "target_checks": "PASS: HotSpot rebuild, invocation exports, embedded VirtualSpaceList::create_new_node 2M-word argument, signed package and rebuilt libjvm byte equality",
+    "console": "pending"
   }
 }
