@@ -1,0 +1,22 @@
+diff --git a/src/java.base/share/classes/java/security/Security.java b/src/java.base/share/classes/java/security/Security.java
+--- a/src/java.base/share/classes/java/security/Security.java
++++ b/src/java.base/share/classes/java/security/Security.java
+@@ -265,7 +265,17 @@
+         private static void loadFromPath(Path path, LoadingMode mode)
+                 throws IOException {
+             boolean isRegularFile = Files.isRegularFile(path);
+-            if (isRegularFile) {
++            // A native PS5 title can read its bundled configuration while
++            // rejecting realpath's pathname inspection. Limit this policy
++            // to the exact packaged master file; extra/include paths retain
++            // their normal canonicalization and cycle checks.
++            Path absolute = path.toAbsolutePath().normalize();
++            boolean bundledPs5Master = Boolean.getBoolean("sun.nio.fs.ps5Sandbox")
++                    && absolute.equals(Path.of(StaticProperty.javaHome(), "conf",
++                            "security", "java.security").toAbsolutePath().normalize());
++            if (isRegularFile && bundledPs5Master) {
++                path = absolute;
++            } else if (isRegularFile) {
+                 path = path.toRealPath();
+             } else if (Files.isDirectory(path)) {
+                 throw new IOException("Is a directory");

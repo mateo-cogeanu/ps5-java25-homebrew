@@ -1,0 +1,34 @@
+diff --git a/src/hotspot/share/runtime/ps5StartupTrace.hpp b/src/hotspot/share/runtime/ps5StartupTrace.hpp
+--- a/src/hotspot/share/runtime/ps5StartupTrace.hpp
++++ b/src/hotspot/share/runtime/ps5StartupTrace.hpp
+@@ -10,8 +10,18 @@
+ #include <string.h>
+ #include <errno.h>
+ #include <stdio.h>
++inline char* ps5_vm_last_stage() {
++  static char previous[144] = "No startup stage recorded";
++  return previous;
++}
+ inline void ps5_vm_trace(const char *stage) {
+   int saved_errno = errno;
++  if (::strncmp(stage, "SIGNAL:", 7) != 0 && stage != ps5_vm_last_stage()) {
++    char* previous = ps5_vm_last_stage();
++    size_t i = 0;
++    for (; stage[i] && i < 143; ++i) previous[i] = stage[i];
++    previous[i] = 0;
++  }
+   int fd = ::open("/download0/java25-vm-trace.log", O_CREAT | O_WRONLY | O_APPEND, 0600);
+   if (fd < 0) { errno = saved_errno; return; }
+   size_t length = ::strlen(stage);
+diff --git a/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp b/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
+--- a/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
++++ b/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
+@@ -407,6 +407,8 @@
+                                              ucontext_t* uc, JavaThread* thread) {
+ #ifdef __PROSPERO__
+   if (sig == SIGSEGV || sig == SIGBUS || sig == SIGILL || sig == SIGFPE) {
++    ps5_vm_trace(ps5_vm_last_stage());
++    ps5_vm_trace_hex("SIGNAL: handler anchor=", (unsigned long long)&PosixSignals::pd_hotspot_signal_handler);
+     ps5_vm_trace_hex("SIGNAL: number=", (unsigned long long)sig);
+     ps5_vm_trace_hex("SIGNAL: pc=", uc ? (unsigned long long)os::Posix::ucontext_get_pc(uc) : 0);
+     ps5_vm_trace_hex("SIGNAL: fault address=", info ? (unsigned long long)info->si_addr : 0);
