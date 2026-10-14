@@ -167,7 +167,7 @@
     "zip_sha256": "96f9eb12994e49e5d630fc8fb2acb174d1630231273575a6afaf89687b751959",
     "host_checks": "PASS: real Java fixtures and Python helper; IPv6 request/response; production loopback-peer rejection; shortened concurrent TCP and UDP duration/count checks; premature workload rejection; neighbor discovery matching",
     "package_checks": "PASS: native integrity/signature, ZIP CRC/version, exact Java25 fixtures; no preset device addresses or endpoint properties",
-    "discovery": "Mac has IPv6 LAN addresses; no matching PS5 neighbor yet. Tool environment multicast discovery reports No route to host; user Terminal launcher will try discovery. No fabricated PS5 IPv6 address.",
+    "discovery": "User confirms correct fixed IPv4 but helper had no ARP entry and stopped before IPv6 lookup. Cache-first and exact full-table fallback added; new user Terminal discovery result pending.",
     "scope": "IPv6 LAN must establish an actual external IPv6 peer; TCP uses four 60-second workers, UDP at least 60 seconds with verified sequence/bytes. Longer endurance, simultaneous TCP/UDP mixed load and external IPv6 routing remain separate."
   }
 }

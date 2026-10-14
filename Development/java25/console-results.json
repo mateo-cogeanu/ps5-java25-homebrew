@@ -579,6 +579,12 @@
       "IPv6 UDP exchange (TCP accept failed first)",
       "ALL PASS for this combined build"
     ],
-    "next_step": "Run check_lan_ipv6.command to retain neighbor discovery evidence without repeating load tests; PS5 package unchanged"
+    "next_step": "Run check_lan_ipv6.command to retain neighbor discovery evidence without repeating load tests; PS5 package unchanged",
+    "discovery_followup": {
+      "reported": "arp returned 1; no IPv4 ARP hardware address; no IPv6 neighbor found",
+      "ipv4_confirmation": "Human confirms same fixed PS5 IPv4 address used for passing external TCP/UDP tests",
+      "interpretation": "Discovery stopped before NDP matching; this is not proof of absent PS5 IPv6 support. A valid ARP entry was observed by a direct local query, while a later helper invocation failed to see it. Tool network probing also reports No route to host.",
+      "helper_change": "Read existing ARP cache first, fall back to exact address/interface in full table, prime only if needed, print entered address/route and command error stdout"
+    }
   }
 }

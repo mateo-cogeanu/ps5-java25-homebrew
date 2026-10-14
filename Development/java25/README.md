@@ -1425,3 +1425,28 @@ address/interface used for NDP matching. Failure to observe a neighbor
 does not prove the PS5 lacks IPv6 configuration. No device address is
 guessed. All older passing snapshots stay frozen; this combined IPv6/load
 package still has a failed row and is not a passing milestone.
+
+
+### IPv4 neighbor lookup blocked IPv6 discovery — 2026-10-14
+
+The user supplied the retained discovery log: arp returned 1 and no IPv4
+hardware address was found, so discovery stopped before IPv6 NDP matching.
+They confirm the entered address is the PS5's fixed IPv4 address used for
+the passing TCP/UDP load tests. This is not evidence of missing IPv6 support.
+
+The helper now checks existing ARP evidence before ICMP probing. If the
+single-address query fails, it searches the full ARP table for the exact
+IPv4 address on the route interface. Only when both lack an entry does it
+try priming and rechecking. Logs now show the entered address, route
+interface, tunnel-route notice when applicable, command failure output
+and whether ARP or NDP matching was missing. No device address is embedded.
+
+A direct local ARP query observed a valid PS5 entry, while a subsequent
+helper invocation reported no entry; tool-environment ICMP access also
+reports No route to host. No IPv6 address is inferred from that inconsistency.
+Retry tools/check_lan_ipv6.command in the user's Terminal; no PS5 package
+change or repetition of the passing load rows is needed.
+
+Focused host discovery checks are now in tools/test_java25_ipv6_discovery.py.
+They cover MAC/scope matching, exact full-table fallback and rejection of
+unrelated destination evidence; the full protocol suite still invokes them.

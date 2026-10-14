@@ -97,7 +97,8 @@ def discover_ipv6(ipv4,verbose=False):
         try:
             result=subprocess.run(args,capture_output=True,text=True,timeout=4)
             if verbose and getattr(result,'returncode',0)!=0:
-                print('DISCOVERY: '+args[0]+' returned '+str(result.returncode)+'; '+getattr(result,'stderr','').strip(),flush=True)
+                detail=(getattr(result,'stderr','').strip() or result.stdout.strip())[:300]
+                print('DISCOVERY: '+args[0]+' returned '+str(result.returncode)+'; '+detail,flush=True)
             return result.stdout
         except (OSError,subprocess.TimeoutExpired) as error:
             if verbose:print('DISCOVERY: '+args[0]+': '+str(error),flush=True)
@@ -107,10 +108,28 @@ def discover_ipv6(ipv4,verbose=False):
         if verbose:print('DISCOVERY: no route interface found for the supplied IPv4 address',flush=True)
         return []
     interface=interface.group(1)
-    command(['ping','-c','1','-W','1000',ipv4])
-    arp=command(['arp','-n',ipv4]);mac=re.search(r' at ([0-9a-f:]+) on ',arp,re.I)
+    if verbose:
+        print('DISCOVERY: requested PS5 IPv4 '+ipv4+'; route interface '+interface,flush=True)
+        if interface.startswith('utun'):print('DISCOVERY: this route uses a tunnel/VPN interface; a physical LAN route is needed for neighbor matching',flush=True)
+    def lookup_mac():
+        arp=command(['arp','-n',ipv4])
+        mac=re.search(r' at ([0-9a-f:]+) on '+re.escape(interface)+r'(?:\s|$)',arp,re.I)
+        if mac:return mac
+        # Accept only the exact destination on the route's interface.
+        for line in command(['arp','-an']).splitlines():
+            entry=re.search(r'\(([^)]+)\) at ([0-9a-f:]+) on (\w+)',line,re.I)
+            if entry and entry.group(1)==ipv4 and entry.group(3)==interface:
+                if verbose:print('DISCOVERY: found exact IPv4/interface entry in full ARP table',flush=True)
+                return re.search(r' at ([0-9a-f:]+) on ',line,re.I)
+        return None
+    # Preserve valid cache evidence before probing. ICMP may be denied or
+    # unavailable even when existing TCP traffic works.
+    mac=lookup_mac()
     if not mac:
-        if verbose:print('DISCOVERY: no IPv4 ARP hardware address found for the PS5',flush=True)
+        command(['ping','-c','1','-W','1000',ipv4])
+        mac=lookup_mac()
+    if not mac:
+        if verbose:print('DISCOVERY: no exact IPv4/interface ARP hardware address found; cannot match the PS5 in IPv6 neighbors',flush=True)
         return []
     normalize=lambda text:':'.join(part.zfill(2).lower() for part in text.split(':'))
     wanted=normalize(mac.group(1))
@@ -125,6 +144,7 @@ def discover_ipv6(ipv4,verbose=False):
         except ValueError:continue
         if parsed.is_link_local and '%' not in address:address+='%'+interface
         if not parsed.is_loopback and not parsed.is_multicast:found.append(address)
+    if verbose and not found:print('DISCOVERY: no IPv6 NDP entry matched the PS5 hardware address on '+interface,flush=True)
     return sorted(set(found),key=lambda value:ipaddress.IPv6Address(value.split('%')[0]).is_link_local)
 
 def main():
