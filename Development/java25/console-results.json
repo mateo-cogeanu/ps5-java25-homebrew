@@ -498,5 +498,23 @@
     "evidence": "User photos IMG_0429.JPG, IMG_0430.JPG and IMG_0431.JPG",
     "package_sha256": "90162513b13832cc7c53689f962922ab14956e54f1e2d56bffa1fafe3cb6a37c",
     "next_probe": "01.000.001 exposes actual platform inet_pton to global embedded lookup, splits TLS phases and includes nested cause chains / worker phases"
+  },
+  "advanced_network_01_000_001": {
+    "title_id": "PPSA99871",
+    "version": "01.000.001",
+    "tested_date": "2026-10-14",
+    "console": "PS5 firmware 13.60",
+    "results": {
+      "native_initialization": "PASS",
+      "JNI_CreateJavaVM": "PASS",
+      "Https25": "FAIL: create TLS context; ExceptionInInitializerError caused by JCE SecurityException: Cannot initialize cryptographic mechanism / Cannot read cryptographic policy directory: unlimited",
+      "Ipv625": "PASS",
+      "NetworkLoad25": "PASS",
+      "DestroyJavaVM": "PASS"
+    },
+    "evidence": "Human report: all works except HTTPS; IMG_0432.JPG shows HTTPS cause and earlier test state",
+    "package_sha256": "48c77c48af0b19a3e8606a4b18ea1132869016127d8c3c8913be388d113866b6",
+    "scope": "IPv6 loopback and bounded concurrent/repeated loopback workload pass; no LAN IPv6 or extended endurance claim",
+    "next_probe": "01.000.002 loads exact bundled JCE policy files directly with normal parsing"
   }
 }

@@ -1294,3 +1294,38 @@ causes still need actual console evidence before a targeted runtime fix.
 Native build/signature and host TLS positive/negative, IPv6, concurrent load
 and embedded lookup checks pass. The new package still needs all six console
 rows tested. No passing snapshot was altered.
+
+
+### Advanced Network 01.000.002 — bundled cryptographic policy reads
+
+The user reports all 01.000.001 rows pass except HTTPS. Its visible nested
+cause is JCE initialization failing to inspect the unlimited cryptographic
+policy directory, before any HTTPS connection. IPv6 loopback and bounded
+concurrent TCP/repeated UDP therefore have console evidence, while this
+combined milestone remains unfrozen until every row passes.
+
+Patch 0032 adapts JceSecurity.java.template under sun.nio.fs.ps5Sandbox
+only for the exact built-in limited/unlimited policy names. Existing
+single-directory name and normalized-parent checks remain. Instead of
+directory stat/access/enumeration, it directly reads the two mandatory
+standard default policy files; limited also reads exempt_local.policy.
+Normal CryptoPermissions parsing/intersection and mandatory-default checks
+remain. Missing/unreadable or invalid files reject initialization. Custom
+policy directories and non-PS5 operation retain the original loading path.
+No permission is invented, no trust manager accepts all certificates, and
+no weak entropy substitute is added. This tailored path assumes the pinned
+bundled policy filenames; custom policy filenames require normal loading.
+
+```sh
+python3 tools/test_java25_crypto_policy.py
+python3 tools/test_java25_advanced_network.py --crypto-patch build/java25/crypto-policy-test/patch
+python3 tools/package_java25_jni.py --advanced-network
+```
+
+Real host JNI hooks deny metadata/enumeration only on policy paths. Actual
+unlimited parsing permits the expected maximum AES size, limited remains
+128 bits, missing required files fail, and custom-policy metadata denial
+still fails. TLS trusted success and untrusted/hostname rejection also pass
+with the patched JCE class. The target core classes were rebuilt; packaged
+JIMAGE inspection confirms the patch and all bundled policy files match
+the target-generated configuration. All six rows still need PS5 retesting.

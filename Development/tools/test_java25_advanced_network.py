@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Real host sockets/TLS: verify trust, hostname rejection, IPv6 and load fixtures."""
 from pathlib import Path
+import argparse
 import http.server
 import ssl
 import subprocess
@@ -9,7 +10,14 @@ import threading
 ROOT=Path(__file__).resolve().parents[1]
 JDK=Path('/opt/homebrew/opt/openjdk@25/bin')
 classes=ROOT/'build/java25/advanced-network-assets/java25/classes'
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--crypto-patch',type=Path,help='Test patched JCE policy implementation in the host VM')
+args=parser.parse_args()
 base=[str(JDK/'java'),'-Xint','-Xms16m','-Xmx128m','-Djava.net.preferIPv4Stack=false','-cp',str(classes)]
+
+if args.crypto_patch:
+    if not (args.crypto_patch/'javax/crypto/JceSecurity.class').is_file():raise SystemExit('Missing compiled JCE patch')
+    base.append('--patch-module=java.base='+str(args.crypto_patch.resolve()))
 
 def run(fixture,*options,expect=None):
     result=subprocess.run([*base,*options,fixture],capture_output=True,text=True,timeout=90)

@@ -319,7 +319,7 @@ bool update() noexcept {
 }
 void draw(Canvas &c) noexcept {
  c.gradient(rgb(18,29,49),rgb(8,13,23));
- c.label(100,64,"Java 25 - Advanced Network 01.000.001",64,rgb(238,242,250));
+ c.label(100,64,"Java 25 - Advanced Network 01.000.002",64,rgb(238,242,250));
  c.label(103,163,"HTTPS needs Internet. IPv6 and load use local sockets; no Mac helper needed.",24,rgb(139,153,178));
  for(int i=0;i<test_count;++i) {
   int y=220+i*82;

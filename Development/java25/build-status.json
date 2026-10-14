@@ -13,7 +13,7 @@
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
   "next_console_title": "PPSA99870",
-  "next_console_probe": "Advanced Network PPSA99871 01.000.001: IPv6 API lookup fix and TLS/load cause diagnostics",
+  "next_console_probe": "Advanced Network PPSA99871 01.000.002: bundled cryptographic policy loading fix",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -145,10 +145,19 @@
   "advanced_network_01_000_001_validation": {
     "title_id": "PPSA99871",
     "version": "01.000.001",
-    "console": "pending",
+    "console": "All rows PASS except HTTPS: cannot read unlimited cryptographic policy directory",
     "zip_sha256": "48c77c48af0b19a3e8606a4b18ea1132869016127d8c3c8913be388d113866b6",
     "host_checks": "PASS: TLS success and certificate/hostname rejection; IPv6 loopback; concurrent TCP/repeated UDP; global inet_pton execution and library-scope isolation",
     "package_checks": "PASS: target signature/integrity, ZIP CRC, version, exact Java25 fixture bytes, no device configuration",
     "remaining": "Console IPv6 capability and TLS/load nested causes; no complete advanced-network pass yet"
+  },
+  "advanced_network_01_000_002_validation": {
+    "title_id": "PPSA99871",
+    "version": "01.000.002",
+    "console": "pending",
+    "zip_sha256": "8c95655c87b1433c291170d606c22e740b2099b4e8a28ed2906905ba534c32cc",
+    "host_checks": "PASS: actual JCE policy parsing with policy stat/access/opendir denied; unlimited/limited AES limits preserved; missing required policy and custom policy denial reject; verified HTTPS and certificate/hostname rejection with patched JCE",
+    "package_checks": "PASS: native signature/integrity, ZIP CRC/version, exact bundled policy bytes, patched JceSecurity confirmed in packaged JIMAGE",
+    "scope": "Fixes bundled crypto policy loading; HTTPS still awaits PS5 execution"
   }
 }
