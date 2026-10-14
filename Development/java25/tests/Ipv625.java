@@ -8,6 +8,15 @@ public class Ipv625 {
     private static void trace(String stage) {
         if(Boolean.getBoolean("ps5.probe.networkTrace")) checkpoint("IPv6: "+stage);
     }
+    private static String describe(Throwable error) {
+        StringBuilder text=new StringBuilder();
+        for(int depth=0;error!=null&&depth<8;depth++) {
+            if(depth>0)text.append(" | caused by: ");
+            text.append(error);
+            Throwable next=error.getCause();if(next==error)break;error=next;
+        }
+        return text.toString();
+    }
     public static void main(String[] args) throws Exception {
         String stage="construct IPv6 loopback";
         try {
@@ -51,6 +60,6 @@ public class Ipv625 {
                     throw new AssertionError("IPv6 UDP reply");
             }
             System.out.println("JAVA_IPV6_OK TCP UDP ::1 (LAN IPv6 not tested)");
-        }catch(Throwable error){throw new Exception("IPv6 stage "+stage+": "+error,error);}
+        }catch(Throwable error){throw new Exception("IPv6 stage "+stage+": "+describe(error),error);}
     }
 }

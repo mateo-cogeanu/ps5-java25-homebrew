@@ -73,7 +73,7 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 
 **Outbound LAN setup:** see [LAN_DNS_Probe](LAN_DNS_Probe/) for the Mac echo helper and runtime endpoint configuration. TLS, IPv6 and sustained network load remain unverified.
 
-**Current development probe:** [Advanced Network](Development/java25/probe/advanced-network.cpp), `PPSA99871` version `01.000.000`. Six rows cover VM startup, verified HTTPS, IPv6 loopback, concurrent/repeated TCP/UDP traffic and shutdown. Console validation is pending; no Mac helper is required.
+**Current development probe:** [Advanced Network](Development/java25/probe/advanced-network.cpp), `PPSA99871` version `01.000.001`. Six rows cover VM startup, verified HTTPS, IPv6 loopback, concurrent/repeated TCP/UDP traffic and shutdown. The first build failed HTTPS initialization, IPv6 detection and the TCP load worker. Version 001 fixes platform API lookup and exposes nested failure causes; console validation is pending. No Mac helper is required.
 
 ## Explore the source
 

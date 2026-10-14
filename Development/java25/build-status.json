@@ -13,7 +13,7 @@
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
   "next_console_title": "PPSA99870",
-  "next_console_probe": "Advanced Network PPSA99871 01.000.000: HTTPS, IPv6 loopback and concurrent/repeated loopback traffic",
+  "next_console_probe": "Advanced Network PPSA99871 01.000.001: IPv6 API lookup fix and TLS/load cause diagnostics",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -134,12 +134,21 @@
     "scope": "one inbound TCP connection and one UDP request/response; no sustained load or TLS validation"
   },
   "advanced_network_01_000_000_validation": {
-    "console": "pending",
+    "console": "FAIL: HTTPS initialization, IPv6 family detection, TCP load worker (root causes incomplete)",
     "title_id": "PPSA99871",
     "version": "01.000.000",
     "host_checks": "PASS: trusted TLS/HTTPS; untrusted certificate and hostname mismatch rejected; IPv6 TCP/UDP ::1; four concurrent TCP workers / 512 frames / 2 MiB each direction; 256 UDP round trips",
     "package_checks": "PASS: native signature/integrity, ZIP CRC, exact classes and target-generated CA truststore, no device IPs",
     "zip_sha256": "90162513b13832cc7c53689f962922ab14956e54f1e2d56bffa1fafe3cb6a37c",
     "scope": "HTTPS to example.com with standard certificate/hostname validation; IPv6 and load on loopback only. No IPv6 LAN or long-duration endurance proof."
+  },
+  "advanced_network_01_000_001_validation": {
+    "title_id": "PPSA99871",
+    "version": "01.000.001",
+    "console": "pending",
+    "zip_sha256": "48c77c48af0b19a3e8606a4b18ea1132869016127d8c3c8913be388d113866b6",
+    "host_checks": "PASS: TLS success and certificate/hostname rejection; IPv6 loopback; concurrent TCP/repeated UDP; global inet_pton execution and library-scope isolation",
+    "package_checks": "PASS: target signature/integrity, ZIP CRC, version, exact Java25 fixture bytes, no device configuration",
+    "remaining": "Console IPv6 capability and TLS/load nested causes; no complete advanced-network pass yet"
   }
 }

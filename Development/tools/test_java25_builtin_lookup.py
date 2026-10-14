@@ -25,6 +25,11 @@ source += r'''
 int main() {
  void *process=__dlopen(nullptr,0);
  assert(process);
+ auto parse=reinterpret_cast<int (*)(int,const char *,void *)>(__dlsym(RTLD_DEFAULT,"inet_pton"));
+ unsigned char address[16]{};
+ assert(parse && parse(AF_INET6,"::1",address)==1 && address[15]==1);
+ assert(parse(AF_INET6,"invalid",address)==0);
+ assert(!__dlsym(__dlopen("libjava.so",0),"inet_pton"));
  for(const char *name : {"java","zip","jimage","net","nio"}) {
   char symbol[64];std::snprintf(symbol,sizeof(symbol),"JNI_OnLoad_%s",name);
   auto load=reinterpret_cast<int (*)(void *,void *)>(__dlsym(process,symbol));

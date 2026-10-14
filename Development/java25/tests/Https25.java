@@ -12,6 +12,15 @@ public class Https25 {
     private static void trace(String stage) {
         if(Boolean.getBoolean("ps5.probe.networkTrace")) checkpoint("HTTPS: "+stage);
     }
+    private static String describe(Throwable error) {
+        StringBuilder text=new StringBuilder();
+        for(int depth=0;error!=null&&depth<8;depth++) {
+            if(depth>0)text.append(" | caused by: ");
+            text.append(error);
+            Throwable next=error.getCause();if(next==error)break;error=next;
+        }
+        return text.toString();
+    }
     public static void main(String[] args) throws Exception {
         String stage="load bundled CA trust store";
         HttpsURLConnection connection=null;
@@ -21,10 +30,14 @@ public class Https25 {
             try(InputStream input=Files.newInputStream(Path.of(System.getProperty("ps5.probe.trustStore",
                     "/app0/assets/java25/lib/security/cacerts")))) {store.load(input,"changeit".toCharArray());}
             if(store.size()==0) throw new AssertionError("Empty CA store");
-            stage="initialize trust managers and TLS context";trace(stage);
+            stage="create trust manager factory";trace(stage);
             TrustManagerFactory trust=TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            stage="initialize trust managers from bundled CAs";trace(stage);
             trust.init(store);
-            SSLContext context=SSLContext.getInstance("TLS");context.init(null,trust.getTrustManagers(),null);
+            stage="create TLS context";trace(stage);
+            SSLContext context=SSLContext.getInstance("TLS");
+            stage="initialize TLS context and secure randomness";trace(stage);
+            context.init(null,trust.getTrustManagers(),null);
             stage="connect HTTPS with certificate and hostname verification";trace(stage);
             URI uri=URI.create(System.getProperty("ps5.probe.httpsUrl","https://example.com/"));
             if(!uri.getScheme().equals("https")) throw new AssertionError("HTTPS required");
@@ -43,7 +56,7 @@ public class Https25 {
             try(InputStream input=connection.getInputStream()) {body=input.readNBytes(65537);}
             if(body.length==0||body.length>65536) throw new AssertionError("Unexpected body size "+body.length);
             System.out.println("JAVA_HTTPS_OK status="+code+" cipher="+cipher+" bytes="+body.length);
-        } catch(Throwable error) {throw new Exception("HTTPS stage "+stage+": "+error,error);}
+        } catch(Throwable error) {throw new Exception("HTTPS stage "+stage+": "+describe(error),error);}
         finally {if(connection!=null) connection.disconnect();}
     }
 }

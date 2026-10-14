@@ -55,7 +55,7 @@ bool initialized=false;
 JavaVM *java_vm=nullptr;
 JNIEnv *java_env=nullptr;
 FILE *startup_log=nullptr;
-char exception_detail[768]{};
+char exception_detail[1536]{};
 char previous_log[7][160]={{},{},{},{},{},{},"No previous startup log."};
 struct NativeTraceScope {
  NativeTraceScope() {
@@ -113,7 +113,7 @@ void java_failure(int i,int code,const char* phase) {
  // Keep the original exception alive while obtaining its actual Java text.
  jthrowable original=java_env->ExceptionOccurred();
  java_env->ExceptionClear();
- char detail[768]="Java exception text unavailable";
+ char detail[1536]="Java exception text unavailable";
  if(original) {
   jclass type=java_env->GetObjectClass(original);
   jmethodID method=type?java_env->GetMethodID(type,"toString","()Ljava/lang/String;"):nullptr;
@@ -225,6 +225,11 @@ void run_test(int i) {
  } else if(!java_vm||!java_env) {
   result(i,-1303,"Create the VM first; relaunch to retry");
  } else if(i>=2 && i<=4) {
+  if(i==3) {
+   int fd=socket(AF_INET6,SOCK_STREAM,0);int error=fd<0?errno:0;
+   char diagnostic[128];std::snprintf(diagnostic,sizeof(diagnostic),"IPv6 native socket: fd=%d errno=%d",fd,error);
+   log_stage(diagnostic);if(fd>=0)close(fd);
+  }
   const char *fixture=i==2?"Https25":i==3?"Ipv625":"NetworkLoad25";
   NativeTraceScope trace_scope;
   log_stage("Reading bundled java.security through native file API");
@@ -314,7 +319,7 @@ bool update() noexcept {
 }
 void draw(Canvas &c) noexcept {
  c.gradient(rgb(18,29,49),rgb(8,13,23));
- c.label(100,64,"Java 25 - Advanced Network 01.000.000",64,rgb(238,242,250));
+ c.label(100,64,"Java 25 - Advanced Network 01.000.001",64,rgb(238,242,250));
  c.label(103,163,"HTTPS needs Internet. IPv6 and load use local sockets; no Mac helper needed.",24,rgb(139,153,178));
  for(int i=0;i<test_count;++i) {
   int y=220+i*82;
@@ -333,10 +338,10 @@ void draw(Canvas &c) noexcept {
   c.label(103,768,"Java exception (full message):",24,rgb(230,176,91));
   // Fixed-width chunks keep native method signatures visible on the TV.
   for(size_t offset=0,line=0;exception_detail[offset]&&line<7;++line) {
-   char chunk[105]{};
-   size_t count=std::strlen(exception_detail+offset);if(count>104) count=104;
+   char chunk[209]{};
+   size_t count=std::strlen(exception_detail+offset);if(count>208) count=208;
    std::memcpy(chunk,exception_detail+offset,count);offset+=count;
-   c.label(103,800+static_cast<int>(line)*21,chunk,18,rgb(238,242,250));
+   c.label(103,800+static_cast<int>(line)*21,chunk,16,rgb(238,242,250));
   }
  } else {
   c.label(103,768,"Last startup checkpoints (oldest to newest):",24,rgb(139,153,178));

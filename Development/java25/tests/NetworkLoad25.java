@@ -8,6 +8,15 @@ public class NetworkLoad25 {
     private static void trace(String stage) {
         if(Boolean.getBoolean("ps5.probe.networkTrace")) checkpoint("Network load: "+stage);
     }
+    private static String describe(Throwable error) {
+        StringBuilder text=new StringBuilder();
+        for(int depth=0;error!=null&&depth<8;depth++) {
+            if(depth>0)text.append(" | caused by: ");
+            text.append(error);
+            Throwable next=error.getCause();if(next==error)break;error=next;
+        }
+        return text.toString();
+    }
     public static void main(String[] args) throws Exception {
         String stage="four concurrent TCP workers, 128 frames each";
         int workers=4,frames=128,size=4096;
@@ -20,24 +29,31 @@ public class NetworkLoad25 {
                 final int id=w;
                 threads[w]=new Thread(()->{
                     Thread echo=null;
+                    String workerStage="worker "+id+" bind TCP listener";
                     try(ServerSocket server=new ServerSocket()) {
                         server.bind(new InetSocketAddress(loop,0));server.setSoTimeout(5000);
+                        workerStage="worker "+id+" start echo thread";
                         echo=new Thread(()->{
+                            String echoStage="worker "+id+" accept";
                             try(Socket peer=server.accept()) {
+                                echoStage="worker "+id+" configure accepted socket";
                                 peer.setSoTimeout(5000);
                                 var input=new DataInputStream(peer.getInputStream());var output=new DataOutputStream(peer.getOutputStream());
                                 byte[] data=new byte[size];
                                 for(int f=0;f<frames;f++) {
+                                    echoStage="worker "+id+" echo frame "+f;
                                     if(input.readInt()!=size)throw new AssertionError("TCP length");
                                     input.readFully(data);output.writeInt(size);output.write(data);output.flush();
                                 }
-                            }catch(Throwable error){failure.compareAndSet(null,error);}
+                            }catch(Throwable error){failure.compareAndSet(null,new IOException(echoStage+": "+describe(error),error));}
                         },"Load-echo-"+id);echo.setDaemon(true);echo.start();
+                        workerStage="worker "+id+" create/connect client";
                         try(Socket client=new Socket()) {
                             client.connect(new InetSocketAddress(loop,server.getLocalPort()),5000);client.setSoTimeout(5000);
                             var input=new DataInputStream(client.getInputStream());var output=new DataOutputStream(client.getOutputStream());
                             byte[] data=new byte[size],reply=new byte[size];
                             for(int f=0;f<frames;f++) {
+                                workerStage="worker "+id+" client frame "+f;
                                 for(int i=0;i<size;i++)data[i]=(byte)(id*31+f+i);
                                 output.writeInt(size);output.write(data);output.flush();
                                 if(input.readInt()!=size)throw new AssertionError("TCP reply size");input.readFully(reply);
@@ -45,7 +61,7 @@ public class NetworkLoad25 {
                             }
                         }finally{server.close();echo.join(6000);}
                         if(echo.isAlive())throw new AssertionError("Echo worker stuck");
-                    }catch(Throwable error){failure.compareAndSet(null,error);}
+                    }catch(Throwable error){failure.compareAndSet(null,new IOException(workerStage+": "+describe(error),error));}
                 },"Load-client-"+w);threads[w].setDaemon(true);threads[w].start();
             }
             long deadline=System.nanoTime()+60_000_000_000L;
@@ -70,6 +86,6 @@ public class NetworkLoad25 {
                 }
             }
             System.out.println("JAVA_NETWORK_LOAD_OK TCP 4x128x4096 UDP 256x512 (loopback)");
-        }catch(Throwable error){throw new Exception("Network load stage "+stage+": "+error,error);}
+        }catch(Throwable error){throw new Exception("Network load stage "+stage+": "+describe(error),error);}
     }
 }

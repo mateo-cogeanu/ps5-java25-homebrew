@@ -1264,3 +1264,33 @@ and repeated loopback traffic, not prolonged LAN endurance.
 Host protocols and negative TLS checks pass. Native signature/integrity,
 ZIP CRC, Java 25 fixture bytes, CA-store bytes and absence of preset device
 IPs pass. No console pass is inferred. Passing snapshots are unchanged.
+
+
+### Advanced Network 01.000.001 — IPv6 lookup and cause diagnostics
+
+The user's 01.000.000 photos show three failed rows: HTTPS throws
+ExceptionInInitializerError while initializing trust managers/TLS; IPv6
+reports protocol family unavailable; load wraps an unreported TCP worker
+cause. VM creation passed; shutdown results were not shown.
+
+OpenJDK IPv6_supported first creates a real AF_INET6 socket, then looks
+up inet_pton through JVM_FindLibraryEntry(RTLD_DEFAULT). The embedded
+lookup searched only the resident Java library exports and omitted that
+platform function. The lookup now exposes the existing SDK/platform
+inet_pton for global/process scope, without changing library-scoped symbol
+resolution. An actual IPv6 socket failure still returns unsupported; this
+is not forced capability detection. Host lookup tests execute ::1 parsing,
+invalid-input rejection and library-scope isolation. Native socket creation
+also records its actual fd/errno before the Java IPv6 row.
+
+TLS initialization now records separate trust-factory, trust initialization,
+TLS-context creation and secure-random initialization phases. Each fixture
+includes a bounded nested cause chain in its visible exception text. Load
+errors identify the client/echo worker and bind, accept, connect or frame
+phase. The exception buffer is larger to retain those details. No certificate
+validation, entropy source or load assertions are relaxed. The TLS and load
+causes still need actual console evidence before a targeted runtime fix.
+
+Native build/signature and host TLS positive/negative, IPv6, concurrent load
+and embedded lookup checks pass. The new package still needs all six console
+rows tested. No passing snapshot was altered.

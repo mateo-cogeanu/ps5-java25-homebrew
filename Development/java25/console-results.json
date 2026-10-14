@@ -483,5 +483,20 @@
       "Sustained or concurrent inbound load",
       "JIT stability"
     ]
+  },
+  "advanced_network_01_000_000": {
+    "title_id": "PPSA99871",
+    "version": "01.000.000",
+    "tested_date": "2026-10-14",
+    "results": {
+      "JNI_CreateJavaVM": "PASS (visible)",
+      "Https25": "FAIL: initialize trust managers/TLS context; ExceptionInInitializerError; nested cause not shown",
+      "Ipv625": "FAIL: bind IPv6 TCP listener; IPv6 protocol family unavailable",
+      "NetworkLoad25": "FAIL: four concurrent TCP workers; TCP load worker; nested cause not shown",
+      "DestroyJavaVM": "not shown"
+    },
+    "evidence": "User photos IMG_0429.JPG, IMG_0430.JPG and IMG_0431.JPG",
+    "package_sha256": "90162513b13832cc7c53689f962922ab14956e54f1e2d56bffa1fafe3cb6a37c",
+    "next_probe": "01.000.001 exposes actual platform inet_pton to global embedded lookup, splits TLS phases and includes nested cause chains / worker phases"
   }
 }

@@ -83,6 +83,7 @@ def main():
 #include <cstddef>
 #include <cstring>
 #include <dlfcn.h>
+#include <arpa/inet.h>
 '''+ '\n'.join(declarations)+'\n'+'\n'.join(builtin_loaders)+'''
 struct Symbol { const char *name; void *address; };
 struct Library { const char *name; const Symbol *symbols; size_t count; };
@@ -101,6 +102,8 @@ extern "C" void *__dlopen(const char *path,int) {
 extern "C" void *__dlsym(void *handle,const char *name) {
  if(!name) {last_error="Missing symbol name";return nullptr;}
  if(handle==RTLD_DEFAULT || handle==RTLD_SELF || handle==&libraries[0]) {
+  // OpenJDK probes this platform API by name after creating an IPv6 socket.
+  if(std::strcmp(name,"inet_pton")==0) return reinterpret_cast<void *>(&inet_pton);
   for(auto &lib:libraries) if(void *p=find_symbol(lib,name)) return p;
  } else {
   for(auto &lib:libraries) if(handle==&lib) if(void *p=find_symbol(lib,name)) return p;
