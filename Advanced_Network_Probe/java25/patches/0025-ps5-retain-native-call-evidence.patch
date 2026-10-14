@@ -1,0 +1,75 @@
+diff --git a/src/hotspot/share/runtime/ps5StartupTrace.hpp b/src/hotspot/share/runtime/ps5StartupTrace.hpp
+--- a/src/hotspot/share/runtime/ps5StartupTrace.hpp
++++ b/src/hotspot/share/runtime/ps5StartupTrace.hpp
+@@ -13,13 +13,30 @@
+ inline bool& ps5_vm_signal_trace_active() {
+   static bool active = false; return active;
+ }
++struct Ps5NativeCallRecord {
++  const char* operation;
++  unsigned long long caller, source, destination, bytes;
++  bool completed;
++};
++inline Ps5NativeCallRecord& ps5_vm_native_call_record() {
++  static Ps5NativeCallRecord record = {nullptr, 0, 0, 0, 0, false};
++  return record;
++}
++inline bool& ps5_vm_trace_io_active() { static bool active = false; return active; }
++struct Ps5TraceIOScope {
++  bool saved;
++  Ps5TraceIOScope() : saved(ps5_vm_trace_io_active()) { ps5_vm_trace_io_active() = true; }
++  ~Ps5TraceIOScope() { ps5_vm_trace_io_active() = saved; }
++};
+ inline char* ps5_vm_last_stage() {
+   static char previous[144] = "No startup stage recorded";
+   return previous;
+ }
+ inline void ps5_vm_trace(const char *stage) {
++  Ps5TraceIOScope io_scope;
+   int saved_errno = errno;
+-  if (::strncmp(stage, "SIGNAL:", 7) != 0 && stage != ps5_vm_last_stage()) {
++  if (::strncmp(stage, "SIGNAL:", 7) != 0 && ::strncmp(stage, "CALL:", 5) != 0 &&
++      ::strncmp(stage, "DONE: Traced", 12) != 0 && stage != ps5_vm_last_stage()) {
+     char* previous = ps5_vm_last_stage();
+     size_t i = 0;
+     for (; stage[i] && i < 143; ++i) previous[i] = stage[i];
+@@ -67,6 +84,7 @@
+ }
+ inline void ps5_vm_trace_memory(const char *operation, const void *address,
+                                 size_t bytes, int mode, int error) {
++  Ps5TraceIOScope io_scope;
+   int saved_errno = errno;
+   char message[192];
+   snprintf(message, sizeof(message), "%s addr=%p bytes=%zu mode=%d errno=%d",
+diff --git a/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp b/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
+--- a/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
++++ b/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
+@@ -417,22 +417,12 @@
+     ps5_vm_trace_hex("SIGNAL: number=", (unsigned long long)sig);
+     ps5_vm_trace_hex("SIGNAL: pc=", uc ? (unsigned long long)os::Posix::ucontext_get_pc(uc) : 0);
+     ps5_vm_trace_hex("SIGNAL: fault address=", info ? (unsigned long long)info->si_addr : 0);
+-    if (uc != nullptr) {
+-      ps5_vm_trace_values("SIGNAL: RDI=", (unsigned long long)uc->uc_mcontext.mc_rdi,
+-                          " RSI=", (unsigned long long)uc->uc_mcontext.mc_rsi,
+-                          " RDX=", (unsigned long long)uc->uc_mcontext.mc_rdx);
+-      // Only inspect addresses inside the already discovered current stack.
+-      // Values are stack candidates, not an asserted unwind/backtrace.
+-      const uintptr_t sp = (uintptr_t)os::Bsd::ucontext_get_sp(uc);
+-      unsigned long long slots[3] = {0, 0, 0};
+-      if (thread != nullptr && sp <= UINTPTR_MAX - 3 * sizeof(uintptr_t) &&
+-          thread->is_in_full_stack((address)sp) &&
+-          thread->is_in_full_stack((address)(sp + 3 * sizeof(uintptr_t) - 1))) {
+-        const volatile uintptr_t* stack = (const volatile uintptr_t*)sp;
+-        for (int i = 0; i < 3; ++i) slots[i] = stack[i];
+-      }
+-      ps5_vm_trace_values("SIGNAL: stack0=", slots[0], " stack1=", slots[1], " stack2=", slots[2]);
+-    }
++    const Ps5NativeCallRecord record = ps5_vm_native_call_record();
++    ps5_vm_trace_values(record.operation != nullptr ? record.operation : "CALL: unavailable caller=",
++                        record.caller, " src=", record.source, " dst=", record.destination);
++    ps5_vm_trace_values("SIGNAL: last call bytes=", record.bytes,
++                        " completed=", record.completed ? 1 : 0, " reserved=", 0);
++
+ 
+   }
+ #endif

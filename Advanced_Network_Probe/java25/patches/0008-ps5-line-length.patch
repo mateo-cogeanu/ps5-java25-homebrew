@@ -1,0 +1,42 @@
+diff --git a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+index d85bea608..a4d180a0e 100644
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -477,16 +477,35 @@ JNIEXPORT jint JNICALL
+ Java_sun_nio_fs_UnixNativeDispatcher_getlinelen(JNIEnv* env, jclass this, jlong stream)
+ {
+     FILE* fp = jlong_to_ptr(stream);
++    int saved_errno;
++#ifdef __PROSPERO__
++    // Only the length is needed here. The SDK has fgetc but no getline;
++    // consume through newline without allocating or interpreting NUL bytes.
++    ssize_t res = 0;
++    int ch;
++    while ((ch = fgetc(fp)) != EOF) {
++        if (res == SSIZE_MAX) {
++            errno = EOVERFLOW;
++            res = -1;
++            break;
++        }
++        ++res;
++        if (ch == '\n')
++            break;
++    }
++    if (ch == EOF && (res == 0 || ferror(fp)))
++        res = -1;
++    saved_errno = errno;
++#else
+     size_t lineSize = 0;
+     char * lineBuffer = NULL;
+-    int saved_errno;
+-
+     ssize_t res = getline(&lineBuffer, &lineSize, fp);
+     saved_errno = errno;
+ 
+     /* Should free lineBuffer no matter result, according to man page */
+     if (lineBuffer != NULL)
+         free(lineBuffer);
++#endif
+ 
+     if (feof(fp))
+         return -1;
