@@ -15,7 +15,7 @@ An experimental **native OpenJDK 25 port for PlayStation 5 homebrew**, built and
 
 This repository contains the **Java runtime port, platform adaptations and acceptance probes**. Java 25 bytecode execution, file I/O and JAR class loading have passed their tests on a real console.
 
-> **Current progress:** five passing milestones on PS5 firmware **13.60**, using interpreter mode. IPv4 loopback, LAN TCP/UDP and forward DNS are now console-tested.
+> **Current progress:** six passing milestones on PS5 firmware **13.60**, using interpreter mode. IPv4 loopback, outbound and inbound LAN TCP/UDP, and forward DNS are console-tested.
 
 **Related project:** [ps5-minecraft-java](https://github.com/mateo-cogeanu/ps5-minecraft-java) tracks Minecraft-specific work separately and will use this Java runtime.
 
@@ -30,16 +30,17 @@ Each milestone is a **frozen source snapshot** of a build that received **ALL PA
 | [ZIP_JAR_Probe](ZIP_JAR_Probe/) | **ALL PASS** | `01.000.000` | Stored/deflated ZIP entries, JAR manifest, JAR class loading and UTF-8 resources | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/ZIP_JAR_Probe-v01.000.000) |
 | [Network_Probe](Network_Probe/) | **ALL PASS** | `01.000.003` | TCP/UDP IPv4 loopback, Java worker echo, nonblocking NIO channels and selector readiness | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Network_Probe-v01.000.003) |
 | [LAN_DNS_Probe](LAN_DNS_Probe/) | **ALL PASS** | `01.000.000` | Outbound LAN TCP/UDP echo to a Mac, forward DNS lookup and VM lifecycle | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/LAN_DNS_Probe-v01.000.000) |
+| [Inbound_LAN_Probe](Inbound_LAN_Probe/) | **ALL PASS** | `01.000.000` | Inbound LAN TCP accept and UDP receive/reply with verified UTF-8 exchanges | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Inbound_LAN_Probe-v01.000.000) |
 | [Development](Development/) | **In progress** | — | Current source and upcoming probes; updated as changes are completed | [Browse source](Development/) |
 
 Passing folders stay unchanged. New work goes into `Development`; a new milestone is frozen only after its console tests pass. A successful host build alone does not qualify a milestone.
 
 ## Try a passing build
 
-1. Choose a milestone release above and download its **app ZIP**. The latest passing probe is **LAN_DNS_Probe**; its LAN row needs a configured Mac helper.
+1. Choose a milestone release above and download its **app ZIP**. The latest passing probe is **Inbound_LAN_Probe**; start its Mac client helper before running the console rows.
 2. Extract it and copy the **entire title folder** into the homebrew scan location used by your existing ShadowLoader setup.
 3. Let the loader register the app, then launch it from the home screen.
-4. Run the test rows **in order** (five for LAN/DNS, four for earlier probes). Use the **D-pad** to select and **X** to run a test. Close the app through the PS menu.
+4. Run the test rows **in order** (five for inbound LAN and LAN/DNS, four for earlier probes). Use the **D-pad** to select and **X** to run a test. Close the app through the PS menu.
 
 | App | Title folder |
 | :--- | :--- |
@@ -48,6 +49,7 @@ Passing folders stay unchanged. New work goes into `Development`; a new mileston
 | ZIP / JAR | `PPSA99867` |
 | Networking | `PPSA99868` |
 | LAN / DNS | `PPSA99869` |
+| Inbound LAN | `PPSA99870` |
 
 The apps use separate title IDs, so you can keep the passing probes installed side by side. Keep all files inside each extracted folder, including its assets, runtime and licenses. Compare the ZIP against the checksum supplied in its release.
 
@@ -60,17 +62,16 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 - [x] Read ZIP/JAR archives and load a Java class and resource from a JAR.
 - [x] Test Java TCP/UDP loopback and NIO selector readiness.
 - [x] Test outbound IPv4 LAN TCP/UDP and forward DNS resolution.
-- [ ] Validate inbound LAN connections, TLS and further socket behavior.
+- [x] Accept inbound LAN TCP connections and receive/reply to UDP datagrams.
+- [ ] Validate TLS and further socket behavior.
 - [ ] Expand class-path/dependency loading and filesystem coverage.
 - [ ] Validate JIT execution, garbage collection and sustained workloads.
 - [ ] Improve JNI and native-library compatibility for Java applications.
 - [ ] Test broader Java APIs, error handling and repeated application runs.
 
-**Latest passing networking probe:** [Network_Probe](Network_Probe/), `PPSA99868` version `01.000.003`. Its console result covers IPv4 loopback; the newer LAN/DNS milestone adds outbound LAN and forward DNS coverage.
+**Latest passing networking probe:** [Inbound_LAN_Probe](Inbound_LAN_Probe/), `PPSA99870` version `01.000.000`. Start its [Terminal launcher](Development/tools/start_inbound_client.command), enter the current PS5 address and keep Terminal open while running all five rows. The app listens without preset IPs.
 
-**LAN setup:** start the [Mac echo helper](Development/tools/java25_lan_server.py) on your LAN address, then set `lan.host` and `lan.port` in the extracted app's `assets/java25/probe.properties`. Keep the Mac awake while running the LAN row. See [LAN_DNS_Probe](LAN_DNS_Probe/) for commands and test scope. TLS and inbound LAN server connections remain separate tests.
-
-**Current development probe:** [Inbound LAN](Development/java25/probe/inbound.cpp), `PPSA99870` version `01.000.000`. The PS5 app listens without a preset IP; the [Mac client helper](Development/tools/java25_inbound_client.py) receives the PS5 address at runtime. The first console attempt timed out waiting for TCP and UDP traffic. Run `tools/start_inbound_client.command` in your own Terminal before retrying; inbound validation remains pending.
+**Outbound LAN setup:** see [LAN_DNS_Probe](LAN_DNS_Probe/) for the Mac echo helper and runtime endpoint configuration. TLS, IPv6 and sustained network load remain unverified.
 
 ## Explore the source
 

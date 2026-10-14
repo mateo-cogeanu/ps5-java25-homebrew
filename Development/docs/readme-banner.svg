@@ -26,7 +26,8 @@
       <text x="442" y="247" fill="#92e4cb">Network ✓</text>
       <rect x="563" y="225" width="130" height="35" rx="17" fill="#132e32" stroke="#28504e"/>
       <text x="580" y="247" fill="#92e4cb">LAN / DNS ✓</text>
-      <text x="728" y="247" font-weight="400" fill="#8b9fbd">Console tested · Interpreter mode</text>
+      <rect x="706" y="225" width="137" height="35" rx="17" fill="#132e32" stroke="#28504e"/>
+      <text x="724" y="247" fill="#92e4cb">Inbound LAN ✓</text>
     </g>
   </g>
 </svg>

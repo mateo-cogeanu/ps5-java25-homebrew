@@ -13,7 +13,7 @@
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
   "next_console_title": "PPSA99870",
-  "next_console_probe": "Java 25 Inbound LAN 01.000.000: separate inbound TCP/UDP server rows with no IP configuration",
+  "next_console_probe": "To be selected; inbound LAN 01.000.000 passed",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -125,7 +125,7 @@
   },
   "console_lan_dns": "ALL PASS: outbound IPv4 LAN TCP/UDP echo to Mac, forward DNS and VM lifecycle",
   "inbound_01_000_000_validation": {
-    "console": "FAIL: TCP accept and UDP receive timed out; no inbound exchange established",
+    "console": "ALL PASS: human PS5 report, 2026-10-14",
     "host_protocol": "PASS: real Java TCP/UDP listeners and actual Python client handshake; malformed TCP length correctly fails",
     "target_package": "PASS: native signature/integrity, ZIP CRC/version and exact fixture classes",
     "address_audit": "PASS: no probe.properties, no user/device addresses in package; listener binds by port without client-IP filter",

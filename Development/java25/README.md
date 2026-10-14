@@ -1215,3 +1215,12 @@ closed at that time. This result is not evidence of a PS5 routing failure.
 The console package is unchanged. Host TCP/UDP handshakes and invalid-frame
 rejection still pass. Retest the same package with the visible helper before
 changing the runtime or freezing an inbound milestone.
+
+
+### Inbound LAN console pass — 2026-10-14
+
+The user reports ALL PASS for unchanged PPSA99870 01.000.000 after the
+Terminal helper retry instructions. All five rows passed. The matching
+package and source are frozen as Inbound_LAN_Probe; see inbound-validation.json.
+Earlier timeout evidence is retained separately. TLS, IPv6 and sustained
+inbound workloads remain unvalidated.
