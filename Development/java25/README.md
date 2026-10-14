@@ -1463,3 +1463,14 @@ runtime IPv4 destination. Explicit scopes are preserved, and automatic
 tunnel scopes, loopback, unspecified and multicast destinations are rejected.
 Host checks cover those cases. The console package remains 01.000.000
 and IPv6 LAN exchange still needs actual PS5 verification.
+
+
+### LAN Endurance console pass — 2026-10-14
+
+The user reports ALL PASS for unchanged PPSA99872 01.000.000 after entering
+the PS5 IPv6 link-local address at runtime. All six rows passed. The matching
+package and current source/helper are frozen as LAN_Endurance_Probe; see
+lan-endurance-validation.json for the checksum and console scope. Earlier
+accept timeout and discovery failure evidence remain recorded separately.
+This establishes link-local IPv6 LAN traffic and separate 60-second external
+IPv4 TCP/UDP workloads, not global IPv6 routing or hours-long endurance.

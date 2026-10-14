@@ -555,7 +555,7 @@
       "JIT stability"
     ]
   },
-  "lan_endurance_01_000_000": {
+  "lan_endurance_01_000_000_first_attempt": {
     "title_id": "PPSA99872",
     "version": "01.000.000",
     "tested_date": "2026-10-14",
@@ -586,5 +586,37 @@
       "interpretation": "Discovery stopped before NDP matching; this is not proof of absent PS5 IPv6 support. A valid ARP entry was observed by a direct local query, while a later helper invocation failed to see it. Tool network probing also reports No route to host.",
       "helper_change": "Read existing ARP cache first, fall back to exact address/interface in full table, prime only if needed, print entered address/route and command error stdout"
     }
+  },
+  "lan_endurance_01_000_000": {
+    "title_id": "PPSA99872",
+    "version": "01.000.000",
+    "tested_date": "2026-10-14",
+    "console": "PS5 firmware 13.60",
+    "results": {
+      "native_initialization": "PASS",
+      "JNI_CreateJavaVM": "PASS",
+      "Ipv6Lan25": "PASS",
+      "LanTcpLoad25": "PASS",
+      "LanUdpLoad25": "PASS",
+      "DestroyJavaVM": "PASS"
+    },
+    "evidence": "Human console report: ALL PASS lets gooooo! after using manually supplied PS5 IPv6 link-local address with the updated Mac helper; console package unchanged",
+    "checks": [
+      "Actual external IPv6 LAN TCP framed UTF-8 request/reply and helper verification",
+      "Actual external IPv6 LAN UDP UTF-8 request/reply and helper verification",
+      "Four concurrent external IPv4 TCP clients, each at least 60 seconds and 128 verified 4096-byte frames with monotonic sequence and client confirmations",
+      "External IPv4 UDP at least 60 seconds and 128 verified 512-byte round trips, duplicate accounting and client confirmation",
+      "Real Java 25 interpreter VM initialization and shutdown"
+    ],
+    "package_file": "PPSA99872-lan-endurance-pass-01.000.000.zip",
+    "sha256": "96f9eb12994e49e5d630fc8fb2acb174d1630231273575a6afaf89687b751959",
+    "configuration": "Console app has no preset device IPs or client-IP filters. Mac helper receives IPv4 and IPv6 addresses at runtime; tested IPv6 is link-local with LAN interface scope. Manual address bypassed inconclusive ARP/NDP discovery.",
+    "unverified": [
+      "Global/routed IPv6 Internet reachability",
+      "Hours-long network endurance",
+      "Simultaneous mixed TCP/UDP load",
+      "Broader TLS configurations and console negative TLS checks",
+      "JIT stability"
+    ]
   }
 }

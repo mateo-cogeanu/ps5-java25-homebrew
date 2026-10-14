@@ -15,7 +15,7 @@ An experimental **native OpenJDK 25 port for PlayStation 5 homebrew**, built and
 
 This repository contains the **Java runtime port, platform adaptations and acceptance probes**. Java 25 bytecode execution, file I/O and JAR class loading have passed their tests on a real console.
 
-> **Current progress:** seven passing milestones on PS5 firmware **13.60**, using interpreter mode. HTTPS, IPv6 loopback, concurrent TCP traffic, IPv4 LAN TCP/UDP and forward DNS are console-tested.
+> **Current progress:** eight passing milestones on PS5 firmware **13.60**, using interpreter mode. HTTPS, IPv6 loopback and link-local LAN, 60-second LAN workloads, IPv4 TCP/UDP and forward DNS are console-tested.
 
 **Related project:** [ps5-minecraft-java](https://github.com/mateo-cogeanu/ps5-minecraft-java) tracks Minecraft-specific work separately and will use this Java runtime.
 
@@ -32,16 +32,17 @@ Each milestone is a **frozen source snapshot** of a build that received **ALL PA
 | [LAN_DNS_Probe](LAN_DNS_Probe/) | **ALL PASS** | `01.000.000` | Outbound LAN TCP/UDP echo to a Mac, forward DNS lookup and VM lifecycle | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/LAN_DNS_Probe-v01.000.000) |
 | [Inbound_LAN_Probe](Inbound_LAN_Probe/) | **ALL PASS** | `01.000.000` | Inbound LAN TCP accept and UDP receive/reply with verified UTF-8 exchanges | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Inbound_LAN_Probe-v01.000.000) |
 | [Advanced_Network_Probe](Advanced_Network_Probe/) | **ALL PASS** | `01.000.002` | Verified HTTPS, IPv6 loopback, four concurrent TCP workers and repeated UDP round trips | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Advanced_Network_Probe-v01.000.002) |
+| [LAN_Endurance_Probe](LAN_Endurance_Probe/) | **ALL PASS** | `01.000.000` | IPv6 link-local LAN TCP/UDP; four concurrent TCP clients and repeated UDP for at least 60 seconds each | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/LAN_Endurance_Probe-v01.000.000) |
 | [Development](Development/) | **In progress** | — | Current source and upcoming probes; updated as changes are completed | [Browse source](Development/) |
 
 Passing folders stay unchanged. New work goes into `Development`; a new milestone is frozen only after its console tests pass. A successful host build alone does not qualify a milestone.
 
 ## Try a passing build
 
-1. Choose a milestone release above and download its **app ZIP**. The latest passing probe is **Advanced_Network_Probe**; it needs Internet for HTTPS and no Mac helper.
+1. Choose a milestone release above and download its **app ZIP**. The latest passing probe is **LAN_Endurance_Probe**; it needs the Mac helper and current PS5 IPv4/IPv6 addresses.
 2. Extract it and copy the **entire title folder** into the homebrew scan location used by your existing ShadowLoader setup.
 3. Let the loader register the app, then launch it from the home screen.
-4. Run the test rows **in order** (six for Advanced Network, five for inbound LAN and LAN/DNS, four for earlier probes). Use the **D-pad** to select and **X** to run a test. Close the app through the PS menu.
+4. Run the test rows **in order** (six for LAN Endurance and Advanced Network, five for inbound LAN and LAN/DNS, four for earlier probes). Use the **D-pad** to select and **X** to run a test. Close the app through the PS menu.
 
 | App | Title folder |
 | :--- | :--- |
@@ -52,6 +53,7 @@ Passing folders stay unchanged. New work goes into `Development`; a new mileston
 | LAN / DNS | `PPSA99869` |
 | Inbound LAN | `PPSA99870` |
 | Advanced Network | `PPSA99871` |
+| LAN Endurance | `PPSA99872` |
 
 The apps use separate title IDs, so you can keep the passing probes installed side by side. Keep all files inside each extracted folder, including its assets, runtime and licenses. Compare the ZIP against the checksum supplied in its release.
 
@@ -66,17 +68,16 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 - [x] Test outbound IPv4 LAN TCP/UDP and forward DNS resolution.
 - [x] Accept inbound LAN TCP connections and receive/reply to UDP datagrams.
 - [x] Verify HTTPS, IPv6 loopback and bounded concurrent/repeated TCP/UDP traffic.
-- [ ] Expand TLS coverage, IPv6 LAN reachability and prolonged network workloads.
+- [x] Exchange IPv6 link-local LAN traffic and run 60-second external TCP/UDP workloads.
+- [ ] Expand TLS coverage, routed IPv6 and longer mixed network workloads.
 - [ ] Expand class-path/dependency loading and filesystem coverage.
 - [ ] Validate JIT execution, garbage collection and sustained workloads.
 - [ ] Improve JNI and native-library compatibility for Java applications.
 - [ ] Test broader Java APIs, error handling and repeated application runs.
 
-**Latest passing networking probe:** [Advanced_Network_Probe](Advanced_Network_Probe/), `PPSA99871` version `01.000.002`. Run all six rows in order. HTTPS accesses `https://example.com/` with certificate and hostname verification; IPv6 and traffic-load tests use loopback. No Mac helper is needed.
+**Latest passing networking probe:** [LAN_Endurance_Probe](LAN_Endurance_Probe/), `PPSA99872` version `01.000.000`. Start the [Mac launcher](Development/tools/start_lan_endurance.command), enter the PS5’s current IPv4 and IPv6 addresses, and keep Terminal open. The helper adds the LAN interface scope for a link-local IPv6 address when needed. Run all six console rows in order; each load row takes about a minute. The app contains no preset device addresses.
 
-**LAN setup:** [Inbound_LAN_Probe](Inbound_LAN_Probe/) uses a Mac client helper with the PS5 address supplied at runtime. [LAN_DNS_Probe](LAN_DNS_Probe/) uses a configured Mac echo endpoint. IPv6 LAN reachability, prolonged LAN load and broader TLS configurations remain unverified.
-
-**Current development probe:** [LAN Endurance](Development/java25/probe/lan-endurance.cpp), `PPSA99872` version `01.000.000`. The 60-second external TCP and UDP rows passed on PS5. IPv6 TCP accept timed out; IPv6 LAN remains unvalidated; shutdown also passed. The [Mac launcher](Development/tools/start_lan_endurance.command) prompts for the current PS5 IPv4 address and tries IPv6 neighbor discovery. Use [discovery only](Development/tools/check_lan_ipv6.command) to diagnose IPv6 without repeating load tests. Terminal output is saved locally and the window stays open.
+**Other network scopes:** [Advanced_Network_Probe](Advanced_Network_Probe/) covers verified HTTPS and local IPv6; [Inbound_LAN_Probe](Inbound_LAN_Probe/) covers short inbound IPv4 exchanges; [LAN_DNS_Probe](LAN_DNS_Probe/) covers outbound LAN and DNS. Routed IPv6, hours-long endurance, simultaneous mixed load and broader TLS configurations remain unverified.
 
 ## Explore the source
 
