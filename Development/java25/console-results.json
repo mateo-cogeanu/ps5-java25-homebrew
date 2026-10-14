@@ -566,9 +566,9 @@
       "Ipv6Lan25": "FAIL: SocketTimeoutException: Accept timed out while waiting for actual IPv6 LAN client",
       "LanTcpLoad25": "PASS",
       "LanUdpLoad25": "PASS",
-      "DestroyJavaVM": "not yet shown/reported"
+      "DestroyJavaVM": "PASS (human follow-up)"
     },
-    "evidence": "User photo IMG_0433.JPG; runtime and VM return code 00000000, both load rows show PASS/00000000, IPv6 accept timeout FFFFFAE5",
+    "evidence": "User photo IMG_0433.JPG; runtime and VM return code 00000000, both load rows show PASS/00000000, IPv6 accept timeout FFFFFAE5; follow-up: all passed except IPv6, Terminal closed before discovery output could be retained",
     "package_sha256": "96f9eb12994e49e5d630fc8fb2acb174d1630231273575a6afaf89687b751959",
     "established": [
       "Four external TCP client workers satisfy at least 60 seconds and 128 verified 4096-byte frames each, with client confirmations",
@@ -577,9 +577,8 @@
     "not_established": [
       "IPv6 LAN destination discovery or reachability",
       "IPv6 UDP exchange (TCP accept failed first)",
-      "VM shutdown for this package (not shown)",
       "ALL PASS for this combined build"
     ],
-    "next_step": "Obtain Terminal IPv6 discovery result and confirm row 6; retain passing IPv4 results without freezing a partial milestone"
+    "next_step": "Run check_lan_ipv6.command to retain neighbor discovery evidence without repeating load tests; PS5 package unchanged"
   }
 }

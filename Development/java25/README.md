@@ -1403,3 +1403,25 @@ The external helper may not have discovered a PS5 IPv6 destination; its
 Terminal discovery result is requested. VM destruction remains unreported
 in this photo. The source/package are unchanged and the partial build is
 not frozen as a passing milestone. Existing seven snapshots remain intact.
+
+
+### Retain IPv6 discovery evidence — 2026-10-14
+
+The user confirms every LAN Endurance row except IPv6 passed, including
+DestroyJavaVM. The helper's Terminal window closed before its discovery
+output could be read, so a discovery failure cannot yet be distinguished
+from a failed connection to a discovered address.
+
+Both Terminal launchers now save stdout/stderr under build/java25, show
+the exit status and wait for Enter before closing. Double-click
+tools/check_lan_ipv6.command for discovery only, with the PS5 awake and
+connected. No need to repeat load rows or transfer a new console build.
+The result is in build/java25/lan-ipv6-discovery.log; the full helper output
+is in build/java25/lan-endurance-terminal.log. Logs and runtime addresses
+are excluded from publication.
+
+Discovery prints route/ARP absence or command errors, and the hardware
+address/interface used for NDP matching. Failure to observe a neighbor
+does not prove the PS5 lacks IPv6 configuration. No device address is
+guessed. All older passing snapshots stay frozen; this combined IPv6/load
+package still has a failed row and is not a passing milestone.

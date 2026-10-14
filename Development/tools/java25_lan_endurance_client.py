@@ -91,19 +91,30 @@ def udp_load(host,port,seconds):
         s.send(b'MAC_UDP_VERIFIED')
         return {'round_trips':count,'server_ms':elapsed,'retries':retries,'server_duplicates':duplicates}
 
-def discover_ipv6(ipv4):
+def discover_ipv6(ipv4,verbose=False):
     """Match NDP entries to the PS5's IPv4 ARP MAC, without guessing IPv6."""
     def command(args):
-        try:return subprocess.run(args,capture_output=True,text=True,timeout=4).stdout
-        except (OSError,subprocess.TimeoutExpired):return ''
+        try:
+            result=subprocess.run(args,capture_output=True,text=True,timeout=4)
+            if verbose and getattr(result,'returncode',0)!=0:
+                print('DISCOVERY: '+args[0]+' returned '+str(result.returncode)+'; '+getattr(result,'stderr','').strip(),flush=True)
+            return result.stdout
+        except (OSError,subprocess.TimeoutExpired) as error:
+            if verbose:print('DISCOVERY: '+args[0]+': '+str(error),flush=True)
+            return ''
     route=command(['route','-n','get',ipv4]);interface=re.search(r'interface:\s*(\w+)',route)
-    if not interface:return []
+    if not interface:
+        if verbose:print('DISCOVERY: no route interface found for the supplied IPv4 address',flush=True)
+        return []
     interface=interface.group(1)
     command(['ping','-c','1','-W','1000',ipv4])
     arp=command(['arp','-n',ipv4]);mac=re.search(r' at ([0-9a-f:]+) on ',arp,re.I)
-    if not mac:return []
+    if not mac:
+        if verbose:print('DISCOVERY: no IPv4 ARP hardware address found for the PS5',flush=True)
+        return []
     normalize=lambda text:':'.join(part.zfill(2).lower() for part in text.split(':'))
     wanted=normalize(mac.group(1))
+    if verbose:print('DISCOVERY: matching PS5 hardware address '+wanted+' on '+interface,flush=True)
     command(['ping6','-c','2','-I',interface,'ff02::1'])
     found=[]
     for line in command(['ndp','-an']).splitlines():
@@ -121,13 +132,17 @@ def main():
     parser.add_argument('--ps5-ipv4',required=True)
     parser.add_argument('--ps5-ipv6',help='Optional discovered address, with %%interface for link-local')
     parser.add_argument('--discover',action='store_true')
+    parser.add_argument('--discover-only',action='store_true',help='Print IPv6 neighbor evidence without starting any traffic tests')
     parser.add_argument('--timeout',type=float,default=1800)
     args=parser.parse_args();ipaddress.IPv4Address(args.ps5_ipv4)
     host6=args.ps5_ipv6
-    if args.discover and not host6:
-        candidates=discover_ipv6(args.ps5_ipv4)
+    if (args.discover or args.discover_only) and not host6:
+        candidates=discover_ipv6(args.ps5_ipv4,verbose=True)
         print('IPv6 discovery:',', '.join(candidates) if candidates else 'no PS5 neighbor address found',flush=True)
         if candidates:host6=candidates[0]
+    if args.discover_only:
+        print('Discovery finished. No address found does not prove IPv6 is disabled; it means no matching neighbor was observed.',flush=True)
+        return
     stop=threading.Event();results={};deadline=time.monotonic()+args.timeout
     def worker(label,operation):
         last=None;reported=0;attempt=0

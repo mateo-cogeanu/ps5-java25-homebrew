@@ -13,7 +13,7 @@
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
   "next_console_title": "PPSA99870",
-  "next_console_probe": "Diagnose LAN Endurance IPv6 destination discovery/reachability and obtain VM shutdown result; same 01.000.000 package",
+  "next_console_probe": "Run standalone IPv6 neighbor discovery in user Terminal; PPSA99872 01.000.000 package unchanged",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -163,7 +163,7 @@
   "lan_endurance_01_000_000_validation": {
     "title_id": "PPSA99872",
     "version": "01.000.000",
-    "console": "PARTIAL: initialization, VM creation, 60-second external TCP and UDP PASS; IPv6 TCP accept timed out; shutdown not shown",
+    "console": "All rows PASS except IPv6 LAN TCP accept timeout; shutdown confirmed by human follow-up",
     "zip_sha256": "96f9eb12994e49e5d630fc8fb2acb174d1630231273575a6afaf89687b751959",
     "host_checks": "PASS: real Java fixtures and Python helper; IPv6 request/response; production loopback-peer rejection; shortened concurrent TCP and UDP duration/count checks; premature workload rejection; neighbor discovery matching",
     "package_checks": "PASS: native integrity/signature, ZIP CRC/version, exact Java25 fixtures; no preset device addresses or endpoint properties",

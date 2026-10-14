@@ -76,7 +76,7 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 
 **LAN setup:** [Inbound_LAN_Probe](Inbound_LAN_Probe/) uses a Mac client helper with the PS5 address supplied at runtime. [LAN_DNS_Probe](LAN_DNS_Probe/) uses a configured Mac echo endpoint. IPv6 LAN reachability, prolonged LAN load and broader TLS configurations remain unverified.
 
-**Current development probe:** [LAN Endurance](Development/java25/probe/lan-endurance.cpp), `PPSA99872` version `01.000.000`. The 60-second external TCP and UDP rows passed on PS5. IPv6 TCP accept timed out; IPv6 LAN and this build’s shutdown still await validation. Start the [Mac launcher](Development/tools/start_lan_endurance.command) first; it prompts for the current PS5 IPv4 address and tries IPv6 neighbor discovery.
+**Current development probe:** [LAN Endurance](Development/java25/probe/lan-endurance.cpp), `PPSA99872` version `01.000.000`. The 60-second external TCP and UDP rows passed on PS5. IPv6 TCP accept timed out; IPv6 LAN remains unvalidated; shutdown also passed. The [Mac launcher](Development/tools/start_lan_endurance.command) prompts for the current PS5 IPv4 address and tries IPv6 neighbor discovery. Use [discovery only](Development/tools/check_lan_ipv6.command) to diagnose IPv6 without repeating load tests. Terminal output is saved locally and the window stays open.
 
 ## Explore the source
 
