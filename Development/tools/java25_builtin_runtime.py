@@ -7,6 +7,7 @@ from pathlib import Path
 import json
 import subprocess
 import re
+import argparse
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / '.tools/java25/openjdk/build/ps5-bootstrap'
@@ -17,6 +18,9 @@ LLD = Path(subprocess.check_output(['brew','--prefix','lld'],text=True).strip())
 LIBRARIES = ['java','zip','jimage','net','nio']
 
 def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--jni-fixture",action="store_true",help="Include real dependency-probe JNI test library")
+    args=parser.parse_args()
     declarations=[]; tables=[]; mapped=[]; links=[]; alias_index=0; builtin_loaders=[]
     libraries=[('jvm',WORK/'embedded-jvm.o')]
     for name in LIBRARIES:
@@ -47,6 +51,13 @@ def main():
                 options+=['--rename-section',section+'=.data.rel.ro.jvm_init_array.'+name+section]
             subprocess.run([str(LLVM/'llvm-objcopy'),*options,str(merged)],check=True)
         libraries.append((name,merged));links.append(str(merged))
+    if args.jni_fixture:
+        headers=BUILD/'support/modules_include/java.base'
+        fixture=WORK/'dependency-jni.o'
+        subprocess.run([str(LLVM/'clang++'),'-target','x86_64-sie-ps5','-std=c++20','-O2','-fPIC',
+            '-DPS5_EMBEDDED_FIXTURE','-fvisibility-nodllstorageclass=default','-isysroot',str(SDK),
+            '-I'+str(headers),'-I'+str(headers/'freebsd'),'-c',str(ROOT/'java25/probe/dependency_jni.cpp'),'-o',str(fixture)],check=True)
+        libraries.append(('ps5probe',fixture));links.append(str(fixture))
     for name, merged in libraries:
         symbols=subprocess.check_output([str(LLVM/'llvm-nm'),'--defined-only','--extern-only',str(merged)],text=True)
         entries=[]
@@ -63,7 +74,7 @@ def main():
             alias='embedded_symbol_'+str(alias_index);alias_index+=1
             declarations.append('extern "C" void '+alias+'() __asm__("'+symbol+'");')
             entries.append('{"'+display+'", reinterpret_cast<void *>(&'+alias+')}')
-        if name in LIBRARIES:
+        if name in LIBRARIES or name=='ps5probe':
             # Advertise known resident libraries through OpenJDK's standard
             # JNI_OnLoad_<name> discovery. This avoids File.exists/canonical
             # path checks before their filesystem natives are registered.

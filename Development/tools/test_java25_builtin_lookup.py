@@ -48,6 +48,14 @@ int main() {
  assert(!__dlsym(process,"JNI_OnLoad_unknown"));
  assert(!__dlopen("libunknown.so",0));
  assert(__dlclose(nio)==0);
+ if(void *probe_load=__dlsym(process,"JNI_OnLoad_ps5probe")) {
+  load_version=0x00010008;
+  assert(reinterpret_cast<int (*)(void *,void *)>(probe_load)(nullptr,nullptr)==0x00010008);
+  void *probe=__dlopen("libps5probe.so",0);assert(probe);
+  assert(__dlsym(probe,"Java_ps5deps_NativeMath_sum"));
+  assert(!__dlsym(java,"Java_ps5deps_NativeMath_sum"));
+ }
+
  std::puts("PASS: built-in discovery, original hooks, JNI versions, native symbols and library scope");
 }
 '''

@@ -1474,3 +1474,51 @@ lan-endurance-validation.json for the checksum and console scope. Earlier
 accept timeout and discovery failure evidence remain recorded separately.
 This establishes link-local IPv6 LAN traffic and separate 60-second external
 IPv4 TCP/UDP workloads, not global IPv6 routing or hours-long endurance.
+
+
+### Dependency loading 01.000.000 — next application prerequisite
+
+The user deferred hours-long endurance until a useful application exists.
+The existing network milestones remain valid; further networking scope is
+not a gate for this next probe. PPSA99873 has six rows: initialize, create
+VM, multi-JAR dependencies, actual system class path, JNI library, destroy VM.
+No external endpoint or Mac helper is needed.
+
+```sh
+python3 tools/package_java25_jni.py --dependencies
+python3 tools/test_java25_dependencies.py
+python3 tools/test_java25_builtin_lookup.py
+```
+
+Four deterministic unsigned JARs hold every payload class. application.jar
+has manifest Class-Path: dependency.jar api.jar; it calls cross-JAR classes,
+loads a ServiceLoader provider from META-INF/services, verifies a UTF-8
+resource and computes a known result. MultiJar25 supplies only application.jar
+to an isolated URLClassLoader with the platform parent, then verifies
+transitive loading and the order of three same-name resources.
+
+The native VM options now put application.jar on java.class.path alongside
+the fixture entrypoint directory. SystemClasspath25 uses the actual system
+class loader to resolve the JAR-only application, confirms its defining
+loader, invokes transitive code and requires ClassNotFoundException for a
+missing class. JNI DefineClass is used only for the probe entrypoint as in
+earlier builds; it never supplies the payload/dependency bytecode.
+
+NativeDeps25 loads ps5deps.NativeMath from native.jar. Its static initializer
+calls System.loadLibrary("ps5probe"). The dependency package includes an
+opt-in real target-compiled resident JNI fixture in the existing embedded
+lookup tables, exposing its actual JNI_OnLoad and native method addresses.
+The on-load function calls GetEnv on the real VM. The method copies byte
+arrays through GetByteArrayRegion and computes weighted sums. Eight calls
+verify the arithmetic; a null input verifies native-to-Java exception
+propagation, and a missing library must throw UnsatisfiedLinkError.
+This is a test of resident JNI discovery, not arbitrary external ELF loading.
+Other probe packages omit the fixture; no host native binaries are packaged.
+
+Host tests compile the same JNI source as a temporary host dynamic library,
+then exercise actual Java loading and calls. They also reject missing
+transitive JARs, a missing application system-classpath entry, and a missing
+JNI library. The generated embedded lookup test covers opt-in discovery and
+library symbol isolation. Package integrity/CRC, Java 25 bytes, JAR-only
+payload placement and real target JNI definitions pass. Console execution
+remains pending; no ninth milestone or application compatibility is claimed.

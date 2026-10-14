@@ -13,7 +13,7 @@
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
   "next_console_title": "PPSA99870",
-  "next_console_probe": "To be selected; LAN Endurance 01.000.000 passed",
+  "next_console_probe": "Dependencies PPSA99873 01.000.000: multi-JAR manifest dependencies/services, actual system class path and real resident JNI fixture",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -169,5 +169,14 @@
     "package_checks": "PASS: native integrity/signature, ZIP CRC/version, exact Java25 fixtures; no preset device addresses or endpoint properties",
     "discovery": "Manual PS5 IPv6 link-local address supplied at runtime; all IPv6 and load rows passed. Automatic ARP/NDP discovery remains inconclusive in this environment.",
     "scope": "Actual IPv6 link-local LAN TCP/UDP and two separate 60-second IPv4 LAN load rows passed; routed IPv6, hours-long soak and simultaneous mixed protocols remain unverified."
+  },
+  "dependency_01_000_000_validation": {
+    "title_id": "PPSA99873",
+    "version": "01.000.000",
+    "console": "pending",
+    "zip_sha256": "4b5e3ae7433f654d517f1283024af72586918319416d1298ff141221825adf68",
+    "host_checks": "PASS: manifest Class-Path transitive classes, service provider and UTF-8 resource/order, actual system class loader, real host JNI library discovery/arrays/arithmetic/exception; missing JAR/classpath/native library reject; embedded lookup discovery/symbol scope",
+    "package_checks": "PASS: native signature/integrity, ZIP CRC/title/version, exact class/JAR bytes, payload classes only in JARs, real target JNI symbols; no host dynamic library packaged",
+    "scope": "Four controlled unsigned JARs and one resident test JNI library; no Minecraft server boot or arbitrary external native ELF loading claimed"
   }
 }
