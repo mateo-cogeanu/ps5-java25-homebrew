@@ -188,5 +188,30 @@
     "package_checks": "PASS: target signature/integrity, ZIP CRC/version, JAR-only payload classes, exact fixtures; patched URLClassPath confirmed in packaged JIMAGE",
     "ui_check": "Host layout preview confirms long diagnostic wraps within actual font widths; unsupported 16/18px fallback replaced with baked 20px exception font and left/right paging",
     "scope": "Manifest-linked dependencies/services/resources, actual VM system class path and real resident JNI fixture all passed; external native ELF and application bootstrap remain unvalidated."
+  },
+  "external_probe_packaging": {
+    "console": "consumer package pending",
+    "host_checks": "PASS: target modules compiled and linked; default base-only image preserved; exact target timezone/CA data; external source/assets/spec packaging and native signature/CRC",
+    "image_modules_supported": [
+      "java.base",
+      "java.compiler",
+      "java.datatransfer",
+      "java.xml",
+      "java.prefs",
+      "java.desktop",
+      "java.logging",
+      "java.management",
+      "java.security.sasl",
+      "java.naming",
+      "java.rmi",
+      "java.scripting",
+      "java.transaction.xa",
+      "java.sql",
+      "jdk.httpserver",
+      "jdk.jfr",
+      "jdk.unsupported"
+    ],
+    "native_scope": "Image adds Java classes/configuration only. Optional per-module native services remain unvalidated; no host native binaries used.",
+    "consumer_source_repository": "https://github.com/mateo-cogeanu/ps5-minecraft-java"
   }
 }

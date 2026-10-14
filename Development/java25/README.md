@@ -1575,3 +1575,31 @@ The matching package and source are frozen as Dependency_Probe; see
 dependency-validation.json for its checksum and scope. Earlier failure
 evidence is retained. This establishes the controlled dependency fixture,
 not Minecraft bootstrap or arbitrary external native-library support.
+
+
+### External consumer probes and optional target modules
+
+The runtime packaging tool now accepts --probe-spec JSON with source,
+param, asset_dir, java_sources, modules and include_dirs. Consumer app
+source/assets remain in their own repository; the Java project owns the
+reusable native runtime/image tooling. All required paths must exist.
+The native builder accepts additional include directories. External asset
+staging is fresh for each build, and real module names are retained in
+the release metadata. Related application work lives in
+https://github.com/mateo-cogeanu/ps5-minecraft-java.
+
+java25_boot_image.py --modules accepts optional target-built Java modules,
+builds their Java targets, creates classes/config-only JMODs and uses jlink
+to include the dependency closure. It rejects missing target modules and
+checks the image did not borrow a host module. Default builds still include
+only java.base. Optional modules currently cover compiler, desktop, XML,
+logging, management, naming, RMI, scripting, SQL, HTTP server, JFR and
+unsupported APIs with their dependencies. Their optional native services
+are not implied to work by packaging their Java classes.
+
+Target-generated tzdb.dat and security/cacerts are now always copied into
+the core image: class/config-only JMODs previously omitted these data files.
+Exact source/output bytes and default-module isolation were checked.
+No host native library is included. An external consumer package passes
+assembly/signature/CRC/content checks and awaits its own console test.
+Existing nine frozen runtime milestones remain unchanged.

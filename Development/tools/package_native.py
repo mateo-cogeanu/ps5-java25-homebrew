@@ -36,6 +36,7 @@ def main():
     parser.add_argument("--linker-script", default=str(UPSTREAM / "tooling/native/ps5-pie.ld"))
     parser.add_argument("--license-file", action="append", default=[], help="Additional upstream notice/license to include")
     parser.add_argument("--asset-dir", help="Directory whose contents are included under app assets/")
+    parser.add_argument("--include-dir",action="append",default=[],help="Additional native source include directory")
     args = parser.parse_args()
     if not UPSTREAM.exists():
         run("git", "clone", "https://github.com/blackbearreloaded/ps5-native-app-boilerplate.git", UPSTREAM)
@@ -78,7 +79,7 @@ def main():
     for name, source in (("main", ROOT / args.source), ("renderer", ROOT / "native/renderer/demo_renderer.cpp"), ("crt", native / "app_crt.cpp"), ("cpp_runtime", native / "app_cpp_runtime.cpp")):
         obj = WORK / (name + ".o")
         run(llvm / "clang++", "-target", "x86_64-sie-ps5", "-fvisibility-nodllstorageclass=default", "-isysroot", SDK,
-            "-isystem", SDK / "target/include/c++/v1", "-isystem", SDK / "target/include", "-I", ROOT / "native/renderer", "-I", WORK, "-I", ROOT / "src",
+            "-isystem", SDK / "target/include/c++/v1", "-isystem", SDK / "target/include", "-I", ROOT / "native/renderer", "-I", WORK, "-I", ROOT / "src", "-I", ROOT / "native", *[item for path in args.include_dir for item in ("-I",path)],
             "-std=c++20", "-O2", "-Wall", "-Wextra", "-Werror", "-fno-stack-protector", "-fno-plt", "-femulated-tls", "-fno-exceptions", "-fno-rtti",
             "-ffunction-sections", "-fdata-sections", "-c", source, "-o", obj, env=env)
         objects.append(obj)

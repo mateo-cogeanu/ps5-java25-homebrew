@@ -62,3 +62,11 @@ out of Git. Compiled packages belong in release assets, not source commits.
 In the final response, state whether GitHub was updated and identify any console
 validation still needed. These rules guide work during agent turns; they do not
 create a background file watcher or automatic uploads while no agent is working.
+
+## Separate consumer repositories
+
+Minecraft-specific source, artifact pins, harnesses and validation belong
+in https://github.com/mateo-cogeanu/ps5-minecraft-java and must be committed
+and pushed there. Reusable Java runtime fixes, patches and packaging/image
+tools belong here and are published through tools/sync_github.py. Do not
+copy consumer game code or downloaded game JARs into this repository.

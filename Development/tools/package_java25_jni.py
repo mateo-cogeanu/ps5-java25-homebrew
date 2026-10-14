@@ -21,7 +21,12 @@ parser.add_argument("--inbound", action="store_true", help="Package separate inb
 parser.add_argument("--advanced-network", action="store_true", help="Package HTTPS, IPv6 and concurrent network load tests")
 parser.add_argument("--lan-endurance", action="store_true", help="Package IPv6 LAN and prolonged external TCP/UDP tests")
 parser.add_argument("--dependencies",action="store_true",help="Package multi-JAR, system class-path and resident JNI dependency tests")
+parser.add_argument("--probe-spec",type=Path,help="External consumer probe JSON; source and assets stay in their own project")
 args = parser.parse_args()
+external=json.loads(args.probe_spec.read_text()) if args.probe_spec else None
+if external:
+    for key in ("source","param","asset_dir"):
+        if not Path(external[key]).exists():parser.error("External probe input missing: "+key)
 if args.lan:
     import ipaddress
     try:
@@ -30,9 +35,9 @@ if args.lan:
             raise ValueError("Choose a private unicast LAN address")
     except ValueError as error: parser.error(str(error))
     if not 1024 <= args.lan_port <= 65535: parser.error("LAN port must be 1024..65535")
-if sum([args.fileio,args.zipjar,args.network,args.lan,args.inbound,args.advanced_network,args.lan_endurance,args.dependencies]) > 1:
-    parser.error("Choose one probe: --fileio, --zipjar, --network, --lan, --inbound, --advanced-network, --lan-endurance or --dependencies")
-args.startup = args.startup or args.fileio or args.zipjar or args.network or args.lan or args.inbound or args.advanced_network or args.lan_endurance or args.dependencies
+if sum([args.fileio,args.zipjar,args.network,args.lan,args.inbound,args.advanced_network,args.lan_endurance,args.dependencies,bool(external)]) > 1:
+    parser.error("Choose one probe: --fileio, --zipjar, --network, --lan, --inbound, --advanced-network, --lan-endurance, --dependencies or --probe-spec")
+args.startup = args.startup or args.fileio or args.zipjar or args.network or args.lan or args.inbound or args.advanced_network or args.lan_endurance or args.dependencies or bool(external)
 WORK = ROOT / "build/java25"
 SDK = ROOT / ".tools/native-sdk/ps5-payload-sdk"
 JVM = ROOT / ".tools/java25/openjdk/build/ps5-bootstrap/hotspot/variant-server/libjvm/objs"
@@ -106,11 +111,12 @@ extra_args=[]
 app_source="java25/probe/jni.cpp"
 app_param="java25/probe/jni-param.json"
 if args.startup:
-    subprocess.run(["python3",str(ROOT/"tools/java25_boot_image.py")],check=True)
+    subprocess.run(["python3",str(ROOT/"tools/java25_boot_image.py"),*(["--modules",",".join(external.get("modules",["java.base"]))] if external else [])],check=True)
     subprocess.run(["python3",str(ROOT/"tools/java25_builtin_runtime.py"),*(["--jni-fixture"] if args.dependencies else [])],check=True)
     extra_objects=json.loads((WORK/"builtin-link-inputs.json").read_text())
     absent_callbacks=[name for name in absent_callbacks if not name.startswith("__dl")]
-    assets=WORK/("dependency-assets/java25" if args.dependencies else "lan-endurance-assets/java25" if args.lan_endurance else "advanced-network-assets/java25" if args.advanced_network else "inbound-assets/java25" if args.inbound else ("lan-assets/java25" if args.lan else ("network-assets/java25" if args.network else ("zipjar-assets/java25" if args.zipjar else "startup-assets/java25"))))
+    if external:shutil.rmtree(WORK/"external-assets",ignore_errors=True)
+    assets=WORK/("external-assets/java25" if external else "dependency-assets/java25" if args.dependencies else "lan-endurance-assets/java25" if args.lan_endurance else "advanced-network-assets/java25" if args.advanced_network else "inbound-assets/java25" if args.inbound else ("lan-assets/java25" if args.lan else ("network-assets/java25" if args.network else ("zipjar-assets/java25" if args.zipjar else "startup-assets/java25"))))
     shutil.copytree(WORK/"boot-image",assets,dirs_exist_ok=True)
     shutil.copy2(WORK/"boot-image-audit.json",assets/"boot-image-audit.json")
     legal=ROOT/".tools/java25/openjdk/src/java.base/share/legal"
@@ -121,7 +127,8 @@ if args.startup:
     shutil.copy2(native_libs/"server/libjvm.so",assets/"lib/server/libjvm.so")
     for name in ("java","zip","jimage","net","nio"):
         shutil.copy2(native_libs/("lib"+name+".so"),assets/"lib"/("lib"+name+".so"))
-    (assets/"release").write_text('JAVA_VERSION="25.0.4"\nMODULES="java.base"\nOS_NAME="FreeBSD"\nOS_ARCH="amd64"\nIMPLEMENTOR="Experimental PS5 port"\n')
+    module_names=re.search(r'^MODULES="([^"]+)"',(WORK/"boot-image/release").read_text(),re.M).group(1)
+    (assets/"release").write_text('JAVA_VERSION="25.0.4"\nMODULES="'+module_names+'"\nOS_NAME="FreeBSD"\nOS_ARCH="amd64"\nIMPLEMENTOR="Experimental PS5 port"\n')
     (assets/"classes").mkdir(exist_ok=True)
     subprocess.run(["/opt/homebrew/opt/openjdk@25/bin/javac","--release","25","-d",str(assets/"classes"),str(ROOT/"java25/tests/Hello25.java")],check=True)
     if args.fileio:
@@ -136,6 +143,9 @@ if args.startup:
     if args.lan:
         subprocess.run(["/opt/homebrew/opt/openjdk@25/bin/javac","--release","25","-d",str(assets/"classes"),str(ROOT/"java25/tests/Lan25.java"),str(ROOT/"java25/tests/Dns25.java")],check=True)
         (assets/"probe.properties").write_text("lan.host="+args.lan_host+"\nlan.port="+str(args.lan_port)+"\n")
+    if external:
+        shutil.copytree(Path(external['asset_dir'])/'java25',assets,dirs_exist_ok=True)
+        subprocess.run(["/opt/homebrew/opt/openjdk@25/bin/javac","--release","25","-d",str(assets/"classes"),*external['java_sources']],check=True)
     if args.dependencies:
         subprocess.run(["/opt/homebrew/opt/openjdk@25/bin/javac","--release","25","-d",str(assets/"classes"),*[str(ROOT/"java25/tests"/(name+".java")) for name in ("MultiJar25","SystemClasspath25","NativeDeps25")]],check=True)
         subprocess.run(["python3",str(ROOT/"tools/java25_dependency_fixture.py"),"--output",str(assets/"jars")],check=True)
@@ -184,8 +194,11 @@ if args.startup:
     if args.dependencies:
         app_source="java25/probe/dependencies.cpp"
         app_param="java25/probe/dependencies-param.json"
+    if external:
+        app_source=external["source"];app_param=external["param"]
+        extra_args.extend([item for path in external.get("include_dirs",[]) for item in ("--include-dir",path)])
 wrapped_calls=["--wrap="+name for name in ("memcpy","memmove","memcmp","strcmp","strlen","memset","strncmp","strncpy","strchr","memchr","strcpy","malloc","strdup")] if args.startup else []
-if args.fileio or args.zipjar or args.network or args.lan or args.inbound or args.advanced_network or args.lan_endurance or args.dependencies:
+if args.fileio or args.zipjar or args.network or args.lan or args.inbound or args.advanced_network or args.lan_endurance or args.dependencies or bool(external):
     wrapped_calls.append("--wrap=open")
 response(link_response, [*wrapped_calls,*("--defsym=" + name + "=0" for name in absent_callbacks),
                         "-L" + str(SDK / "target/lib"), merged,*extra_objects, native_libc, SDK / "target/lib/libpthread.a",
@@ -234,6 +247,6 @@ report = {"source_commit": actual, "hotspot_object_count": len(objects),
           "memory_api_binding": "mmap/mprotect are undefined platform imports; SDK payload mman.o excluded",
           "console_execution": "pending",
           "vm_creation_and_java_bytecode": "Multi-JAR/system-classpath/JNI console execution pending" if args.dependencies else "IPv6 LAN/endurance console execution pending" if args.lan_endurance else "HTTPS/IPv6/load console execution pending" if args.advanced_network else "inbound LAN console execution pending" if args.inbound else "LAN/DNS console execution pending" if args.lan else "new Java networking title console execution pending" if args.network else "new ZIP/JAR title console execution pending" if args.zipjar else ("new file I/O title console execution pending" if args.fileio else ("package-specific console execution pending" if args.startup else "not attempted by this package"))}
-audit_name="dependency-package-audit.json" if args.dependencies else "lan-endurance-package-audit.json" if args.lan_endurance else "advanced-network-package-audit.json" if args.advanced_network else "inbound-package-audit.json" if args.inbound else "lan-package-audit.json" if args.lan else "network-package-audit.json" if args.network else ("zipjar-package-audit.json" if args.zipjar else ("fileio-package-audit.json" if args.fileio else ("startup-package-audit.json" if args.startup else "jni-package-audit.json")))
+audit_name="external-probe-package-audit.json" if external else "dependency-package-audit.json" if args.dependencies else "lan-endurance-package-audit.json" if args.lan_endurance else "advanced-network-package-audit.json" if args.advanced_network else "inbound-package-audit.json" if args.inbound else "lan-package-audit.json" if args.lan else "network-package-audit.json" if args.network else ("zipjar-package-audit.json" if args.zipjar else ("fileio-package-audit.json" if args.fileio else ("startup-package-audit.json" if args.startup else "jni-package-audit.json")))
 (WORK / audit_name).write_text(json.dumps(report, indent=2)+"\n")
 print(f"Verified embedded HotSpot: {len(objects)} objects, {(last-first)//8} staged constructors")

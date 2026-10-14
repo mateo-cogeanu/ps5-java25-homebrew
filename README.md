@@ -85,6 +85,8 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 
 **Latest passing dependency probe:** [Dependency_Probe](Dependency_Probe/), `PPSA99873` version `01.000.001`. Run all six rows in order. The controlled application and its dependencies exist only in JARs; the JNI fixture is target-compiled and embedded. Arbitrary external native ELF loading and real application compatibility remain unverified. Longer network endurance is deferred until there is a useful application to exercise.
 
+**Reusable consumer tooling:** the runtime builder supports external probe specifications and optional target-built Java modules. Application-specific work remains in its own repository. Existing passing snapshots stay frozen; additional-module console coverage is pending.
+
 ## Explore the source
 
 [Development](Development/) contains the current probe apps, Java fixtures, packaging tools and patches against a pinned FreeBSD OpenJDK source revision. The native UI grew out of a controller tester and Interface Lab prototype.
