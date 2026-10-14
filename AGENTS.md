@@ -28,6 +28,9 @@ Keep the milestone table and release links current when freezing a milestone.
 This repository's branding and roadmap cover the Java runtime only. Link to
 `mateo-cogeanu/ps5-minecraft-java` for Minecraft-specific goals; do not add game,
 graphics or mod-loader roadmaps here. Preserve frozen validation snapshots.
+New inbound test apps must not contain preset device IP addresses or client-IP
+filters. Listen on available interfaces; pass the target address to external
+client helpers at runtime. Preserve older frozen validation snapshots.
 
 Verify the command succeeds and the push completes. Report failures and their
 reason; never claim an upload succeeded without evidence. Retry recoverable

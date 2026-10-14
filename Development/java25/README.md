@@ -1156,3 +1156,40 @@ passing package retains its tested endpoint in assets/java25/probe.properties;
 other users must supply their own Mac helper address and port before running
 the LAN row. Inbound LAN server acceptance, TLS, IPv6, DNS edge cases and
 sustained/concurrent loads remain separate work.
+
+### Next probe: Inbound LAN 01.000.000 (console pending)
+
+PPSA99870 has five rows: initialize, create VM, inbound TCP, inbound UDP
+and destroy VM. The Java app binds listeners by port on available interfaces,
+with IPv4 preference. TCP uses 38026; UDP uses 38027. There are no preset
+device addresses, packaged endpoint properties or client-address filters.
+Replies go to the accepted connection or received datagram's actual peer.
+
+```sh
+python3 tools/package_java25_jni.py --inbound
+python3 tools/java25_inbound_client.py --ps5-host YOUR_PS5_IP --background
+python3 tools/test_java25_inbound.py
+```
+
+Only the external client helper takes a runtime destination. It uses normal
+OS routing by default; --bind is optional. The helper retries while the app
+is not listening, for up to 30 minutes, and exits after both protocol checks
+pass. Keep the Mac awake. Readiness/results are in build/java25/inbound-client.log
+and its PID is in inbound-client.pid; neither is tracked. Restart the helper
+if its wait expires before testing.
+
+The TCP fixture accepts a client, validates framed UTF-8 data, sends its
+own acknowledgement and requires a client verification marker. UDP binds
+a listener, validates a request, replies to its sender and checks a second
+verification packet from that same peer. Accept/receive waits are bounded
+to 25 seconds, with 5-second connected exchange/confirmation waits. Every
+fixture uses real Java sockets and closes its resources. The native app
+registers only diagnostic callbacks and persists active stage names.
+
+The actual packaged Java listeners and Python protocol pass host tests,
+including an invalid TCP frame that fails instead of reporting success.
+Native build/signature, ZIP CRC/version, exact class bytes and package-wide
+user-address checks pass. Packaging now replaces generated asset directories
+rather than retaining removed files: the initial configured draft is superseded
+and its stale properties are absent from the final ZIP. Console validation
+remains pending; older passing milestones and archives are unchanged.

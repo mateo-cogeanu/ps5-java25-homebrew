@@ -101,7 +101,14 @@ def main():
     shutil.copy2(ROOT / args.param, app / "sce_sys/param.json")
     shutil.copy2(ROOT / args.icon, app / "sce_sys/icon0.png")
     if args.asset_dir:
-        shutil.copytree(ROOT / args.asset_dir, app / "assets", dirs_exist_ok=True)
+        # Assets are a generated snapshot. Replacing the directory prevents
+        # removed configuration/files from leaking into a later package.
+        asset_target = app / "assets"
+        if asset_target.is_symlink():
+            asset_target.unlink()
+        elif asset_target.exists():
+            shutil.rmtree(asset_target)
+        shutil.copytree(ROOT / args.asset_dir, asset_target)
     (app / "licenses").mkdir(exist_ok=True)
     shutil.copy2(UPSTREAM / "LICENSE", app / "licenses/GPL-3.0.txt")
     shutil.copy2(ROOT / "THIRD_PARTY_NOTICES.md", app / "licenses/THIRD_PARTY_NOTICES.md")
