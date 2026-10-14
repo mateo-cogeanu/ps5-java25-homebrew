@@ -13,7 +13,7 @@
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
   "next_console_title": "PPSA99870",
-  "next_console_probe": "To be selected; inbound LAN 01.000.000 passed",
+  "next_console_probe": "Advanced Network PPSA99871 01.000.000: HTTPS, IPv6 loopback and concurrent/repeated loopback traffic",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -132,5 +132,14 @@
     "helper": "Diagnostic retry errors now visible; run tools/start_inbound_client.command in user Terminal before retrying",
     "zip_sha256": "11f28dda3fcec883283896fee6e36fd1f29b3e57a0a38fef38576a5e0af4813b",
     "scope": "one inbound TCP connection and one UDP request/response; no sustained load or TLS validation"
+  },
+  "advanced_network_01_000_000_validation": {
+    "console": "pending",
+    "title_id": "PPSA99871",
+    "version": "01.000.000",
+    "host_checks": "PASS: trusted TLS/HTTPS; untrusted certificate and hostname mismatch rejected; IPv6 TCP/UDP ::1; four concurrent TCP workers / 512 frames / 2 MiB each direction; 256 UDP round trips",
+    "package_checks": "PASS: native signature/integrity, ZIP CRC, exact classes and target-generated CA truststore, no device IPs",
+    "zip_sha256": "90162513b13832cc7c53689f962922ab14956e54f1e2d56bffa1fafe3cb6a37c",
+    "scope": "HTTPS to example.com with standard certificate/hostname validation; IPv6 and load on loopback only. No IPv6 LAN or long-duration endurance proof."
   }
 }

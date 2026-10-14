@@ -1224,3 +1224,43 @@ Terminal helper retry instructions. All five rows passed. The matching
 package and source are frozen as Inbound_LAN_Probe; see inbound-validation.json.
 Earlier timeout evidence is retained separately. TLS, IPv6 and sustained
 inbound workloads remain unvalidated.
+
+
+### Advanced Network 01.000.000 — awaiting PS5 tests
+
+PPSA99871 adds six rows: initialize, create VM, HTTPS, IPv6 loopback,
+network load and destroy VM. No preset device addresses or Mac helper.
+Run all six in order, even if an individual test reports FAIL.
+
+```sh
+python3 tools/package_java25_jni.py --advanced-network
+python3 tools/test_java25_advanced_network.py
+```
+
+HTTPS uses HttpsURLConnection to https://example.com/, with 10-second
+connect/read timeouts and a 64-KiB body limit. The exact pinned target
+OpenJDK build's generated CA store is bundled at lib/security/cacerts and
+loaded through the already-tested Files read API. TrustManagerFactory
+and SSLContext use standard providers; hostname verification remains
+enabled. No accept-all trust manager, certificate override or insecure
+randomness fallback is used. The PS5 needs Internet access and a correct
+system clock for certificate validity. Host tests use a temporary local
+TLS server and demonstrate trusted success, untrusted-chain rejection and
+wrong-hostname rejection. Certificates/keys from that harness are temporary
+and are not packaged or published. Public endpoint behavior remains a
+console-time dependency.
+
+This probe enables IPv6 sockets (preferIPv4Stack=false). The IPv6 row
+explicitly binds/connects ::1 for TCP and UDP, checks the actual IPv6 peer
+and verifies replies. This establishes IPv6 loopback only, not LAN IPv6
+routing, external reachability or interface discovery.
+
+Load uses four concurrent client workers with separate TCP echo workers,
+128 verified 4096-byte frames each (2 MiB each direction overall), followed
+by 256 verified 512-byte UDP round trips. Sockets have five-second timeouts;
+client-worker joins share a 60-second deadline. This tests bounded concurrent
+and repeated loopback traffic, not prolonged LAN endurance.
+
+Host protocols and negative TLS checks pass. Native signature/integrity,
+ZIP CRC, Java 25 fixture bytes, CA-store bytes and absence of preset device
+IPs pass. No console pass is inferred. Passing snapshots are unchanged.
