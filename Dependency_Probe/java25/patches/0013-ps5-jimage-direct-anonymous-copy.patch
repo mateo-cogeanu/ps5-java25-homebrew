@@ -1,0 +1,53 @@
+diff --git a/src/java.base/unix/native/libjimage/osSupport_unix.cpp b/src/java.base/unix/native/libjimage/osSupport_unix.cpp
+--- a/src/java.base/unix/native/libjimage/osSupport_unix.cpp
++++ b/src/java.base/unix/native/libjimage/osSupport_unix.cpp
+@@ -76,22 +76,21 @@
+  */
+ void* osSupport::map_memory(int fd, const char *filename, size_t file_offset, size_t bytes) {
+     void* mapped_address = NULL;
+-    mapped_address = (void*) mmap(NULL,
+-            bytes, PROT_READ, MAP_SHARED,
+-            fd, file_offset);
+-    if (mapped_address == MAP_FAILED) {
+ #ifdef __PROSPERO__
+-        // Anonymous mapping was validated on the console; file-backed
+-        // mapping was not. Preserve mmap ownership and unmap semantics.
+-        ps5_vm_trace("JIMAGE: file mmap failed; anonymous copy fallback");
++        // Native PS5 module-image reading uses anonymous memory directly.
++        // The file-backed mmap attempt crashed before returning on console.
++        ps5_vm_trace("JIMAGE: PS5 anonymous read-only image copy");
+         if (bytes == 0 || file_offset > static_cast<size_t>(LLONG_MAX) ||
+                 bytes > static_cast<size_t>(LLONG_MAX) - file_offset) return NULL;
++        ps5_vm_trace("ENTER: JIMAGE anonymous allocation");
+         mapped_address = mmap(NULL, bytes, PROT_READ | PROT_WRITE,
+                               MAP_PRIVATE | MAP_ANON, -1, 0);
+         if (mapped_address == MAP_FAILED) {
+             ps5_vm_trace("FAIL: JIMAGE anonymous mapping");
+             return NULL;
+         }
++        ps5_vm_trace("DONE: JIMAGE anonymous allocation");
++        ps5_vm_trace("ENTER: JIMAGE file-to-memory copy");
+         size_t completed = 0;
+         while (completed < bytes) {
+             size_t request = bytes - completed;
+@@ -106,6 +105,8 @@
+                 return NULL;
+             }
+         }
++        ps5_vm_trace("DONE: JIMAGE file-to-memory copy");
++        ps5_vm_trace("ENTER: JIMAGE read-only protection");
+         if (mprotect(mapped_address, bytes, PROT_READ) != 0) {
+             ps5_vm_trace("FAIL: JIMAGE anonymous copy read-only protection");
+             munmap(mapped_address, bytes);
+@@ -113,9 +114,9 @@
+         }
+         ps5_vm_trace("DONE: JIMAGE anonymous read-only copy");
+ #else
+-        return NULL;
++    mapped_address = mmap(NULL, bytes, PROT_READ, MAP_SHARED, fd, file_offset);
++    if (mapped_address == MAP_FAILED) return NULL;
+ #endif
+-    }
+     return mapped_address;
+ }
+ 

@@ -1,0 +1,204 @@
+diff --git a/src/hotspot/share/runtime/ps5StartupTrace.hpp b/src/hotspot/share/runtime/ps5StartupTrace.hpp
+--- a/src/hotspot/share/runtime/ps5StartupTrace.hpp
++++ b/src/hotspot/share/runtime/ps5StartupTrace.hpp
+@@ -1,6 +1,6 @@
+ /* SPDX-License-Identifier: GPL-2.0-only
+- * PS5 port diagnostic helper: record startup milestones without stdio,
+- * JVM allocation, JVM locks or signal recovery.
++ * PS5 port diagnostic helper: record startup milestones through raw file IO,
++ * with stack formatting and no JVM allocation, locks or signal recovery.
+  */
+ #ifndef SHARE_RUNTIME_PS5STARTUPTRACE_HPP
+ #define SHARE_RUNTIME_PS5STARTUPTRACE_HPP
+@@ -9,9 +9,11 @@
+ #include <unistd.h>
+ #include <string.h>
+ #include <errno.h>
++#include <stdio.h>
+ inline void ps5_vm_trace(const char *stage) {
++  int saved_errno = errno;
+   int fd = ::open("/download0/java25-vm-trace.log", O_CREAT | O_WRONLY | O_APPEND, 0600);
+-  if (fd < 0) return;
++  if (fd < 0) { errno = saved_errno; return; }
+   size_t length = ::strlen(stage);
+   size_t sent = 0;
+   while (sent < length) {
+@@ -22,8 +24,19 @@
+   }
+   (void)::write(fd, "\n", 1);
+   (void)::close(fd);
++  errno = saved_errno;
++}
++inline void ps5_vm_trace_memory(const char *operation, const void *address,
++                                size_t bytes, int mode, int error) {
++  int saved_errno = errno;
++  char message[192];
++  snprintf(message, sizeof(message), "%s addr=%p bytes=%zu mode=%d errno=%d",
++           operation, address, bytes, mode, error);
++  ps5_vm_trace(message);
++  errno = saved_errno;
+ }
+ #else
++inline void ps5_vm_trace_memory(const char *, const void *, size_t, int, int) {}
+ inline void ps5_vm_trace(const char *) {}
+ #endif
+ #endif
+diff --git a/src/hotspot/share/runtime/init.cpp b/src/hotspot/share/runtime/init.cpp
+--- a/src/hotspot/share/runtime/init.cpp
++++ b/src/hotspot/share/runtime/init.cpp
+@@ -43,6 +43,7 @@
+ #include "runtime/handles.inline.hpp"
+ #include "runtime/icache.hpp"
+ #include "runtime/init.hpp"
++#include "runtime/ps5StartupTrace.hpp"
+ #include "runtime/safepoint.hpp"
+ #include "runtime/sharedRuntime.hpp"
+ #include "sanitizers/leak.hpp"
+@@ -115,25 +116,47 @@
+ 
+ 
+ jint init_globals() {
++  ps5_vm_trace("ENTER: Management initialization");
+   management_init();
++  ps5_vm_trace("DONE: Management initialization");
++  ps5_vm_trace("ENTER: JVMTI OopStorage");
+   JvmtiExport::initialize_oop_storage();
++  ps5_vm_trace("DONE: JVMTI OopStorage");
+ #if INCLUDE_JVMTI
+   if (AlwaysRecordEvolDependencies) {
+     JvmtiExport::set_can_hotswap_or_post_breakpoint(true);
+     JvmtiExport::set_all_dependencies_are_recorded(true);
+   }
+ #endif
++  ps5_vm_trace("ENTER: Bytecode table initialization");
+   bytecodes_init();
++  ps5_vm_trace("DONE: Bytecode table initialization");
++  ps5_vm_trace("ENTER: Class loader phase 1");
+   classLoader_init1();
++  ps5_vm_trace("DONE: Class loader phase 1");
++  ps5_vm_trace("ENTER: Compilation policy");
+   compilationPolicy_init();
++  ps5_vm_trace("DONE: Compilation policy");
++  ps5_vm_trace("ENTER: Code cache initialization");
+   codeCache_init();
+-  VM_Version_init();              // depends on codeCache_init for emitting code
+-  icache_init2();                 // depends on VM_Version for choosing the mechanism
++  ps5_vm_trace("DONE: Code cache initialization");
++  ps5_vm_trace("ENTER: CPU version and executable detection stubs");
++  VM_Version_init();
++  ps5_vm_trace("DONE: CPU version and executable detection stubs");              // depends on codeCache_init for emitting code
++  ps5_vm_trace("ENTER: Instruction cache initialization");
++  icache_init2();
++  ps5_vm_trace("DONE: Instruction cache initialization");                 // depends on VM_Version for choosing the mechanism
+   // stub routines in initial blob are referenced by later generated code
++  ps5_vm_trace("ENTER: Initial machine-code stubs");
+   initial_stubs_init();
++  ps5_vm_trace("DONE: Initial machine-code stubs");
+   // stack overflow exception blob is referenced by the interpreter
++  ps5_vm_trace("ENTER: Stack-overflow runtime stubs");
+   SharedRuntime::generate_initial_stubs();
+-  jint status = universe_init();  // dependent on codeCache_init and
++  ps5_vm_trace("DONE: Stack-overflow runtime stubs");
++  ps5_vm_trace("ENTER: Universe and Java heap initialization");
++  jint status = universe_init();
++  ps5_vm_trace("DONE: Universe and Java heap initialization");  // dependent on codeCache_init and
+                                   // initial_stubs_init and metaspace_init.
+   if (status != JNI_OK)
+     return status;
+@@ -145,21 +168,47 @@
+     LSAN_REGISTER_ROOT_REGION(summary.start(), summary.reserved_size());
+   }
+ #endif // LEAK_SANITIZER
+-  AOTCodeCache::init2();     // depends on universe_init
++  ps5_vm_trace("ENTER: AOT code cache phase 2");
++  AOTCodeCache::init2();
++  ps5_vm_trace("DONE: AOT code cache phase 2");     // depends on universe_init
++  ps5_vm_trace("ENTER: Async log writer");
+   AsyncLogWriter::initialize();
+-  gc_barrier_stubs_init();   // depends on universe_init, must be before interpreter_init
+-  continuations_init();      // must precede continuation stub generation
+-  continuation_stubs_init(); // depends on continuations_init
++  ps5_vm_trace("DONE: Async log writer");
++  ps5_vm_trace("ENTER: GC barrier stubs");
++  gc_barrier_stubs_init();
++  ps5_vm_trace("DONE: GC barrier stubs");   // depends on universe_init, must be before interpreter_init
++  ps5_vm_trace("ENTER: Continuations initialization");
++  continuations_init();
++  ps5_vm_trace("DONE: Continuations initialization");      // must precede continuation stub generation
++  ps5_vm_trace("ENTER: Continuation stubs");
++  continuation_stubs_init();
++  ps5_vm_trace("DONE: Continuation stubs"); // depends on continuations_init
+ #if INCLUDE_JFR
++  ps5_vm_trace("ENTER: JFR runtime stubs");
+   SharedRuntime::generate_jfr_stubs();
++  ps5_vm_trace("DONE: JFR runtime stubs");
+ #endif
+-  interpreter_init_stub();   // before methods get loaded
++  ps5_vm_trace("ENTER: Interpreter entry stubs");
++  interpreter_init_stub();
++  ps5_vm_trace("DONE: Interpreter entry stubs");   // before methods get loaded
++  ps5_vm_trace("ENTER: Access flags");
+   accessFlags_init();
++  ps5_vm_trace("DONE: Access flags");
++  ps5_vm_trace("ENTER: Interface support");
+   InterfaceSupport_init();
+-  VMRegImpl::set_regName();  // need this before generate_stubs (for printing oop maps).
++  ps5_vm_trace("DONE: Interface support");
++  ps5_vm_trace("ENTER: VM register names");
++  VMRegImpl::set_regName();
++  ps5_vm_trace("DONE: VM register names");  // need this before generate_stubs (for printing oop maps).
++  ps5_vm_trace("ENTER: Shared runtime stubs");
+   SharedRuntime::generate_stubs();
+-  AOTCodeCache::init_shared_blobs_table();  // need this after generate_stubs
+-  SharedRuntime::init_adapter_library(); // do this after AOTCodeCache::init_shared_blobs_table
++  ps5_vm_trace("DONE: Shared runtime stubs");
++  ps5_vm_trace("ENTER: Shared blob table");
++  AOTCodeCache::init_shared_blobs_table();
++  ps5_vm_trace("DONE: Shared blob table");  // need this after generate_stubs
++  ps5_vm_trace("ENTER: Runtime adapter library");
++  SharedRuntime::init_adapter_library();
++  ps5_vm_trace("DONE: Runtime adapter library"); // do this after AOTCodeCache::init_shared_blobs_table
+   return JNI_OK;
+ }
+ 
+diff --git a/src/hotspot/os/bsd/os_bsd.cpp b/src/hotspot/os/bsd/os_bsd.cpp
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -1892,12 +1892,15 @@
+ //       left at the time of mmap(). This could be a potential
+ //       problem.
+ bool os::pd_commit_memory(char* addr, size_t size, bool exec) {
++  ps5_vm_trace_memory("ENTER: Native memory commit", addr, size, exec, 0);
+   int prot = exec ? PROT_READ|PROT_WRITE|PROT_EXEC : PROT_READ|PROT_WRITE;
+   if (exec) {
+     // Do not replace MAP_JIT mappings, see JDK-8234930
+     if (::mprotect(addr, size, prot) == 0) {
++      ps5_vm_trace_memory("DONE: Native executable commit", addr, size, prot, 0);
+       return true;
+     } else {
++      ps5_vm_trace_memory("FAIL: Native executable commit", addr, size, prot, errno);
+       ErrnoPreserver ep;
+       log_trace(os, map)("mprotect failed: " RANGEFMT " errno=(%s)",
+                          RANGEFMTARGS(addr, size),
+@@ -1907,8 +1910,10 @@
+     uintptr_t res = (uintptr_t) ::mmap(addr, size, prot,
+                                        MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0);
+     if (res != (uintptr_t) MAP_FAILED) {
++      ps5_vm_trace_memory("DONE: Native RW memory commit", addr, size, prot, 0);
+       return true;
+     } else {
++      ps5_vm_trace_memory("FAIL: Native RW memory commit", addr, size, prot, errno);
+       ErrnoPreserver ep;
+       log_trace(os, map)("mmap failed: " RANGEFMT " errno=(%s)",
+                          RANGEFMTARGS(addr, size),
+@@ -2050,7 +2055,10 @@
+   // Map reserved/uncommitted pages PROT_NONE so we fail early if we
+   // touch an uncommitted page. Otherwise, the read/write might
+   // succeed if we have enough swap space to back the physical page.
++  ps5_vm_trace_memory("ENTER: Native memory reserve", requested_addr, bytes, flags, 0);
+   char* addr = (char*)::mmap(requested_addr, bytes, PROT_NONE, flags, -1, 0);
++  ps5_vm_trace_memory(addr == MAP_FAILED ? "FAIL: Native memory reserve" : "DONE: Native memory reserve",
++                      addr, bytes, flags, addr == MAP_FAILED ? errno : 0);
+   if (addr == MAP_FAILED) {
+     ErrnoPreserver ep;
+     log_trace(os, map)("mmap failed: " RANGEFMT " errno=(%s)",

@@ -1,0 +1,38 @@
+{
+  "title_id": "PPSA99871",
+  "version": "01.000.002",
+  "tested_date": "2026-10-14",
+  "console": "PS5 firmware 13.60",
+  "results": {
+    "native_initialization": "PASS",
+    "JNI_CreateJavaVM": "PASS",
+    "Https25": "PASS",
+    "Ipv625": "PASS",
+    "NetworkLoad25": "PASS",
+    "DestroyJavaVM": "PASS"
+  },
+  "evidence": "Human console report: ALL PASS! after supplying Advanced Network 01.000.002",
+  "checks": [
+    "HTTPS to https://example.com/ with bundled CA trust store and standard hostname verification; HTTP 200, encrypted cipher and nonempty bounded response",
+    "IPv6 ::1 TCP request/reply and UDP request/reply",
+    "Four concurrent TCP clients with echo workers: 128 verified 4096-byte frames each; 2 MiB each direction overall",
+    "256 verified 512-byte UDP loopback round trips",
+    "Real Java 25 interpreter VM initialization and shutdown"
+  ],
+  "package_file": "PPSA99871-advanced-network-pass-01.000.002.zip",
+  "sha256": "8c95655c87b1433c291170d606c22e740b2099b4e8a28ed2906905ba534c32cc",
+  "configuration": "No preset device IPs or external LAN helper; HTTPS requires Internet, IPv6 and load use loopback",
+  "host_negative_checks": [
+    "Untrusted TLS certificate rejected",
+    "Trusted certificate with wrong hostname rejected",
+    "JCE limited policy remains AES-128, unlimited policy parsed normally",
+    "Missing mandatory policy files and denied custom policy metadata reject"
+  ],
+  "unverified": [
+    "TLS certificate rejection on the actual PS5 (negative checks currently host-tested)",
+    "IPv6 LAN/external reachability",
+    "Prolonged or concurrent LAN endurance",
+    "Broader HTTPS endpoints and TLS configurations",
+    "JIT stability"
+  ]
+}

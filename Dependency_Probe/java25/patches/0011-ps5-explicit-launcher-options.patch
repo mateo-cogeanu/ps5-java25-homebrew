@@ -1,0 +1,137 @@
+diff --git a/src/hotspot/share/runtime/arguments.cpp b/src/hotspot/share/runtime/arguments.cpp
+--- a/src/hotspot/share/runtime/arguments.cpp
++++ b/src/hotspot/share/runtime/arguments.cpp
+@@ -2151,6 +2151,8 @@
+     bool is_absolute_path = false;  // for -agentpath vs -agentlib
+ 
+     const JavaVMOption* option = args->options + index;
++    ps5_vm_trace("PARSING OPTION:");
++    ps5_vm_trace(option->optionString);
+ 
+     if (!match_option(option, "-Djava.class.path", &tail) &&
+         !match_option(option, "-Dsun.java.command", &tail) &&
+@@ -3101,6 +3103,12 @@
+ 
+ jint Arguments::parse_jdk_aot_vm_options_environment_variable(GrowableArrayCHeap<VMInitArgsGroup, mtArguments>* all_args,
+                                                             ScopedVMInitArgs* jdk_aot_vm_options_args) {
++#ifdef __PROSPERO__
++  // Native bootstrap options are supplied by the JNI launcher. No desktop
++  // AOT/environment option source is configured for this application.
++  ps5_vm_trace("PS5: JDK_AOT_VM_OPTIONS disabled; explicit launcher options");
++  return JNI_OK;
++#endif
+   // Don't bother scanning all the args if this env variable is not set
+   if (::getenv("JDK_AOT_VM_OPTIONS") == nullptr) {
+     return JNI_OK;
+@@ -3134,6 +3142,10 @@
+ 
+ jint Arguments::parse_options_environment_variable(const char* name,
+                                                    ScopedVMInitArgs* vm_args) {
++#ifdef __PROSPERO__
++  ps5_vm_trace("PS5: desktop VM environment options disabled");
++  return JNI_OK;
++#endif
+   char *buffer = ::getenv(name);
+ 
+   // Don't check this environment variable if user has special privileges
+@@ -3500,8 +3512,10 @@
+ // Parse entry point called from JNI_CreateJavaVM
+ 
+ jint Arguments::parse(const JavaVMInitArgs* initial_cmd_args) {
++  ps5_vm_trace("ENTER: VM argument parser entry and flag declarations");
+   assert(verify_special_jvm_flags(false), "deprecated and obsolete flag table inconsistent");
+   JVMFlag::check_all_flag_declarations();
++  ps5_vm_trace("DONE: Flag declarations");
+ 
+   // If flag "-XX:Flags=flags-file" is used it will be the first option to be processed.
+   const char* hotspotrc = ".hotspotrc";
+@@ -3528,6 +3542,7 @@
+ 
+   GrowableArrayCHeap<VMInitArgsGroup, mtArguments> all_args;
+ 
++  ps5_vm_trace("ENTER: Desktop environment option sources");
+   jint code =
+       parse_java_tool_options_environment_variable(&initial_java_tool_options_args);
+   if (code != JNI_OK) {
+@@ -3542,7 +3557,10 @@
+   }
+ 
+   // Parse the options in the /java.base/jdk/internal/vm/options resource, if present
++  ps5_vm_trace("DONE: Desktop environment option sources");
++  ps5_vm_trace("ENTER: Embedded module image VM options");
+   char *vmoptions = ClassLoader::lookup_vm_options();
++  ps5_vm_trace("DONE: Embedded module image VM options");
+   if (vmoptions != nullptr) {
+     code = parse_options_buffer("vm options resource", vmoptions, strlen(vmoptions), &initial_vm_options_args);
+     FREE_C_HEAP_ARRAY(char, vmoptions);
+@@ -3551,6 +3569,7 @@
+     }
+   }
+ 
++  ps5_vm_trace("ENTER: Expand VM option containers");
+   code = expand_vm_options_as_needed(initial_java_tool_options_args.get(),
+                                      &mod_java_tool_options_args,
+                                      &cur_java_tool_options_args);
+@@ -3579,6 +3598,8 @@
+     return code;
+   }
+ 
++  ps5_vm_trace("DONE: Expand VM option containers");
++  ps5_vm_trace("ENTER: Optional VM settings file checks");
+   const char* flags_file = Arguments::get_jvm_flags_file();
+   settings_file_specified = (flags_file != nullptr);
+ 
+@@ -3603,6 +3624,7 @@
+ #endif
+   }
+ 
++  ps5_vm_trace("DONE: Optional VM settings file checks");
+   // The settings in the args are applied in this order to the the JVM global flags.
+   // For historical reasons, the order is DIFFERENT than the scanning order of
+   // the above expand_vm_options_as_needed() calls.
+@@ -3655,7 +3677,9 @@
+   }
+ 
+   // Apply the settings in these args to the JVM global flags.
++  ps5_vm_trace("ENTER: Apply launcher VM arguments");
+   jint result = parse_vm_init_args(&all_args);
++  ps5_vm_trace("DONE: Apply launcher VM arguments");
+ 
+   if (result != JNI_OK) {
+     return result;
+diff --git a/src/hotspot/share/classfile/classLoader.cpp b/src/hotspot/share/classfile/classLoader.cpp
+--- a/src/hotspot/share/classfile/classLoader.cpp
++++ b/src/hotspot/share/classfile/classLoader.cpp
+@@ -62,6 +62,7 @@
+ #include "oops/symbol.hpp"
+ #include "prims/jvm_misc.hpp"
+ #include "runtime/arguments.hpp"
++#include "runtime/ps5StartupTrace.hpp"
+ #include "runtime/handles.inline.hpp"
+ #include "runtime/init.hpp"
+ #include "runtime/interfaceSupport.inline.hpp"
+@@ -1382,10 +1383,14 @@
+   const char* fileSep = os::file_separator();
+ 
+   // Initialize jimage library entry points
++  ps5_vm_trace("ENTER: Load embedded jimage library and function bindings");
+   load_jimage_library();
++  ps5_vm_trace("DONE: Embedded jimage library bindings");
+ 
+   jio_snprintf(modules_path, JVM_MAXPATHLEN, "%s%slib%smodules", Arguments::get_java_home(), fileSep, fileSep);
++  ps5_vm_trace("ENTER: Real JIMAGE_Open on packaged modules");
+   JImage_file =(*JImageOpen)(modules_path, &error);
++  ps5_vm_trace("DONE: Real JIMAGE_Open on packaged modules");
+   if (JImage_file == nullptr) {
+     if (Arguments::has_jimage()) {
+       // The modules file exists but is unreadable or corrupt
+@@ -1395,7 +1400,9 @@
+   }
+ 
+   const char *jimage_version = get_jimage_version_string();
++  ps5_vm_trace("ENTER: Module image VM options resource lookup");
+   char *options = lookup_vm_resource(JImage_file, jimage_version, "jdk/internal/vm/options");
++  ps5_vm_trace("DONE: Module image VM options resource lookup");
+   return options;
+ }
+ 
