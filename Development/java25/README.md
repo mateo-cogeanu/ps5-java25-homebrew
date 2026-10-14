@@ -1340,3 +1340,50 @@ and package are frozen as Advanced_Network_Probe. See
 advanced-network-validation.json for the exact checksum and limits.
 TLS negative cases remain host-tested; IPv6 LAN and prolonged network
 endurance are separate unvalidated scopes. No next probe has been chosen.
+
+
+### LAN Endurance 01.000.000 — IPv6 discovery and external load
+
+PPSA99872 has six rows: initialize, create VM, actual IPv6 LAN TCP/UDP,
+four concurrent external TCP clients for 60 seconds, repeated external UDP
+for 60 seconds, destroy VM. It contains no device addresses or client-IP
+filters. IPv6 binds :: on TCP 38028 and UDP 38029; load binds IPv4 wildcard
+on TCP 38030 and UDP 38031. IPv6/IPv4 load peers must be external; loopback
+is rejected unless an explicit host-test property is supplied.
+
+```sh
+python3 tools/package_java25_jni.py --lan-endurance
+python3 tools/test_java25_lan_endurance.py
+# Or double-click tools/start_lan_endurance.command in Finder:
+python3 tools/java25_lan_endurance_client.py --ps5-ipv4 YOUR_PS5_IPV4 --discover
+# A confirmed IPv6 address can also be supplied at runtime:
+python3 tools/java25_lan_endurance_client.py --ps5-ipv4 YOUR_PS5_IPV4 --ps5-ipv6 YOUR_PS5_IPV6
+```
+
+Discovery uses the route interface and IPv4 ARP neighbor MAC, sends bounded
+IPv6 all-nodes probes on that interface, and matches NDP entries by MAC.
+It retains the scope interface for link-local addresses. It never derives
+or guesses an IPv6 address from IPv4. The Mac has IPv6 configured, but
+no PS5 IPv6 neighbor was established by tool-environment probes. The user
+requested local discovery; the Terminal launcher tries it in their own
+environment. If no IPv6 destination is found, skip row 3 for now and test
+rows 1,2,4,5,6; this is a partial result, not an ALL PASS milestone. Local
+::1 support does not prove the PS5 has a routable LAN IPv6 address.
+
+Each TCP worker verifies monotonic sequence numbers and 4096-byte payloads
+for at least 60 seconds and 128 frames, returns actual frame/time counters
+and requires client confirmation. Four external clients run concurrently.
+UDP verifies sequenced 512-byte payloads for at least 60 seconds/128 round
+trips, handles a retransmitted last sequence without double-counting, returns
+counters and requires final confirmation. The helper runs approximately
+61 seconds per load row to allow clock/startup margin, with bounded retries
+and visible connection errors. This is bounded LAN endurance, not an
+hours-long soak test. TCP and UDP load rows run separately.
+
+Host tests use explicit loopback opt-in and a two-second duration override
+to verify the real Java fixtures, framing, counters, confirmations and
+minimum-duration rejection. The production IPv6 fixture rejects ::1.
+Discovery regression checks match MAC addresses, preserve scope and reject
+missing neighbor evidence. No host result is claimed as a console pass.
+Target signatures/integrity, ZIP CRC/title/version, exact fixture bytes and
+absence of device endpoint data pass. Older milestones remain frozen.

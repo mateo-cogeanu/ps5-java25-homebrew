@@ -76,6 +76,8 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 
 **LAN setup:** [Inbound_LAN_Probe](Inbound_LAN_Probe/) uses a Mac client helper with the PS5 address supplied at runtime. [LAN_DNS_Probe](LAN_DNS_Probe/) uses a configured Mac echo endpoint. IPv6 LAN reachability, prolonged LAN load and broader TLS configurations remain unverified.
 
+**Current development probe:** [LAN Endurance](Development/java25/probe/lan-endurance.cpp), `PPSA99872` version `01.000.000`. Actual IPv6 LAN TCP/UDP and 60-second external TCP/UDP traffic await console validation. Start the [Mac launcher](Development/tools/start_lan_endurance.command) first; it prompts for the current PS5 IPv4 address and tries IPv6 neighbor discovery.
+
 ## Explore the source
 
 [Development](Development/) contains the current probe apps, Java fixtures, packaging tools and patches against a pinned FreeBSD OpenJDK source revision. The native UI grew out of a controller tester and Interface Lab prototype.
