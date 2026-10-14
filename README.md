@@ -15,7 +15,7 @@ An experimental **native OpenJDK 25 port for PlayStation 5 homebrew**, built and
 
 This repository contains the **Java runtime port, platform adaptations and acceptance probes**. Java 25 bytecode execution, file I/O and JAR class loading have passed their tests on a real console.
 
-> **Current progress:** eight passing milestones on PS5 firmware **13.60**, using interpreter mode. HTTPS, IPv6 loopback and link-local LAN, 60-second LAN workloads, IPv4 TCP/UDP and forward DNS are console-tested.
+> **Current progress:** nine passing milestones on PS5 firmware **13.60**, using interpreter mode. Multi-JAR dependencies, system class-path loading, resident JNI calls, HTTPS and IPv4/IPv6 networking are console-tested.
 
 **Related project:** [ps5-minecraft-java](https://github.com/mateo-cogeanu/ps5-minecraft-java) tracks Minecraft-specific work separately and will use this Java runtime.
 
@@ -33,16 +33,17 @@ Each milestone is a **frozen source snapshot** of a build that received **ALL PA
 | [Inbound_LAN_Probe](Inbound_LAN_Probe/) | **ALL PASS** | `01.000.000` | Inbound LAN TCP accept and UDP receive/reply with verified UTF-8 exchanges | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Inbound_LAN_Probe-v01.000.000) |
 | [Advanced_Network_Probe](Advanced_Network_Probe/) | **ALL PASS** | `01.000.002` | Verified HTTPS, IPv6 loopback, four concurrent TCP workers and repeated UDP round trips | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Advanced_Network_Probe-v01.000.002) |
 | [LAN_Endurance_Probe](LAN_Endurance_Probe/) | **ALL PASS** | `01.000.000` | IPv6 link-local LAN TCP/UDP; four concurrent TCP clients and repeated UDP for at least 60 seconds each | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/LAN_Endurance_Probe-v01.000.000) |
+| [Dependency_Probe](Dependency_Probe/) | **ALL PASS** | `01.000.001` | Manifest-linked JARs, services/resources, system class path and real resident JNI library calls | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Dependency_Probe-v01.000.001) |
 | [Development](Development/) | **In progress** | — | Current source and upcoming probes; updated as changes are completed | [Browse source](Development/) |
 
 Passing folders stay unchanged. New work goes into `Development`; a new milestone is frozen only after its console tests pass. A successful host build alone does not qualify a milestone.
 
 ## Try a passing build
 
-1. Choose a milestone release above and download its **app ZIP**. The latest passing probe is **LAN_Endurance_Probe**; it needs the Mac helper and current PS5 IPv4/IPv6 addresses.
+1. Choose a milestone release above and download its **app ZIP**. The latest passing probe is **Dependency_Probe**; it needs no network or Mac helper.
 2. Extract it and copy the **entire title folder** into the homebrew scan location used by your existing ShadowLoader setup.
 3. Let the loader register the app, then launch it from the home screen.
-4. Run the test rows **in order** (six for LAN Endurance and Advanced Network, five for inbound LAN and LAN/DNS, four for earlier probes). Use the **D-pad** to select and **X** to run a test. Close the app through the PS menu.
+4. Run the test rows **in order** (six for Dependencies, LAN Endurance and Advanced Network, five for inbound LAN and LAN/DNS, four for earlier probes). Use the **D-pad** to select and **X** to run a test. Close the app through the PS menu.
 
 | App | Title folder |
 | :--- | :--- |
@@ -54,6 +55,7 @@ Passing folders stay unchanged. New work goes into `Development`; a new mileston
 | Inbound LAN | `PPSA99870` |
 | Advanced Network | `PPSA99871` |
 | LAN Endurance | `PPSA99872` |
+| Dependencies | `PPSA99873` |
 
 The apps use separate title IDs, so you can keep the passing probes installed side by side. Keep all files inside each extracted folder, including its assets, runtime and licenses. Compare the ZIP against the checksum supplied in its release.
 
@@ -70,7 +72,9 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 - [x] Verify HTTPS, IPv6 loopback and bounded concurrent/repeated TCP/UDP traffic.
 - [x] Exchange IPv6 link-local LAN traffic and run 60-second external TCP/UDP workloads.
 - [ ] Expand TLS coverage, routed IPv6 and longer mixed network workloads.
-- [ ] Expand class-path/dependency loading and filesystem coverage.
+- [x] Load manifest-linked JAR dependencies, service providers and system class-path applications.
+- [x] Resolve and call a real resident JNI test library.
+- [ ] Expand application dependency coverage, filesystem behavior and external native-library loading.
 - [ ] Validate JIT execution, garbage collection and sustained workloads.
 - [ ] Improve JNI and native-library compatibility for Java applications.
 - [ ] Test broader Java APIs, error handling and repeated application runs.
@@ -79,7 +83,7 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 
 **Other network scopes:** [Advanced_Network_Probe](Advanced_Network_Probe/) covers verified HTTPS and local IPv6; [Inbound_LAN_Probe](Inbound_LAN_Probe/) covers short inbound IPv4 exchanges; [LAN_DNS_Probe](LAN_DNS_Probe/) covers outbound LAN and DNS. Routed IPv6, hours-long endurance, simultaneous mixed load and broader TLS configurations remain unverified.
 
-**Current development probe:** [Dependencies](Development/java25/probe/dependencies.cpp), `PPSA99873` version `01.000.001`. The isolated multi-JAR and resident JNI rows passed in version 000; the system class-path row failed. Version 001 adapts bundled JAR URL construction and fixes exception wrapping/paging; console validation is pending. No network helper is required. Longer endurance is deferred until there is a useful application to exercise.
+**Latest passing dependency probe:** [Dependency_Probe](Dependency_Probe/), `PPSA99873` version `01.000.001`. Run all six rows in order. The controlled application and its dependencies exist only in JARs; the JNI fixture is target-compiled and embedded. Arbitrary external native ELF loading and real application compatibility remain unverified. Longer network endurance is deferred until there is a useful application to exercise.
 
 ## Explore the source
 

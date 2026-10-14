@@ -13,7 +13,7 @@
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
   "next_console_title": "PPSA99870",
-  "next_console_probe": "Dependencies PPSA99873 01.000.001: bundled system-classpath adaptation and readable paged error panel",
+  "next_console_probe": "To be selected; Dependencies 01.000.001 passed",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -182,11 +182,11 @@
   "dependency_01_000_001_validation": {
     "title_id": "PPSA99873",
     "version": "01.000.001",
-    "console": "pending",
+    "console": "ALL PASS: human PS5 report, 2026-10-14",
     "zip_sha256": "cd25cf54a3a727979da5bb297c96f09114b14105008a943b33929459a16ddeb7",
     "host_checks": "PASS: actual URLClassPath class with canonicalize0 denied; bundled JAR URL retained while other/parent/relative paths keep checks; dependency/JNI positive and missing-file negative tests",
     "package_checks": "PASS: target signature/integrity, ZIP CRC/version, JAR-only payload classes, exact fixtures; patched URLClassPath confirmed in packaged JIMAGE",
     "ui_check": "Host layout preview confirms long diagnostic wraps within actual font widths; unsupported 16/18px fallback replaced with baked 20px exception font and left/right paging",
-    "scope": "Candidate fix for silently dropped bundled system-classpath JARs; console root cause/pass still unconfirmed. FTP mapping for application download0 logs remains unknown."
+    "scope": "Manifest-linked dependencies/services/resources, actual VM system class path and real resident JNI fixture all passed; external native ELF and application bootstrap remain unvalidated."
   }
 }

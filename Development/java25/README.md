@@ -1564,3 +1564,14 @@ The user's FTP setup does not expose that folder, and its mapping is not
 established. Earlier advice that the user could retrieve those logs there
 was too definite. On-screen full-cause photos/pages are the current supported
 reporting route; no FTP-visible log export is claimed.
+
+
+### Dependencies console pass — 2026-10-14
+
+The user reports ALL PASS for PPSA99873 01.000.001. All six rows passed:
+real VM lifecycle, manifest-linked multi-JAR classes/services/resources,
+actual system class-path resolution and resident JNI discovery/calls.
+The matching package and source are frozen as Dependency_Probe; see
+dependency-validation.json for its checksum and scope. Earlier failure
+evidence is retained. This establishes the controlled dependency fixture,
+not Minecraft bootstrap or arbitrary external native-library support.
