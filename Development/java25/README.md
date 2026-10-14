@@ -1615,5 +1615,6 @@ The embedded core now includes the target-built legacy bytecode verifier
 this in addition to HotSpot’s modern stack-map verifier. Its omission caused
 “Could not link verifier” for an external consumer. Verification remains
 enabled; real upstream verifier code is linked and its target library is
-packaged. Lookup/scope and target packaging checks pass; console retest
-is pending.
+packaged. Lookup/scope and target packaging checks pass. An external consumer’s
+bootstrap/help and VM lifecycle now pass on PS5 (01.000.002, human
+ALL PASS on 2026-10-14).
