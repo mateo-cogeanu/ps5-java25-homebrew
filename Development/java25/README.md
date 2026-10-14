@@ -1193,3 +1193,25 @@ user-address checks pass. Packaging now replaces generated asset directories
 rather than retaining removed files: the initial configured draft is superseded
 and its stale properties are absent from the final ZIP. Console validation
 remains pending; older passing milestones and archives are unchanged.
+
+
+### Inbound LAN retry diagnostics — 2026-10-14
+
+The first console run of 01.000.000 reached TCP accept and UDP receive,
+but both timed out (FFFFFAE5). This does not establish successful inbound
+networking or identify a Java socket defect. The background helper had hidden
+all retry errors. It now prints its runtime destination, first/changed error,
+a retry summary every 30 seconds, and successful handshake confirmations.
+
+Run `tools/start_inbound_client.command` by double-clicking it in Finder.
+It prompts for the current PS5 address in the user's Terminal; no device
+address is stored in the launcher or console app. Keep the window open and
+start the app's rows in order. A refused connection before the listener starts
+is expected; persistent errors while a row is waiting need investigation.
+The tool environment reported immediate No route to host during diagnostics;
+the user reports LAN access works in their own environment and the app was
+closed at that time. This result is not evidence of a PS5 routing failure.
+
+The console package is unchanged. Host TCP/UDP handshakes and invalid-frame
+rejection still pass. Retest the same package with the visible helper before
+changing the runtime or freezing an inbound milestone.

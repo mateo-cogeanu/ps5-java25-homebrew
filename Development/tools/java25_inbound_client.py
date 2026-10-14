@@ -64,18 +64,27 @@ def main():
     signal.signal(signal.SIGTERM,lambda *_:stop.set());signal.signal(signal.SIGINT,lambda *_:stop.set())
     deadline=time.monotonic()+args.timeout
     def worker(label,operation,port,done):
+        attempts=0;last_error=None;last_report=0
         while not stop.is_set() and time.monotonic()<deadline:
+            attempts+=1
             try:
                 operation(args.ps5_host,args.bind,port)
-                done.set();print(label+' PASS: request/acknowledgement verified',flush=True);return
-            except (OSError,ValueError,ConnectionError):stop.wait(.75)
+                done.set();print(label+' PASS: request/acknowledgement verified after '+str(attempts)+' attempts',flush=True);return
+            except (OSError,ValueError,ConnectionError) as error:
+                detail=type(error).__name__+': '+str(error)
+                now=time.monotonic()
+                if detail!=last_error or now-last_report>=30:
+                    print(label+' WAIT: '+args.ps5_host+':'+str(port)+'; attempt '+str(attempts)+'; '+detail,flush=True)
+                    last_error=detail;last_report=now
+                stop.wait(.75)
     threads=[threading.Thread(target=worker,args=('TCP',tcp_attempt,args.tcp_port,tcp_ok),daemon=True),
              threading.Thread(target=worker,args=('UDP',udp_attempt,args.udp_port,udp_ok),daemon=True)]
     # Validate the chosen source address before announcing readiness.
     if args.bind:
         with socket.socket() as check:check.bind((args.bind,0))
+    print('READY: target '+args.ps5_host+'; TCP '+str(args.tcp_port)+' / UDP '+str(args.udp_port)+
+          '; source '+(args.bind or 'OS routing')+'; helper retries for '+str(int(args.timeout))+' seconds',flush=True)
     for thread in threads:thread.start()
-    print('READY: waiting for PS5 TCP/UDP listener rows; helper retries for '+str(int(args.timeout))+' seconds',flush=True)
     while not stop.is_set() and time.monotonic()<deadline:
         if tcp_ok.is_set() and udp_ok.is_set():
             print('COMPLETE: TCP and UDP verified',flush=True);return

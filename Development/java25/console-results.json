@@ -439,5 +439,21 @@
       "General DNS failure/caching behavior",
       "JIT stability"
     ]
+  },
+  "inbound_01_000_000": {
+    "title_id": "PPSA99870",
+    "version": "01.000.000",
+    "tested_date": "2026-10-14",
+    "console": "PS5 firmware 13.60",
+    "results": {
+      "JNI_CreateJavaVM": "PASS (visible in photos)",
+      "InboundTcp25": "FAIL: SocketTimeoutException: Accept timed out",
+      "InboundUdp25": "FAIL: SocketTimeoutException: Receive timed out",
+      "DestroyJavaVM": "not shown"
+    },
+    "evidence": "User photos IMG_0427.JPG and IMG_0428.JPG",
+    "interpretation": "Both fixtures reached their accept/receive wait. No successful incoming exchange established. Background helper suppressed retry errors; tool environment currently reports No route to host while user reports their own LAN access works. Console app was closed during diagnostic probes.",
+    "next_test": "Run the diagnostic helper in the user Terminal before retrying the unchanged app; inspect actual TCP/UDP retry errors and PASS confirmations.",
+    "sha256": "11f28dda3fcec883283896fee6e36fd1f29b3e57a0a38fef38576a5e0af4813b"
   }
 }

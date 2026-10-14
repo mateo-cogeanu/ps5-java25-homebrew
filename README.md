@@ -70,7 +70,7 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 
 **LAN setup:** start the [Mac echo helper](Development/tools/java25_lan_server.py) on your LAN address, then set `lan.host` and `lan.port` in the extracted app's `assets/java25/probe.properties`. Keep the Mac awake while running the LAN row. See [LAN_DNS_Probe](LAN_DNS_Probe/) for commands and test scope. TLS and inbound LAN server connections remain separate tests.
 
-**Current development probe:** [Inbound LAN](Development/java25/probe/inbound.cpp), `PPSA99870` version `01.000.000`. The PS5 app listens without a preset IP; the [Mac client helper](Development/tools/java25_inbound_client.py) receives the PS5 address at runtime. Inbound TCP and UDP await console validation.
+**Current development probe:** [Inbound LAN](Development/java25/probe/inbound.cpp), `PPSA99870` version `01.000.000`. The PS5 app listens without a preset IP; the [Mac client helper](Development/tools/java25_inbound_client.py) receives the PS5 address at runtime. The first console attempt timed out waiting for TCP and UDP traffic. Run `tools/start_inbound_client.command` in your own Terminal before retrying; inbound validation remains pending.
 
 ## Explore the source
 
