@@ -1603,3 +1603,9 @@ Exact source/output bytes and default-module isolation were checked.
 No host native library is included. An external consumer package passes
 assembly/signature/CRC/content checks and awaits its own console test.
 Existing nine frozen runtime milestones remain unchanged.
+
+`probe/vm_diagnostics.hpp` provides bounded native formatted-output capture
+for the JVM vfprintf callback, including failures before JNI_CreateJavaVM
+returns. Consumers own persistence and display of the captured error. The
+ASan/UBSan test checks formatting, retention of the recent output and reset.
+Target compilation passes; console diagnostic capture remains pending.

@@ -213,5 +213,11 @@
     ],
     "native_scope": "Image adds Java classes/configuration only. Optional per-module native services remain unvalidated; no host native binaries used.",
     "consumer_source_repository": "https://github.com/mateo-cogeanu/ps5-minecraft-java"
+  },
+  "pre_jni_vm_diagnostics": {
+    "host": "PASS: ASan/UBSan formatted output, bounded tail retention and reset",
+    "target": "PASS: external consumer package compilation and signed binary integrity",
+    "console": "pending",
+    "scope": "Reusable bounded native output capture before JNI_CreateJavaVM returns; consumer owns persistent report and UI"
   }
 }
