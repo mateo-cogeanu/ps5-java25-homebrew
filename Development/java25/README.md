@@ -1634,3 +1634,8 @@ ASan/UBSan checks compile the real Settings header, verify both platform
 branches and model constrained reservation pressure. The target HotSpot
 build and embedded 16 MiB node argument pass inspection. Consumer console
 validation is pending; frozen passing milestones remain unchanged.
+
+The consumer 01.000.005 console result confirms real 192 MiB VM creation,
+artifact preflight and VM destruction with the smaller metaspace nodes.
+Application startup now reaches a separate helper-class lookup failure.
+This result does not establish a ready application server.
