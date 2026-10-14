@@ -1450,3 +1450,16 @@ change or repetition of the passing load rows is needed.
 Focused host discovery checks are now in tools/test_java25_ipv6_discovery.py.
 They cover MAC/scope matching, exact full-table fallback and rejection of
 unrelated destination evidence; the full protocol suite still invokes them.
+
+
+### Manually supplied PS5 IPv6 link-local address
+
+The user found a link-local address in PS5 settings. The LAN endurance
+launcher now prompts for an optional IPv6 address; supplying one bypasses
+ARP/NDP discovery. No address is stored in the app or launcher. Enter a
+valid compressed address (including its double colon). For a link-local
+address lacking %interface, the helper selects the route interface for the
+runtime IPv4 destination. Explicit scopes are preserved, and automatic
+tunnel scopes, loopback, unspecified and multicast destinations are rejected.
+Host checks cover those cases. The console package remains 01.000.000
+and IPv6 LAN exchange still needs actual PS5 verification.

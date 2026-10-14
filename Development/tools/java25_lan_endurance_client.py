@@ -147,6 +147,20 @@ def discover_ipv6(ipv4,verbose=False):
     if verbose and not found:print('DISCOVERY: no IPv6 NDP entry matched the PS5 hardware address on '+interface,flush=True)
     return sorted(set(found),key=lambda value:ipaddress.IPv6Address(value.split('%')[0]).is_link_local)
 
+def scoped_ipv6(host,ipv4):
+    address,separator,scope=host.strip().partition('%')
+    parsed=ipaddress.IPv6Address(address)
+    if parsed.is_loopback or parsed.is_unspecified or parsed.is_multicast:
+        raise ValueError('An external unicast PS5 IPv6 address is required')
+    if parsed.is_link_local and not scope:
+        result=subprocess.run(['route','-n','get',ipv4],capture_output=True,text=True,timeout=4)
+        interface=re.search(r'interface:\s*(\w+)',result.stdout)
+        if not interface or interface.group(1).startswith('utun'):
+            raise ValueError('Cannot select a physical LAN interface; supply the link-local address with %interface')
+        scope=interface.group(1)
+    if separator and not scope:raise ValueError('Empty IPv6 interface scope')
+    return str(parsed)+('%'+scope if scope else '')
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--ps5-ipv4',required=True)
@@ -155,7 +169,9 @@ def main():
     parser.add_argument('--discover-only',action='store_true',help='Print IPv6 neighbor evidence without starting any traffic tests')
     parser.add_argument('--timeout',type=float,default=1800)
     args=parser.parse_args();ipaddress.IPv4Address(args.ps5_ipv4)
-    host6=args.ps5_ipv6
+    try:host6=scoped_ipv6(args.ps5_ipv6,args.ps5_ipv4) if args.ps5_ipv6 else None
+    except (ValueError,OSError,subprocess.TimeoutExpired) as error:parser.error(str(error))
+    if host6:print('IPv6 runtime destination: '+host6,flush=True)
     if (args.discover or args.discover_only) and not host6:
         candidates=discover_ipv6(args.ps5_ipv4,verbose=True)
         print('IPv6 discovery:',', '.join(candidates) if candidates else 'no PS5 neighbor address found',flush=True)

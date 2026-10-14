@@ -31,3 +31,19 @@ try:
     assert helper.discover_ipv6('192.0.2.46')==[]
     print('PASS: full ARP fallback uses exact IPv4/interface; unrelated neighbor cannot become PS5 destination')
 finally:helper.subprocess.run=original
+
+try:
+    helper.subprocess.run=lambda *args,**kwargs:SimpleNamespace(stdout='interface: en0\n')
+    assert helper.scoped_ipv6('fe80::1234','192.0.2.45')=='fe80::1234%en0'
+    assert helper.scoped_ipv6('fe80::1234%en1','192.0.2.45')=='fe80::1234%en1'
+    assert helper.scoped_ipv6('2001:db8::45','192.0.2.45')=='2001:db8::45'
+    for invalid in ['::1','::','ff02::1','fe80:1234']:
+        try:helper.scoped_ipv6(invalid,'192.0.2.45')
+        except ValueError:pass
+        else:raise AssertionError('Invalid/external address accepted: '+invalid)
+    helper.subprocess.run=lambda *args,**kwargs:SimpleNamespace(stdout='interface: utun4\n')
+    try:helper.scoped_ipv6('fe80::1234','192.0.2.45')
+    except ValueError:pass
+    else:raise AssertionError('Tunnel selected for link-local LAN')
+    print('PASS: runtime IPv6 validation, link-local LAN scope, explicit scope and tunnel rejection')
+finally:helper.subprocess.run=original
