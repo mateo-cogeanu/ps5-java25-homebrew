@@ -15,7 +15,7 @@ An experimental **native OpenJDK 25 port for PlayStation 5 homebrew**, built and
 
 This repository contains the **Java runtime port, platform adaptations and acceptance probes**. Java 25 bytecode execution, file I/O and JAR class loading have passed their tests on a real console.
 
-> **Current progress:** six passing milestones on PS5 firmware **13.60**, using interpreter mode. IPv4 loopback, outbound and inbound LAN TCP/UDP, and forward DNS are console-tested.
+> **Current progress:** seven passing milestones on PS5 firmware **13.60**, using interpreter mode. HTTPS, IPv6 loopback, concurrent TCP traffic, IPv4 LAN TCP/UDP and forward DNS are console-tested.
 
 **Related project:** [ps5-minecraft-java](https://github.com/mateo-cogeanu/ps5-minecraft-java) tracks Minecraft-specific work separately and will use this Java runtime.
 
@@ -31,16 +31,17 @@ Each milestone is a **frozen source snapshot** of a build that received **ALL PA
 | [Network_Probe](Network_Probe/) | **ALL PASS** | `01.000.003` | TCP/UDP IPv4 loopback, Java worker echo, nonblocking NIO channels and selector readiness | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Network_Probe-v01.000.003) |
 | [LAN_DNS_Probe](LAN_DNS_Probe/) | **ALL PASS** | `01.000.000` | Outbound LAN TCP/UDP echo to a Mac, forward DNS lookup and VM lifecycle | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/LAN_DNS_Probe-v01.000.000) |
 | [Inbound_LAN_Probe](Inbound_LAN_Probe/) | **ALL PASS** | `01.000.000` | Inbound LAN TCP accept and UDP receive/reply with verified UTF-8 exchanges | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Inbound_LAN_Probe-v01.000.000) |
+| [Advanced_Network_Probe](Advanced_Network_Probe/) | **ALL PASS** | `01.000.002` | Verified HTTPS, IPv6 loopback, four concurrent TCP workers and repeated UDP round trips | [Release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Advanced_Network_Probe-v01.000.002) |
 | [Development](Development/) | **In progress** | — | Current source and upcoming probes; updated as changes are completed | [Browse source](Development/) |
 
 Passing folders stay unchanged. New work goes into `Development`; a new milestone is frozen only after its console tests pass. A successful host build alone does not qualify a milestone.
 
 ## Try a passing build
 
-1. Choose a milestone release above and download its **app ZIP**. The latest passing probe is **Inbound_LAN_Probe**; start its Mac client helper before running the console rows.
+1. Choose a milestone release above and download its **app ZIP**. The latest passing probe is **Advanced_Network_Probe**; it needs Internet for HTTPS and no Mac helper.
 2. Extract it and copy the **entire title folder** into the homebrew scan location used by your existing ShadowLoader setup.
 3. Let the loader register the app, then launch it from the home screen.
-4. Run the test rows **in order** (five for inbound LAN and LAN/DNS, four for earlier probes). Use the **D-pad** to select and **X** to run a test. Close the app through the PS menu.
+4. Run the test rows **in order** (six for Advanced Network, five for inbound LAN and LAN/DNS, four for earlier probes). Use the **D-pad** to select and **X** to run a test. Close the app through the PS menu.
 
 | App | Title folder |
 | :--- | :--- |
@@ -50,6 +51,7 @@ Passing folders stay unchanged. New work goes into `Development`; a new mileston
 | Networking | `PPSA99868` |
 | LAN / DNS | `PPSA99869` |
 | Inbound LAN | `PPSA99870` |
+| Advanced Network | `PPSA99871` |
 
 The apps use separate title IDs, so you can keep the passing probes installed side by side. Keep all files inside each extracted folder, including its assets, runtime and licenses. Compare the ZIP against the checksum supplied in its release.
 
@@ -63,17 +65,16 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 - [x] Test Java TCP/UDP loopback and NIO selector readiness.
 - [x] Test outbound IPv4 LAN TCP/UDP and forward DNS resolution.
 - [x] Accept inbound LAN TCP connections and receive/reply to UDP datagrams.
-- [ ] Validate TLS and further socket behavior.
+- [x] Verify HTTPS, IPv6 loopback and bounded concurrent/repeated TCP/UDP traffic.
+- [ ] Expand TLS coverage, IPv6 LAN reachability and prolonged network workloads.
 - [ ] Expand class-path/dependency loading and filesystem coverage.
 - [ ] Validate JIT execution, garbage collection and sustained workloads.
 - [ ] Improve JNI and native-library compatibility for Java applications.
 - [ ] Test broader Java APIs, error handling and repeated application runs.
 
-**Latest passing networking probe:** [Inbound_LAN_Probe](Inbound_LAN_Probe/), `PPSA99870` version `01.000.000`. Start its [Terminal launcher](Development/tools/start_inbound_client.command), enter the current PS5 address and keep Terminal open while running all five rows. The app listens without preset IPs.
+**Latest passing networking probe:** [Advanced_Network_Probe](Advanced_Network_Probe/), `PPSA99871` version `01.000.002`. Run all six rows in order. HTTPS accesses `https://example.com/` with certificate and hostname verification; IPv6 and traffic-load tests use loopback. No Mac helper is needed.
 
-**Outbound LAN setup:** see [LAN_DNS_Probe](LAN_DNS_Probe/) for the Mac echo helper and runtime endpoint configuration. TLS, IPv6 and sustained network load remain unverified.
-
-**Current development probe:** [Advanced Network](Development/java25/probe/advanced-network.cpp), `PPSA99871` version `01.000.002`. Six rows cover VM startup, verified HTTPS, IPv6 loopback, concurrent/repeated TCP/UDP traffic and shutdown. IPv6 loopback and concurrent/repeated traffic passed on console in version 001. HTTPS remains blocked by bundled crypto policy directory inspection; version 002 fixes that loading step and awaits console validation. No Mac helper is required.
+**LAN setup:** [Inbound_LAN_Probe](Inbound_LAN_Probe/) uses a Mac client helper with the PS5 address supplied at runtime. [LAN_DNS_Probe](LAN_DNS_Probe/) uses a configured Mac echo endpoint. IPv6 LAN reachability, prolonged LAN load and broader TLS configurations remain unverified.
 
 ## Explore the source
 

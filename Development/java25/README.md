@@ -1329,3 +1329,14 @@ still fails. TLS trusted success and untrusted/hostname rejection also pass
 with the patched JCE class. The target core classes were rebuilt; packaged
 JIMAGE inspection confirms the patch and all bundled policy files match
 the target-generated configuration. All six rows still need PS5 retesting.
+
+
+### Advanced Network console pass — 2026-10-14
+
+The user reports ALL PASS for PPSA99871 01.000.002. All six rows passed,
+including verified HTTPS to example.com after patch 0032, IPv6 ::1 TCP/UDP,
+four concurrent TCP workers and 256 UDP round trips. The matching source
+and package are frozen as Advanced_Network_Probe. See
+advanced-network-validation.json for the exact checksum and limits.
+TLS negative cases remain host-tested; IPv6 LAN and prolonged network
+endurance are separate unvalidated scopes. No next probe has been chosen.

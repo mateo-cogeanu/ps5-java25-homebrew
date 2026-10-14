@@ -13,7 +13,7 @@
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
   "next_console_title": "PPSA99870",
-  "next_console_probe": "Advanced Network PPSA99871 01.000.002: bundled cryptographic policy loading fix",
+  "next_console_probe": "To be selected; Advanced Network 01.000.002 passed",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -154,10 +154,10 @@
   "advanced_network_01_000_002_validation": {
     "title_id": "PPSA99871",
     "version": "01.000.002",
-    "console": "pending",
+    "console": "ALL PASS: human PS5 report, 2026-10-14",
     "zip_sha256": "8c95655c87b1433c291170d606c22e740b2099b4e8a28ed2906905ba534c32cc",
     "host_checks": "PASS: actual JCE policy parsing with policy stat/access/opendir denied; unlimited/limited AES limits preserved; missing required policy and custom policy denial reject; verified HTTPS and certificate/hostname rejection with patched JCE",
     "package_checks": "PASS: native signature/integrity, ZIP CRC/version, exact bundled policy bytes, patched JceSecurity confirmed in packaged JIMAGE",
-    "scope": "Fixes bundled crypto policy loading; HTTPS still awaits PS5 execution"
+    "scope": "Verified HTTPS to example.com, IPv6 loopback, bounded concurrent TCP/repeated UDP loopback workload and VM lifecycle"
   }
 }
