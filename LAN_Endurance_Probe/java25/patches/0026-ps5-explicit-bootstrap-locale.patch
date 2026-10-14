@@ -1,0 +1,30 @@
+diff --git a/src/java.base/unix/native/libjava/java_props_md.c b/src/java.base/unix/native/libjava/java_props_md.c
+--- a/src/java.base/unix/native/libjava/java_props_md.c
++++ b/src/java.base/unix/native/libjava/java_props_md.c
+@@ -447,6 +447,17 @@
+     /* Determine the language, country, variant, and encoding from the host,
+      * and store these in the user.language, user.country, user.variant and
+      * file.encoding system properties. */
++#ifdef __PROSPERO__
++    /* Native PS5 bootstrap does not consume desktop BSD locale tables.
++     * These are platform defaults; normal Java property overrides still apply.
++     * Explicit UTF-8 also keeps path/string conversion independent of nl_langinfo.
++     */
++    sprops.format_language = sprops.display_language = "en";
++    sprops.format_country = sprops.display_country = "US";
++    sprops.format_script = sprops.display_script = "";
++    sprops.format_variant = sprops.display_variant = "";
++    sprops.encoding = "UTF-8";
++#else
+     setlocale(LC_ALL, "");
+     if (ParseLocale(env, LC_CTYPE,
+                     &(sprops.format_language),
+@@ -468,6 +479,8 @@
+     /* ParseLocale failed with OOME */
+     JNU_CHECK_EXCEPTION_RETURN(env, NULL);
+ 
++#endif /* __PROSPERO__ */
++
+ #ifdef MACOSX
+     sprops.sun_jnu_encoding = "UTF-8";
+ #else

@@ -1,0 +1,83 @@
+diff --git a/src/hotspot/cpu/x86/vm_version_x86.cpp b/src/hotspot/cpu/x86/vm_version_x86.cpp
+--- a/src/hotspot/cpu/x86/vm_version_x86.cpp
++++ b/src/hotspot/cpu/x86/vm_version_x86.cpp
+@@ -37,6 +37,7 @@
+ #include "runtime/os.inline.hpp"
+ #include "runtime/stubCodeGenerator.hpp"
+ #include "runtime/vm_version.hpp"
++#include "runtime/ps5StartupTrace.hpp"
+ #include "utilities/checkedCast.hpp"
+ #include "utilities/powerOfTwo.hpp"
+ #include "utilities/virtualizationSupport.hpp"
+@@ -501,6 +502,15 @@
+     __ jmp(wrapup);
+ 
+     __ bind(start_simd_check);
++#ifdef __PROSPERO__
++    // Bootstrap explicitly disables AVX until PS5 fault-context recovery is
++    // validated. Do not emit a live deliberate SEGV vector-restore test in
++    // that mode; later feature processing clears AVX/AVX2/AVX512 normally.
++    if (UseAVX == 0) {
++      ps5_vm_trace("PS5 CPU: AVX disabled; skip deliberate SIMD fault probe");
++      __ jmp(wrapup);
++    }
++#endif
+     //
+     // Some OSs have a bug when upper 128/256bits of YMM/ZMM
+     // registers are not restored after a signal processing.
+@@ -880,7 +890,9 @@
+ 
+   // Get raw processor info
+ 
++  ps5_vm_trace("ENTER: Execute generated CPU information stub");
+   get_cpu_info_stub(&_cpuid_info);
++  ps5_vm_trace("DONE: Execute generated CPU information stub");
+ 
+   assert_is_initialized();
+   _cpu = extended_cpu_family();
+@@ -2146,28 +2158,44 @@
+ static bool _vm_version_initialized = false;
+ 
+ void VM_Version::initialize() {
++  ps5_vm_trace("ENTER: CPU ResourceMark");
+   ResourceMark rm;
++  ps5_vm_trace("DONE: CPU ResourceMark");
+ 
+   // Making this stub must be FIRST use of assembler
++  ps5_vm_trace("ENTER: Allocate CPU stub code blob");
+   stub_blob = BufferBlob::create("VM_Version stub", stub_size);
++  ps5_vm_trace("DONE: Allocate CPU stub code blob");
+   if (stub_blob == nullptr) {
+     vm_exit_during_initialization("Unable to allocate stub for VM_Version");
+   }
++  ps5_vm_trace("ENTER: CPU CodeBuffer and assembler setup");
+   CodeBuffer c(stub_blob);
+   VM_Version_StubGenerator g(&c);
+ 
++  ps5_vm_trace("DONE: CPU CodeBuffer and assembler setup");
++  ps5_vm_trace("ENTER: Generate CPU information machine code");
+   get_cpu_info_stub = CAST_TO_FN_PTR(get_cpu_info_stub_t,
+                                      g.generate_get_cpu_info());
++  ps5_vm_trace("DONE: Generate CPU information machine code");
++  ps5_vm_trace("ENTER: Generate virtualization and APX helper stubs");
+   detect_virt_stub = CAST_TO_FN_PTR(detect_virt_stub_t,
+                                      g.generate_detect_virt());
+   clear_apx_test_state_stub = CAST_TO_FN_PTR(clear_apx_test_state_t,
+                                      g.clear_apx_test_state());
++  ps5_vm_trace("DONE: Generate virtualization and APX helper stubs");
++  ps5_vm_trace("ENTER: CPU processor feature discovery");
+   get_processor_features();
+-
++  ps5_vm_trace("DONE: CPU processor feature discovery");
++
++  ps5_vm_trace("ENTER: Assembler instruction precomputation");
+   Assembler::precompute_instructions();
++  ps5_vm_trace("DONE: Assembler instruction precomputation");
+ 
+   if (VM_Version::supports_hv()) { // Supports hypervisor
++    ps5_vm_trace("ENTER: CPU virtualization checks");
+     check_virtualizations();
++    ps5_vm_trace("DONE: CPU virtualization checks");
+   }
+   _vm_version_initialized = true;
+ }

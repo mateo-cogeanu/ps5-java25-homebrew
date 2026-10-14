@@ -1,0 +1,622 @@
+{
+  "date": "2026-10-11",
+  "firmware": "13.60",
+  "title_id": "PPSA99862",
+  "version": "01.000.000",
+  "evidence": "User reports: all PASS",
+  "tests": {
+    "monotonic_clock": "PASS",
+    "reserve_commit_release": "PASS",
+    "pthread_mutex_tls_join": "PASS",
+    "loopback_bind_listen": "PASS",
+    "download0_file_write_read_delete": "PASS",
+    "rw_to_rx_permission_without_execution": "PASS"
+  },
+  "runtime_probe": {
+    "title_id": "PPSA99863",
+    "version": "01.000.000",
+    "evidence": "User reports: all PASS",
+    "runtime_page_size": "PASS; numeric value not reported",
+    "condition_variable_wakeup": "PASS",
+    "sigusr1_sa_siginfo_delivery": "PASS",
+    "generated_x86_64_return_25": "PASS"
+  },
+  "not_established": [
+    "HotSpot startup or Java bytecode execution",
+    "HotSpot JIT compilation and code execution",
+    "fault signal recovery and safepoint handling",
+    "dynamic native module loading",
+    "Minecraft or mod compatibility"
+  ],
+  "embedded_hotspot_probe": {
+    "title_id": "PPSA99864",
+    "version": "01.000.000",
+    "evidence": "User reports: all PASS",
+    "static_constructors": "PASS",
+    "jni_defaults": "PASS",
+    "jni_vm_registry_before_startup": "PASS"
+  },
+  "vm_startup_attempt": {
+    "title_id": "PPSA99865",
+    "version": "01.000.000",
+    "runtime_initialization": "PASS",
+    "vm_creation": "FAIL",
+    "hello25": "FAIL following failed VM creation; no Java execution established",
+    "destroy_vm": "FAIL following failed VM creation",
+    "reported_code": "00000001",
+    "exact_failure_message": "not supplied",
+    "suspected_failure": "preflight access() error; not confirmed"
+  },
+  "vm_startup_01_000_001": {
+    "title_id": "PPSA99865",
+    "runtime_initialization": "PASS from stage-2 report",
+    "vm_creation": "CRASH",
+    "last_log": "STAGE: Calling real JNI_CreateJavaVM",
+    "evidence": "User reported stage-2 crash and copied previous log line (Calling typed as Callling)",
+    "established": "core image preflight succeeded; crash occurred during JNI_CreateJavaVM",
+    "exact_internal_failure": "not known; diagnostic build adds HotSpot checkpoints"
+  },
+  "vm_startup_01_000_002": {
+    "title_id": "PPSA99865",
+    "vm_creation": "CRASH",
+    "reported_checkpoint": "ENTERL System properties and core library paths",
+    "matching_instrumented_checkpoint": "ENTER: System properties and core library paths",
+    "established": "VM creation reached system-property initialization; later Java startup not established",
+    "exact_failing_operation": "unknown within this stage"
+  },
+  "vm_startup_01_000_003": {
+    "title_id": "PPSA99865",
+    "vm_creation": "CRASH inferred from ongoing crash-debugging exchange",
+    "reported_checkpoint": "ENTER: VM argument parsing",
+    "established": "system property/path initialization and JDK version lookup completed; argument parsing entered",
+    "exact_failing_operation": "not yet identified"
+  },
+  "vm_startup_01_000_004": {
+    "title_id": "PPSA99865",
+    "vm_creation": "still blocked during crash-debugging",
+    "reported_checkpoint": "ENTER: Real JIMAGE_Open on packaged modules",
+    "established": "embedded jimage library function binding returned; reader open entered",
+    "exact_failing_operation": "unknown inside JIMAGE_Open"
+  },
+  "vm_startup_01_000_005": {
+    "title_id": "PPSA99865",
+    "reported_checkpoint": "ENTER: JIMAGE memory mapping",
+    "established": "image reader file open, size and header checks returned; map_memory entered",
+    "suspected_failure": "file-backed mmap path before fallback; exact internal failure not established"
+  },
+  "vm_startup_01_000_006": {
+    "reported_checkpoint": "ENTER: JIMAGE anonymous allocation",
+    "established": "direct anonymous allocation path entered; file copy not reached",
+    "source_audit": "SDK libc.a mman.o was linked into native app; contains raw mmap syscall and kernel_mprotect callback; earlier probes imported platform functions"
+  },
+  "vm_startup_01_000_007": {
+    "reported_checkpoint": "ENTER: VM stubs heap and globals",
+    "established": "image and option parsing completed; early JavaThread, stack discovery and guards returned; init_globals entered",
+    "exact_failing_operation": "unknown inside init_globals"
+  },
+  "vm_startup_01_000_008": {
+    "reported_checkpoint": "ENTER: Class loader phase one",
+    "matching_checkpoint": "ENTER: Class loader phase 1",
+    "established": "management/JVMTI storage and bytecode table initialization returned; class-loader phase entered",
+    "exact_failing_operation": "not established inside phase one"
+  },
+  "vm_startup_01_000_009": {
+    "reported_checkpoint": "CPU version and executable detection stubs",
+    "matching_checkpoint": "ENTER: CPU version and executable detection stubs",
+    "established": "class loader phase one, compilation policy and code cache initialization returned; CPU version initialization entered",
+    "exact_failing_operation": "unknown within CPU initialization; source includes a deliberate SIMD SIGSEGV probe"
+  },
+  "vm_startup_01_000_010": {
+    "evidence": "User photograph IMG_0405.JPG of last startup checkpoint",
+    "reported_checkpoint": "FAIL: Native memory reserve addr=ffffffffffffffff bytes=1090519040 mode=4098 errno=12",
+    "established": "A native memory reservation of 1 GiB plus 16 MiB failed with ENOMEM; VM startup and Java execution remain unestablished",
+    "suspected_allocation": "Default 1 GiB compressed class space plus alignment allowance; inferred from source and size, allocation tag not recorded",
+    "next_probe": "01.000.011 explicitly requests 32 MiB compressed class space, retaining the 128 MiB Java heap limit"
+  },
+  "vm_startup_01_000_011": {
+    "evidence": "User photograph IMG_0406.JPG after relaunch",
+    "reported_checkpoint": "DONE: Native RW memory commit addr=207170000 bytes=65536 mode=3 errno=0",
+    "established": "The native RW commit routine reported success for 64 KiB. VM creation and Java execution remain unestablished.",
+    "next_probe": "01.000.012: heap, commit tracking and metaspace bookkeeping checkpoints; last three trace lines displayed"
+  },
+  "vm_startup_01_000_012": {
+    "evidence": "User copied three displayed trace lines",
+    "reported_checkpoints": [
+      "ENTER: Metaspace commit mask",
+      "DONE: Metaspace commit mask",
+      "DONE: Metaspace commit mask"
+    ],
+    "established": "Mask bookkeeping returned at least once; exact later fault and VM startup not established. Duplicate final line retained as reported.",
+    "next_probe": "01.000.013: PS5 RW commits through mprotect on existing reservations, fault PC/address logging and chunk boundary checkpoints"
+  },
+  "vm_startup_01_000_013": {
+    "evidence": "User photograph IMG_0407.JPG; user reports sound does not work",
+    "audio_error": "80260011",
+    "fault_signal": "0x000000000000000b",
+    "fault_pc": "0x00000008000751d0",
+    "fault_address": "0x0000000100026c946",
+    "established": "Fault logging ran for signal 11. No successful VM creation or Java bytecode execution established. Audio setup/output stage not recorded by this version.",
+    "next_probe": "01.000.014: SYSTEM audio user and main-thread setup, named audio errors; preceding VM stage and handler anchor preserved in five trace lines"
+  },
+  "vm_startup_01_000_014": {
+    "evidence": "User photograph IMG_0408.JPG; user confirms sound works and requests quieter music/effects",
+    "audio": "PASS: user confirms playback; lower gains requested",
+    "reported_stage": "DONE: Metachunk commit boundary",
+    "reported_handler_anchor": "0x0000000000ded450",
+    "fault_signal": "0x000000000000000b",
+    "fault_pc": "0x00000008000751d0",
+    "fault_address": "0x0000000100026c946",
+    "established": "Chunk commit-boundary update returned; fault persists afterward. VM creation and Java bytecode execution remain unestablished.",
+    "next_probe": "01.000.015: music 35%, selection 70%, metadata allocation/result and zeroing checkpoints"
+  },
+  "vm_startup_latest_metadata_zeroing": {
+    "evidence": "User photograph IMG_0409.JPG, after latest supplied 01.000.016; header version not visible",
+    "reported_stage": "DONE: Metadata zeroing",
+    "reported_handler_anchor": "0x0000000000dedbc0",
+    "fault_signal": "0x000000000000000b",
+    "fault_pc": "0x00000008000751d0",
+    "fault_address": "0x0000000100026c946",
+    "established": "At least one metadata allocation and zeroing call returned. Signal 11 persists; VM creation and Java execution unestablished.",
+    "source_risk": "FreeBSD anon_mmap uses MAP_FIXED|MAP_EXCL for hints; MAP_EXCL semantics have not been verified on console. If ignored, fixed mappings can replace existing image/heap memory.",
+    "next_probe": "01.000.017: PS5 hints never use MAP_FIXED/MAP_EXCL; target build and occupied-mapping host regression PASS"
+  },
+  "vm_startup_01_000_017": {
+    "evidence": "User photograph IMG_0410.JPG following supplied 01.000.017; version header cropped",
+    "reported_stage": "DONE: Metadata zeroing",
+    "reported_handler_anchor": "0x0000000000deda40",
+    "fault_signal": "0x000000000000000b",
+    "fault_pc": "0x00000008000751d0",
+    "fault_address": "0x0000000100026c946",
+    "established": "Fault persists after metadata zeroing despite removal of fixed address hints. Prior MAP_EXCL hypothesis is not established as the cause.",
+    "next_probe": "01.000.018 captures saved RDI/RSI/RDX and three bounded stack slots; UI shows seven context lines"
+  },
+  "vm_startup_01_000_018": {
+    "evidence": "User photograph IMG_0411.JPG following diagnostic build 01.000.018",
+    "reported_stage": "DONE: Metadata zeroing",
+    "reported_handler_anchor": "0x0000000000dedaa0",
+    "fault_signal": "0x000000000000000b",
+    "fault_pc": "0x00000008000751d0",
+    "fault_address": "0x0000000100026c946",
+    "saved_rdi": "0",
+    "saved_rsi": "0",
+    "saved_rdx": "0",
+    "stack_candidates": [
+      "0",
+      "0",
+      "0"
+    ],
+    "established": "Fault persists. Saved registers are zero and stack candidates unavailable; the register context has not identified a caller. Layout mismatch is a hypothesis, not proven.",
+    "next_probe": "01.000.019 traces five real native memory/string calls before invocation, with caller and pointer values independent of signal context"
+  },
+  "vm_startup_01_000_019": {
+    "evidence": "User photograph IMG_0412.JPG after supplied 01.000.019",
+    "reported_stage": "DONE: Traced native memory/string call",
+    "reported_handler_anchor": "0x0000000000dee390",
+    "fault_signal": "0x000000000000000b",
+    "fault_pc": "0x00000008000751d0",
+    "fault_address": "0x0000000100026c946",
+    "registers_and_stack": "Visible values remain zero; right edge partly cropped",
+    "established": "The fault persists. Generic completion logging obscured call details in the UI; this was a diagnostic shortcoming, not progress toward successful VM startup.",
+    "next_probe": "01.000.020 retains call operation/caller/pointers/bytes/completion independently, protects stage from tracing helpers, and covers ten native operations"
+  },
+  "vm_startup_01_000_020": {
+    "evidence": "User photograph IMG_0413.JPG following supplied 01.000.020; left/right crop",
+    "reported_stage": "DONE: Metadata zeroing",
+    "reported_handler_anchor": "0x0000000000def3b0",
+    "fault_signal": "0x000000000000000b",
+    "fault_pc": "0x00000008000751d0",
+    "fault_address": "0x0000000100026c946",
+    "last_call": "strlen",
+    "caller": "0x000000000116dbb6",
+    "source_pointer": "0x00000008801d3083",
+    "destination_pointer": "0x0000000000000000",
+    "bytes": "0",
+    "completed": "1",
+    "symbol_resolution": "At inferred app base 0x400000, caller return offset 0xd6dbb6 is ParseLocale after strlen and before malloc/strcpy in retained 01.000.020 ELF",
+    "established": "A locale-parser strlen returned. The subsequent allocator/copy path remains the suspected fault site; neither malloc nor strcpy failure was established by this report.",
+    "next_probe": "01.000.021 PS5 bootstrap explicitly sets en_US/UTF-8 native defaults, excludes desktop locale parsing, adds malloc/strcpy tracing"
+  },
+  "vm_startup_01_000_021": {
+    "evidence": "User photograph IMG_0415.JPG, inspected original-resolution crop",
+    "reported_stage": "DONE: Metadata zeroing",
+    "reported_handler_anchor": "0x0000000000def4a0",
+    "fault_signal": "0x000000000000000b",
+    "fault_pc": "0x00000008000751d0",
+    "fault_address": "0x0000000100026c946",
+    "last_call": "memcpy",
+    "caller": "0x00000000009cf4b9",
+    "source_pointer": "0x0000000203c480e0",
+    "destination_pointer": "0x0000000203c4b603",
+    "bytes": "11",
+    "completed": "1",
+    "symbol_resolution": "At app base 0x400000, offset 0x5cf4b9 is SignatureHandlerLibrary::add after copying generated signature bytes; next operations publish/flush the handler before native invocation",
+    "established": "Generated JNI handler copy returned. Locale parser exclusion did not resolve fault. Native system-property struct APIs remain an unverified bootstrap path, not proven crash cause.",
+    "next_probe": "01.000.022 explicit native sandbox/system property defaults, UTC startup option, plus strdup forwarding/capture"
+  },
+  "vm_startup_01_000_022": {
+    "evidence": "User reports PASS PASS FAIL PASS",
+    "runtime_initialization": "PASS",
+    "vm_creation": "PASS",
+    "hello25": "FAIL; exact message/code not yet supplied",
+    "destroy_vm": "PASS",
+    "established": "Real JNI_CreateJavaVM returned success with VM/environment pointers, and DestroyJavaVM succeeded according to test statuses. Full Hello25 version/arithmetic/thread fixture did not pass.",
+    "not_established": "Hello25.main lookup/execution and its application arithmetic/thread fixture",
+    "reported_hello_code": "FFFFFAE8",
+    "failure_phase": "FindClass(\"Hello25\") returned NULL or raised a Java exception; -1304"
+  },
+  "vm_startup_01_000_023": {
+    "evidence": "User reports ALL PASS!",
+    "runtime_initialization": "PASS",
+    "vm_creation": "PASS",
+    "hello25": "PASS: Java 25 feature check, arithmetic and Java worker start/join",
+    "destroy_vm": "PASS",
+    "class_loading_route": "Packaged bytes read natively and defined through real JNI DefineClass into the actual system class loader",
+    "not_established": "Filesystem directory/JAR discovery, Minecraft, third-party native mods or JIT stability"
+  },
+  "file_io_01_000_000": {
+    "evidence": "User reports PASS PASS FAIL PASS with FileIO25.main java.lang.UnsatisfiedLinkError: int sun.nio.fs... / code FFFFFAE5",
+    "runtime_initialization": "PASS",
+    "vm_creation": "PASS",
+    "file_io": "FAIL: main threw Java exception (-1307); native method signature truncated by UI",
+    "destroy_vm": "PASS",
+    "next_probe": "PPSA99866 01.000.001: resident-library JNI_OnLoad_<name> discovery and full exception panel"
+  },
+  "file_io_01_000_001": {
+    "evidence": "IMG_0417.JPG and user confirms crash occurred running Java file test (row 3)",
+    "file_io": "CRASH: SIGSEGV (11)",
+    "reported_handler_anchor": "0x0000000000defa70",
+    "fault_pc": "0x00000008000751d0",
+    "fault_address": "0x0000000100026c946",
+    "last_call_caller": "0x00000000010965e6",
+    "last_call_bytes": "0x203c",
+    "last_call_completed": true,
+    "symbol_resolution": "Matches build anchor at image base 0x400000; caller offset 0xc965e6 is after memset in ThreadsSMRSupport::free_list",
+    "limitation": "Native call tracing was disabled after VM creation; this retained call does not establish the Java I/O crash site",
+    "next_probe": "01.000.002 uses explicit /app0 relative-path resolution to avoid UnixFileSystem getcwd comparison; traces Java file test and shutdown"
+  },
+  "file_io_01_000_002": {
+    "evidence": "IMG_0418.JPG",
+    "vm_creation": "PASS: code 00000000 visible",
+    "file_io": "FAIL: FileIO25.main java.nio.file.FileSystemException: /download0/java25-file-probe-93679299343676.txt: Operation not permitted; code FFFFFAE5",
+    "destroy_vm": "PASS: code 00000000 visible",
+    "established": "Java file test returns a managed exception; no crash reported in this run",
+    "not_established": "Exact failed operation or native errno; the old fixture did not label each operation",
+    "next_probe": "01.000.003 private exclusive Java file creation at mode 0600, operation labels, native open diagnostics"
+  },
+  "file_io_01_000_003": {
+    "evidence": "IMG_0420.jpg",
+    "vm_creation": "PASS: visible code 00000000",
+    "file_io": "FAIL: File I/O stage delete, FileSystemException Operation not permitted; code FFFFFAE5",
+    "destroy_vm": "PASS: visible code 00000000",
+    "established": "Exclusive Java createFile returned successfully before the guarded body and cleanup ran",
+    "not_established": "Write/read/size may have failed first; the cleanup exception could replace their error in 01.000.003",
+    "next_probe": "01.000.004 sandbox unlink/rmdir deletion, descriptor-backed stat on EPERM, preserve primary failure with suppressed cleanup"
+  },
+  "file_io_01_000_004": {
+    "title_id": "PPSA99866",
+    "version": "01.000.004",
+    "tested_date": "2026-10-13",
+    "console": "PS5 firmware 13.60",
+    "results": {
+      "native_initialization": "PASS",
+      "JNI_CreateJavaVM": "PASS",
+      "FileIO25_relative_paths_private_create_utf8_write_read_size_delete": "PASS",
+      "DestroyJavaVM": "PASS"
+    },
+    "evidence": "Human console report: ALL PASS! following supplied 01.000.004",
+    "class_loading": "JNI DefineClass using packaged Java 25 bytecode and actual system class loader",
+    "filesystem_policy": "user.dir=/app0; sun.nio.fs.chdirAllowed=true; sun.nio.fs.ps5Sandbox=true; exclusive file creation with POSIX 0600; PS5 stat EPERM fallback uses real open/fstat/close; sandbox deletion uses real unlink/rmdir",
+    "package_file": "PPSA99866-file-io-pass-01.000.004.zip",
+    "sha256": "a9a0159806034da9dc5f1164046c9c05e9d86340172fca9a071b8ee497304b15",
+    "unverified": [
+      "default-0666 creation",
+      "directory listing and broad filesystem permissions",
+      "ZIP/JAR operations and ordinary class-path discovery",
+      "network I/O",
+      "JIT and long-running stability",
+      "Minecraft/mod compatibility"
+    ],
+    "established": "Real Java file I/O fixture and VM lifecycle pass on the PS5"
+  },
+  "zipjar_01_000_000": {
+    "title_id": "PPSA99867",
+    "version": "01.000.000",
+    "tested_date": "2026-10-13",
+    "console": "PS5 firmware 13.60",
+    "results": {
+      "native_initialization": "PASS",
+      "JNI_CreateJavaVM": "PASS",
+      "ZipJar25_stored_deflated_manifest_jar_class_resource": "PASS",
+      "DestroyJavaVM": "PASS"
+    },
+    "evidence": "Human console report: ALL PASS! following supplied ZIP/JAR 01.000.000",
+    "class_loading": "JNI DefineClass launches ZipJar25; URLClassLoader loads and defines ps5probe.JarHello25 only from the packaged JAR",
+    "checks": [
+      "Stored ZIP bytes",
+      "65536-byte deflated pattern",
+      "Five archive entries",
+      "JAR manifest",
+      "Java 25 JAR class arithmetic and defining loader",
+      "UTF-8 resource through JAR class loader"
+    ],
+    "package_file": "PPSA99867-zip-jar-pass-01.000.000.zip",
+    "sha256": "af883f85f5452e7203aae2a8c8501aaa9c4a62f716225a0d44e9374b55e20672",
+    "unverified": [
+      "Signed JARs",
+      "System application class-path directory discovery",
+      "Complex dependency graphs and mod loaders",
+      "Networking",
+      "JIT and long-running stability",
+      "Minecraft compatibility"
+    ]
+  },
+  "network_01_000_000": {
+    "evidence": "IMG_0421.JPG",
+    "networking": "FAIL: Network stage numeric IPv4 loopback, java.lang.InternalError: Error loading java.security file; code FFFFFAE5",
+    "destroy_vm": "PASS: visible code 00000000",
+    "established": "Failure before TCP, UDP or NIO exchanges; no networking console success established",
+    "packaging_finding": "Packaged classes-only image lacked conf/security/java.security",
+    "next_probe": "01.000.001 includes target-generated security/network configuration and displays nested error causes"
+  },
+  "network_01_000_001": {
+    "evidence": "IMG_0422.JPG",
+    "networking": "FAIL before socket exchanges: security configuration -> InternalError loading java.security -> FileSystemException /app0/assets/java25/conf/security/java.security: Operation not permitted; FFFFFAE5",
+    "destroy_vm": "PASS, code 00000000 visible",
+    "established": "Packaging includes config; Java access still refused; photograph alone does not distinguish canonicalization from file read",
+    "next_probe": "01.000.002 restricted bundled-master path policy and native read preflight"
+  },
+  "network_01_000_002": {
+    "evidence": "IMG_0423.JPG",
+    "native_initialization": "PASS, code 00000000",
+    "vm_creation": "PASS, code 00000000",
+    "networking": "FAIL: TCP server worker IOException Permission denied; FFFFFAE5",
+    "destroy_vm": "PASS, code 00000000",
+    "established": "Security configuration and numeric IPv4 construction reached TCP test; Java listener bind completed before worker started",
+    "not_established": "Specific worker operation, TCP echo, UDP or NIO; older fixture prioritized worker error and could conceal client failure",
+    "next_probe": "01.000.003 socket-only nonblocking-option fallback and phase/first-failure diagnostics"
+  },
+  "network_01_000_003": {
+    "title_id": "PPSA99868",
+    "version": "01.000.003",
+    "tested_date": "2026-10-13",
+    "console": "PS5 firmware 13.60",
+    "results": {
+      "native_initialization": "PASS",
+      "JNI_CreateJavaVM": "PASS",
+      "Network25_TCP_UDP_NIO_loopback": "PASS",
+      "DestroyJavaVM": "PASS"
+    },
+    "evidence": "Human console report: ALL PASS! lets go, following supplied Networking 01.000.003",
+    "checks": [
+      "Bundled native security configuration read",
+      "Java security configuration initialization",
+      "Numeric IPv4 loopback",
+      "Java TCP listener/client/worker framed UTF-8 echo",
+      "Two-way UDP datagrams and source ports",
+      "Nonblocking NIO channels and selector readiness",
+      "Worker termination and VM shutdown"
+    ],
+    "network_scope": "IPv4 loopback on ephemeral ports; no external device or DNS used",
+    "package_file": "PPSA99868-network-pass-01.000.003.zip",
+    "sha256": "9765536f274f3b3e35922b29564ac67afc7cfe979df5d8f3cf5f2a3b3649ebc2",
+    "unverified": [
+      "LAN and remote connectivity",
+      "DNS and IPv6",
+      "TLS/HTTPS",
+      "Sustained load and concurrent connections",
+      "Virtual-thread socket polling",
+      "JIT stability"
+    ]
+  },
+  "lan_dns_01_000_000": {
+    "title_id": "PPSA99869",
+    "version": "01.000.000",
+    "tested_date": "2026-10-13",
+    "console": "PS5 firmware 13.60",
+    "results": {
+      "native_initialization": "PASS",
+      "JNI_CreateJavaVM": "PASS",
+      "Lan25_external_TCP_UDP_echo": "PASS",
+      "Dns25_forward_lookup": "PASS",
+      "DestroyJavaVM": "PASS"
+    },
+    "evidence": "Human console report: ALL PASS! no problemo; local helper log also records TCP and UDP exchanges from the PS5 peer",
+    "checks": [
+      "Native security configuration read",
+      "TCP framed UTF-8 echo between PS5 and Mac",
+      "UDP echoed UTF-8 bytes and peer address/port",
+      "Forward DNS resolution of example.com",
+      "VM shutdown"
+    ],
+    "package_file": "PPSA99869-lan-dns-pass-01.000.000.zip",
+    "sha256": "3cfeed2f321334e742fa93070e6983bed201332f7837d907af2db52d547c11cc",
+    "configuration": "Generated probe.properties contains the tested LAN endpoint; other users must set their own helper address/port",
+    "unverified": [
+      "Inbound LAN server acceptance on PS5",
+      "TLS/HTTPS",
+      "IPv6 reachability",
+      "Sustained or concurrent network load",
+      "General DNS failure/caching behavior",
+      "JIT stability"
+    ]
+  },
+  "inbound_01_000_000_first_attempt": {
+    "title_id": "PPSA99870",
+    "version": "01.000.000",
+    "tested_date": "2026-10-14",
+    "console": "PS5 firmware 13.60",
+    "results": {
+      "JNI_CreateJavaVM": "PASS (visible in photos)",
+      "InboundTcp25": "FAIL: SocketTimeoutException: Accept timed out",
+      "InboundUdp25": "FAIL: SocketTimeoutException: Receive timed out",
+      "DestroyJavaVM": "not shown"
+    },
+    "evidence": "User photos IMG_0427.JPG and IMG_0428.JPG",
+    "interpretation": "Both fixtures reached their accept/receive wait. No successful incoming exchange established. Background helper suppressed retry errors; tool environment currently reports No route to host while user reports their own LAN access works. Console app was closed during diagnostic probes.",
+    "next_test": "Run the diagnostic helper in the user Terminal before retrying the unchanged app; inspect actual TCP/UDP retry errors and PASS confirmations.",
+    "sha256": "11f28dda3fcec883283896fee6e36fd1f29b3e57a0a38fef38576a5e0af4813b"
+  },
+  "inbound_01_000_000": {
+    "title_id": "PPSA99870",
+    "version": "01.000.000",
+    "tested_date": "2026-10-14",
+    "console": "PS5 firmware 13.60",
+    "results": {
+      "native_initialization": "PASS",
+      "JNI_CreateJavaVM": "PASS",
+      "InboundTcp25": "PASS",
+      "InboundUdp25": "PASS",
+      "DestroyJavaVM": "PASS"
+    },
+    "evidence": "Human console report: ALL PASS, following retry instructions for the unchanged 01.000.000 package",
+    "checks": [
+      "Inbound LAN TCP accept, framed UTF-8 request and reply, client verification marker",
+      "Inbound LAN UDP receive/reply and client verification marker",
+      "Real Java 25 interpreter VM lifecycle"
+    ],
+    "configuration": "No preset device IPs or client-IP filters in console package; external helper destination supplied at runtime",
+    "package_file": "PPSA99870-inbound-lan-pass-01.000.000.zip",
+    "sha256": "11f28dda3fcec883283896fee6e36fd1f29b3e57a0a38fef38576a5e0af4813b",
+    "unverified": [
+      "TLS/HTTPS",
+      "IPv6",
+      "Sustained or concurrent inbound load",
+      "JIT stability"
+    ]
+  },
+  "advanced_network_01_000_000": {
+    "title_id": "PPSA99871",
+    "version": "01.000.000",
+    "tested_date": "2026-10-14",
+    "results": {
+      "JNI_CreateJavaVM": "PASS (visible)",
+      "Https25": "FAIL: initialize trust managers/TLS context; ExceptionInInitializerError; nested cause not shown",
+      "Ipv625": "FAIL: bind IPv6 TCP listener; IPv6 protocol family unavailable",
+      "NetworkLoad25": "FAIL: four concurrent TCP workers; TCP load worker; nested cause not shown",
+      "DestroyJavaVM": "not shown"
+    },
+    "evidence": "User photos IMG_0429.JPG, IMG_0430.JPG and IMG_0431.JPG",
+    "package_sha256": "90162513b13832cc7c53689f962922ab14956e54f1e2d56bffa1fafe3cb6a37c",
+    "next_probe": "01.000.001 exposes actual platform inet_pton to global embedded lookup, splits TLS phases and includes nested cause chains / worker phases"
+  },
+  "advanced_network_01_000_001": {
+    "title_id": "PPSA99871",
+    "version": "01.000.001",
+    "tested_date": "2026-10-14",
+    "console": "PS5 firmware 13.60",
+    "results": {
+      "native_initialization": "PASS",
+      "JNI_CreateJavaVM": "PASS",
+      "Https25": "FAIL: create TLS context; ExceptionInInitializerError caused by JCE SecurityException: Cannot initialize cryptographic mechanism / Cannot read cryptographic policy directory: unlimited",
+      "Ipv625": "PASS",
+      "NetworkLoad25": "PASS",
+      "DestroyJavaVM": "PASS"
+    },
+    "evidence": "Human report: all works except HTTPS; IMG_0432.JPG shows HTTPS cause and earlier test state",
+    "package_sha256": "48c77c48af0b19a3e8606a4b18ea1132869016127d8c3c8913be388d113866b6",
+    "scope": "IPv6 loopback and bounded concurrent/repeated loopback workload pass; no LAN IPv6 or extended endurance claim",
+    "next_probe": "01.000.002 loads exact bundled JCE policy files directly with normal parsing"
+  },
+  "advanced_network_01_000_002": {
+    "title_id": "PPSA99871",
+    "version": "01.000.002",
+    "tested_date": "2026-10-14",
+    "console": "PS5 firmware 13.60",
+    "results": {
+      "native_initialization": "PASS",
+      "JNI_CreateJavaVM": "PASS",
+      "Https25": "PASS",
+      "Ipv625": "PASS",
+      "NetworkLoad25": "PASS",
+      "DestroyJavaVM": "PASS"
+    },
+    "evidence": "Human console report: ALL PASS! after supplying Advanced Network 01.000.002",
+    "checks": [
+      "HTTPS to https://example.com/ with bundled CA trust store and standard hostname verification; HTTP 200, encrypted cipher and nonempty bounded response",
+      "IPv6 ::1 TCP request/reply and UDP request/reply",
+      "Four concurrent TCP clients with echo workers: 128 verified 4096-byte frames each; 2 MiB each direction overall",
+      "256 verified 512-byte UDP loopback round trips",
+      "Real Java 25 interpreter VM initialization and shutdown"
+    ],
+    "package_file": "PPSA99871-advanced-network-pass-01.000.002.zip",
+    "sha256": "8c95655c87b1433c291170d606c22e740b2099b4e8a28ed2906905ba534c32cc",
+    "configuration": "No preset device IPs or external LAN helper; HTTPS requires Internet, IPv6 and load use loopback",
+    "host_negative_checks": [
+      "Untrusted TLS certificate rejected",
+      "Trusted certificate with wrong hostname rejected",
+      "JCE limited policy remains AES-128, unlimited policy parsed normally",
+      "Missing mandatory policy files and denied custom policy metadata reject"
+    ],
+    "unverified": [
+      "TLS certificate rejection on the actual PS5 (negative checks currently host-tested)",
+      "IPv6 LAN/external reachability",
+      "Prolonged or concurrent LAN endurance",
+      "Broader HTTPS endpoints and TLS configurations",
+      "JIT stability"
+    ]
+  },
+  "lan_endurance_01_000_000_first_attempt": {
+    "title_id": "PPSA99872",
+    "version": "01.000.000",
+    "tested_date": "2026-10-14",
+    "console": "PS5 firmware 13.60",
+    "results": {
+      "native_initialization": "PASS",
+      "JNI_CreateJavaVM": "PASS",
+      "Ipv6Lan25": "FAIL: SocketTimeoutException: Accept timed out while waiting for actual IPv6 LAN client",
+      "LanTcpLoad25": "PASS",
+      "LanUdpLoad25": "PASS",
+      "DestroyJavaVM": "PASS (human follow-up)"
+    },
+    "evidence": "User photo IMG_0433.JPG; runtime and VM return code 00000000, both load rows show PASS/00000000, IPv6 accept timeout FFFFFAE5; follow-up: all passed except IPv6, Terminal closed before discovery output could be retained",
+    "package_sha256": "96f9eb12994e49e5d630fc8fb2acb174d1630231273575a6afaf89687b751959",
+    "established": [
+      "Four external TCP client workers satisfy at least 60 seconds and 128 verified 4096-byte frames each, with client confirmations",
+      "External UDP satisfies at least 60 seconds and 128 verified 512-byte round trips with final client confirmation"
+    ],
+    "not_established": [
+      "IPv6 LAN destination discovery or reachability",
+      "IPv6 UDP exchange (TCP accept failed first)",
+      "ALL PASS for this combined build"
+    ],
+    "next_step": "Run check_lan_ipv6.command to retain neighbor discovery evidence without repeating load tests; PS5 package unchanged",
+    "discovery_followup": {
+      "reported": "arp returned 1; no IPv4 ARP hardware address; no IPv6 neighbor found",
+      "ipv4_confirmation": "Human confirms same fixed PS5 IPv4 address used for passing external TCP/UDP tests",
+      "interpretation": "Discovery stopped before NDP matching; this is not proof of absent PS5 IPv6 support. A valid ARP entry was observed by a direct local query, while a later helper invocation failed to see it. Tool network probing also reports No route to host.",
+      "helper_change": "Read existing ARP cache first, fall back to exact address/interface in full table, prime only if needed, print entered address/route and command error stdout"
+    }
+  },
+  "lan_endurance_01_000_000": {
+    "title_id": "PPSA99872",
+    "version": "01.000.000",
+    "tested_date": "2026-10-14",
+    "console": "PS5 firmware 13.60",
+    "results": {
+      "native_initialization": "PASS",
+      "JNI_CreateJavaVM": "PASS",
+      "Ipv6Lan25": "PASS",
+      "LanTcpLoad25": "PASS",
+      "LanUdpLoad25": "PASS",
+      "DestroyJavaVM": "PASS"
+    },
+    "evidence": "Human console report: ALL PASS lets gooooo! after using manually supplied PS5 IPv6 link-local address with the updated Mac helper; console package unchanged",
+    "checks": [
+      "Actual external IPv6 LAN TCP framed UTF-8 request/reply and helper verification",
+      "Actual external IPv6 LAN UDP UTF-8 request/reply and helper verification",
+      "Four concurrent external IPv4 TCP clients, each at least 60 seconds and 128 verified 4096-byte frames with monotonic sequence and client confirmations",
+      "External IPv4 UDP at least 60 seconds and 128 verified 512-byte round trips, duplicate accounting and client confirmation",
+      "Real Java 25 interpreter VM initialization and shutdown"
+    ],
+    "package_file": "PPSA99872-lan-endurance-pass-01.000.000.zip",
+    "sha256": "96f9eb12994e49e5d630fc8fb2acb174d1630231273575a6afaf89687b751959",
+    "configuration": "Console app has no preset device IPs or client-IP filters. Mac helper receives IPv4 and IPv6 addresses at runtime; tested IPv6 is link-local with LAN interface scope. Manual address bypassed inconclusive ARP/NDP discovery.",
+    "unverified": [
+      "Global/routed IPv6 Internet reachability",
+      "Hours-long network endurance",
+      "Simultaneous mixed TCP/UDP load",
+      "Broader TLS configurations and console negative TLS checks",
+      "JIT stability"
+    ]
+  }
+}
