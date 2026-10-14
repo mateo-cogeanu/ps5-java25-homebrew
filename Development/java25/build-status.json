@@ -13,7 +13,7 @@
   "java_base_class_count": 7381,
   "console_jvm_startup": "PASS in 01.000.023; Hello25 and DestroyJavaVM also PASS, reported by user",
   "next_console_title": "PPSA99870",
-  "next_console_probe": "Dependencies PPSA99873 01.000.000: multi-JAR manifest dependencies/services, actual system class path and real resident JNI fixture",
+  "next_console_probe": "Dependencies PPSA99873 01.000.001: bundled system-classpath adaptation and readable paged error panel",
   "runtime_probe_host_tests": "all four PASS on x86 macOS; not console evidence",
   "remaining_work": [
     "console VM startup and Hello25 results",
@@ -173,10 +173,20 @@
   "dependency_01_000_000_validation": {
     "title_id": "PPSA99873",
     "version": "01.000.000",
-    "console": "pending",
+    "console": "Only SystemClasspath25 FAIL by human report; complete cause hidden on screen",
     "zip_sha256": "4b5e3ae7433f654d517f1283024af72586918319416d1298ff141221825adf68",
     "host_checks": "PASS: manifest Class-Path transitive classes, service provider and UTF-8 resource/order, actual system class loader, real host JNI library discovery/arrays/arithmetic/exception; missing JAR/classpath/native library reject; embedded lookup discovery/symbol scope",
     "package_checks": "PASS: native signature/integrity, ZIP CRC/title/version, exact class/JAR bytes, payload classes only in JARs, real target JNI symbols; no host dynamic library packaged",
     "scope": "Four controlled unsigned JARs and one resident test JNI library; no Minecraft server boot or arbitrary external native ELF loading claimed"
+  },
+  "dependency_01_000_001_validation": {
+    "title_id": "PPSA99873",
+    "version": "01.000.001",
+    "console": "pending",
+    "zip_sha256": "cd25cf54a3a727979da5bb297c96f09114b14105008a943b33929459a16ddeb7",
+    "host_checks": "PASS: actual URLClassPath class with canonicalize0 denied; bundled JAR URL retained while other/parent/relative paths keep checks; dependency/JNI positive and missing-file negative tests",
+    "package_checks": "PASS: target signature/integrity, ZIP CRC/version, JAR-only payload classes, exact fixtures; patched URLClassPath confirmed in packaged JIMAGE",
+    "ui_check": "Host layout preview confirms long diagnostic wraps within actual font widths; unsupported 16/18px fallback replaced with baked 20px exception font and left/right paging",
+    "scope": "Candidate fix for silently dropped bundled system-classpath JARs; console root cause/pass still unconfirmed. FTP mapping for application download0 logs remains unknown."
   }
 }

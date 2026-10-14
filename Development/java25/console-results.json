@@ -618,5 +618,23 @@
       "Broader TLS configurations and console negative TLS checks",
       "JIT stability"
     ]
+  },
+  "dependency_01_000_000": {
+    "title_id": "PPSA99873",
+    "version": "01.000.000",
+    "tested_date": "2026-10-14",
+    "console": "PS5 firmware 13.60",
+    "results": {
+      "native_initialization": "PASS (human report: only system class path failed)",
+      "JNI_CreateJavaVM": "PASS (human report)",
+      "MultiJar25": "PASS (human report)",
+      "SystemClasspath25": "FAIL: SystemClasspath25 stage sys...; FFFFFAE5; full cause not visible",
+      "NativeDeps25": "PASS (human report)",
+      "DestroyJavaVM": "PASS (human report)"
+    },
+    "evidence": "Human report: only transitive JAR loading row failed; abbreviated row message supplied. FTP has no visible download0 folder.",
+    "package_sha256": "4b5e3ae7433f654d517f1283024af72586918319416d1298ff141221825adf68",
+    "interpretation": "The reported failing row is the actual system class-path test, distinct from passing isolated multi-JAR test. Canonicalization silently dropping bundled entries is a code-supported candidate; exact exception cause is not yet established.",
+    "next_probe": "01.000.001 narrow bundled system-JAR path adaptation and measured-width exception wrapping/pages"
   }
 }

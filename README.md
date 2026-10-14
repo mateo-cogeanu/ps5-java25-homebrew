@@ -79,7 +79,7 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 
 **Other network scopes:** [Advanced_Network_Probe](Advanced_Network_Probe/) covers verified HTTPS and local IPv6; [Inbound_LAN_Probe](Inbound_LAN_Probe/) covers short inbound IPv4 exchanges; [LAN_DNS_Probe](LAN_DNS_Probe/) covers outbound LAN and DNS. Routed IPv6, hours-long endurance, simultaneous mixed load and broader TLS configurations remain unverified.
 
-**Current development probe:** [Dependencies](Development/java25/probe/dependencies.cpp), `PPSA99873` version `01.000.000`. Manifest-linked JARs, service/resource resolution, the actual VM system class path and a real resident JNI test library await console validation. No network helper is required. Longer endurance is deferred until there is a useful application to exercise.
+**Current development probe:** [Dependencies](Development/java25/probe/dependencies.cpp), `PPSA99873` version `01.000.001`. The isolated multi-JAR and resident JNI rows passed in version 000; the system class-path row failed. Version 001 adapts bundled JAR URL construction and fixes exception wrapping/paging; console validation is pending. No network helper is required. Longer endurance is deferred until there is a useful application to exercise.
 
 ## Explore the source
 

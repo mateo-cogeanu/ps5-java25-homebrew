@@ -1522,3 +1522,45 @@ JNI library. The generated embedded lookup test covers opt-in discovery and
 library symbol isolation. Package integrity/CRC, Java 25 bytes, JAR-only
 payload placement and real target JNI definitions pass. Console execution
 remains pending; no ninth milestone or application compatibility is claimed.
+
+
+### Dependency loading 01.000.001 — system paths and visible diagnostics
+
+The user reports only the system class-path row failed in version 000.
+Its shortened message identifies the initial system class resolution stage,
+but hides the cause. The isolated manifest/multi-JAR and native JNI rows
+passed; these must not be conflated with the system loader row.
+
+URLClassPath.toFileURL canonicalizes each class-path entry and returns null
+on IOException, silently excluding the entry. Patch 0033, under the existing
+PS5 sandbox property, constructs the file URL directly only for absolute
+/app0/assets/java25/jars/*.jar paths without dot/parent segments. Other
+paths retain canonicalization. Actual JarFile opening, header validation,
+manifest/dependency resolution and class definition remain unchanged.
+This is a candidate fix consistent with sandbox behavior, not a claim that
+the unseen console cause has been established. Target core classes were
+rebuilt and the patch is verified in packaged JIMAGE bytecode.
+
+```sh
+python3 tools/test_java25_system_classpath.py
+python3 tools/test_java25_dependencies.py
+python3 tools/package_java25_jni.py --dependencies
+```
+
+The host JNI regression denies java.io.UnixFileSystem.canonicalize0.
+Bundled JAR URLs survive under the opt-in property, while normal behavior,
+outside paths, parent traversal and relative paths retain failure. Standard
+real JAR/service/JNI positive and missing-dependency tests pass.
+
+The error panel now wraps by Canvas::text_width using baked 20px glyphs,
+respects explicit newlines and supports seven lines per page with D-pad
+left/right. Requested 16/18px fonts previously fell back to 24px; fixed
+character chunks could therefore exceed the screen width. A synthetic host
+layout preview confirms the diagnostic stays on screen. Preview results
+are layout evidence only. No source snapshot is frozen yet.
+
+The /download0 log paths are from the application's filesystem view.
+The user's FTP setup does not expose that folder, and its mapping is not
+established. Earlier advice that the user could retrieve those logs there
+was too definite. On-screen full-cause photos/pages are the current supported
+reporting route; no FTP-visible log export is claimed.

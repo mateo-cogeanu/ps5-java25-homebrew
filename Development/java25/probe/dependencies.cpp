@@ -50,6 +50,7 @@ const char *names[]={"Initialize embedded core runtime","Create Java 25 VM (inte
 int status[test_count]{}; // 0 untested, 1 pass, -1 fail, 2 running
 char messages[test_count][104]{};
 int selected=0,pending=-1,pad=-1;
+unsigned exception_page=0,exception_pages=1;
 std::uint32_t previous=0;
 bool initialized=false;
 JavaVM *java_vm=nullptr;
@@ -129,7 +130,7 @@ void java_failure(int i,int code,const char* phase) {
   java_env->ExceptionDescribe();java_env->ExceptionClear();
   java_env->DeleteLocalRef(original);
  }
- std::snprintf(exception_detail,sizeof(exception_detail),"%s: %s",phase,detail);
+ std::snprintf(exception_detail,sizeof(exception_detail),"%s: %s",phase,detail);exception_page=0;
  char message[80];std::snprintf(message,sizeof(message),"%.20s: %.48s",phase,detail);
  if(startup_log) {std::fprintf(startup_log,"NETWORK FAILURE: %s: %s / code %08X\n",phase,detail,static_cast<unsigned>(code));std::fflush(startup_log);}
  result(i,code,message);
@@ -303,6 +304,8 @@ bool update() noexcept {
   auto pressed=buttons&~previous;previous=buttons;
   if(pressed&0x10) {selected=(selected+test_count-1)%test_count;ps5::menu_audio::selected();changed=true;}
   if(pressed&0x40) {selected=(selected+1)%test_count;ps5::menu_audio::selected();changed=true;}
+  if(exception_detail[0] && (pressed&0x20) && exception_page+1<exception_pages) {++exception_page;changed=true;}
+  if(exception_detail[0] && (pressed&0x80) && exception_page>0) {--exception_page;changed=true;}
   if((pressed&0x4000)&&status[selected]==0) {
    ps5::menu_audio::selected();
    status[selected]=2;pending=selected;
@@ -314,7 +317,7 @@ bool update() noexcept {
 }
 void draw(Canvas &c) noexcept {
  c.gradient(rgb(18,29,49),rgb(8,13,23));
- c.label(100,64,"Java 25 - Dependencies 01.000.000",64,rgb(238,242,250));
+ c.label(100,64,"Java 25 - Dependencies 01.000.001",64,rgb(238,242,250));
  c.label(103,163,"Packaged JARs and a real embedded JNI fixture. No network or Mac helper needed.",24,rgb(139,153,178));
  for(int i=0;i<test_count;++i) {
   int y=220+i*82;
@@ -331,18 +334,31 @@ void draw(Canvas &c) noexcept {
  }
  if(exception_detail[0]) {
   c.label(103,768,"Java exception (full message):",24,rgb(230,176,91));
-  // Fixed-width chunks keep native method signatures visible on the TV.
-  for(size_t offset=0,line=0;exception_detail[offset]&&line<7;++line) {
-   char chunk[209]{};
-   size_t count=std::strlen(exception_detail+offset);if(count>208) count=208;
-   std::memcpy(chunk,exception_detail+offset,count);offset+=count;
-   c.label(103,800+static_cast<int>(line)*21,chunk,16,rgb(238,242,250));
+  // Wrap against actual baked glyph widths instead of a character count.
+  std::string_view text(exception_detail);size_t offset=0;unsigned line=0;
+  while(offset<text.size()) {
+   size_t count=0,last_space=0;
+   while(offset+count<text.size() && text[offset+count]!='\n' &&
+         Canvas::text_width(text.substr(offset,count+1),20)<=1690) {
+    if(text[offset+count]==' ')last_space=count;
+    ++count;
+   }
+   if(count==0)count=1;
+   if(offset+count<text.size() && text[offset+count]!='\n' && last_space>0)count=last_space;
+   if(line/7==exception_page)c.label(103,800+static_cast<int>(line%7)*21,text.substr(offset,count),20,rgb(238,242,250));
+   offset+=count;
+   while(offset<text.size() && (text[offset]==' '||text[offset]=='\n'))++offset;
+   ++line;
   }
+  unsigned pages=(line+6)/7;
+  exception_pages=pages;
+  char paging[128];std::snprintf(paging,sizeof(paging),"Exception page %u/%u - D-pad left/right",exception_page+1,pages);
+  c.label(103,735,paging,20,rgb(230,176,91));
  } else {
   c.label(103,768,"Last startup checkpoints (oldest to newest):",24,rgb(139,153,178));
-  for(int i=0;i<7;++i) c.label(103,800+i*21,previous_log[i],18,rgb(238,242,250));
+  for(int i=0;i<7;++i) c.label(103,800+i*21,previous_log[i],20,rgb(238,242,250));
  }
- if(native_open_error[0]) c.label(103,925,native_open_error,18,rgb(230,176,91));
+ if(native_open_error[0] && !exception_detail[0]) c.label(103,925,native_open_error,18,rgb(230,176,91));
  c.label(103,954,"D-pad: select   X: run selected test   PS: close game",24,rgb(139,153,178));
  c.label(103,1004,"After a crash, relaunch and photograph the seven startup checkpoints shown above.",20,rgb(139,153,178));
 }
