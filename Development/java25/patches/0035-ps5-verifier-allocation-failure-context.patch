@@ -1,0 +1,175 @@
+diff --git a/src/java.base/share/native/libverify/check_code.c b/src/java.base/share/native/libverify/check_code.c
+--- a/src/java.base/share/native/libverify/check_code.c
++++ b/src/java.base/share/native/libverify/check_code.c
+@@ -81,6 +81,7 @@
+ #include <assert.h>
+ #include <limits.h>
+ #include <stdlib.h>
++#include <errno.h>
+ #include <stdint.h>
+ 
+ #include "jni.h"
+@@ -465,7 +466,7 @@
+ 
+ static void CCerror (context_type *, char *format, ...);
+ static void CFerror (context_type *, char *format, ...);
+-static void CCout_of_memory (context_type *);
++static void CCout_of_memory (context_type *, int);
+ 
+ /* Because we can longjmp any time, we need to be very careful about
+  * remembering what needs to be freed. */
+@@ -498,7 +499,7 @@
+         calloc(HASH_TABLE_SIZE, sizeof(unsigned short));
+     if (class_hash->buckets == 0 ||
+         class_hash->table == 0)
+-        CCout_of_memory(context);
++        CCout_of_memory(context, __LINE__);
+     class_hash->entries_used = 0;
+ }
+ 
+@@ -542,7 +543,7 @@
+         class_hash->buckets[row] = (hash_bucket_type*)
+             calloc(HASH_ROW_SIZE, sizeof(hash_bucket_type));
+         if (class_hash->buckets[row] == 0)
+-            CCout_of_memory(context);
++            CCout_of_memory(context, __LINE__);
+     }
+     class_hash->entries_used++; /* only increment when we are sure there
+                                    is no overflow. */
+@@ -584,7 +585,7 @@
+     local = load_class_local(context, classname);
+     global = (*env)->NewGlobalRef(env, local);
+     if (global == 0)
+-        CCout_of_memory(context);
++        CCout_of_memory(context, __LINE__);
+ #ifdef DEBUG
+     context->n_globalrefs++;
+ #endif
+@@ -639,12 +640,12 @@
+     bucket->hash = hash;
+     bucket->name = malloc(strlen(name) + 1);
+     if (bucket->name == 0)
+-        CCout_of_memory(context);
++        CCout_of_memory(context, __LINE__);
+     strcpy(bucket->name, name);
+     bucket->loadable = loadable;
+     bucket->class = (*env)->NewGlobalRef(env, cb);
+     if (bucket->class == 0)
+-        CCout_of_memory(context);
++        CCout_of_memory(context, __LINE__);
+ #ifdef DEBUG
+     context->n_globalrefs++;
+ #endif
+@@ -700,7 +701,7 @@
+     bucket->hash = hash;
+     bucket->name = malloc(strlen(name) + 1);
+     if (bucket->name == 0)
+-        CCout_of_memory(context);
++        CCout_of_memory(context, __LINE__);
+     strcpy(bucket->name, name);
+ 
+ done:
+@@ -809,12 +810,12 @@
+             malloc(sizeof(unsigned char) * context->nconstants + 1);
+ 
+         if (context->constant_types == 0)
+-            CCout_of_memory(context);
++            CCout_of_memory(context, __LINE__);
+ 
+         JVM_GetClassCPTypes(env, cb, context->constant_types);
+ 
+         if (context->constant_types == 0)
+-            CCout_of_memory(context);
++            CCout_of_memory(context, __LINE__);
+ 
+         context->object_info =
+             make_class_info_from_name(context, "java/lang/Object");
+@@ -851,7 +852,7 @@
+             context->superclasses = gptr =
+                 malloc(sizeof(fullinfo_type)*(i + 1));
+             if (gptr == 0) {
+-                CCout_of_memory(context);
++                CCout_of_memory(context, __LINE__);
+             }
+ 
+             super = (*env)->GetSuperclass(env, context->class);
+@@ -1095,7 +1096,7 @@
+     context->exceptions = (unsigned short *)
+         malloc(sizeof(unsigned short) * nexceptions + 1);
+     if (context->exceptions == 0)
+-        CCout_of_memory(context);
++        CCout_of_memory(context, __LINE__);
+     JVM_GetMethodIxExceptionIndexes(env, cb, method_index,
+                                     context->exceptions);
+     for (i = 0; i < nexceptions; i++) {
+@@ -3534,7 +3535,7 @@
+     /* Set context->CCroot to 0 if new == 0 to tell CCdestroy to lay off */
+     context->CCroot = context->CCcurrent = new;
+     if (new == 0) {
+-        CCout_of_memory(context);
++        CCout_of_memory(context, __LINE__);
+     }
+     new->next = NULL;
+     new->segSize = CCSegSize;
+@@ -3582,7 +3583,7 @@
+             new = (struct CCpool *)malloc(sizeof(struct CCpool) +
+                                           (size - CCSegSize));
+             if (new == 0) {
+-                CCout_of_memory(context);
++                CCout_of_memory(context, __LINE__);
+             }
+             new->next = current->next;
+             new->segSize = size;
+@@ -3592,7 +3593,7 @@
+             if (new == NULL) {
+                 new = (struct CCpool *) malloc(sizeof(struct CCpool));
+                 if (new == 0) {
+-                    CCout_of_memory(context);
++                    CCout_of_memory(context, __LINE__);
+                 }
+                 current->next = new;
+                 new->next = NULL;
+@@ -3704,9 +3705,23 @@
+ }
+ 
+ static void
+-CCout_of_memory(context_type *context)
+-{
++CCout_of_memory(context_type *context, int site)
++{
++#ifdef __PROSPERO__
++    int failure_errno = errno;
++#endif
+     int n = print_CCerror_info(context);
++#ifdef __PROSPERO__
++    // Identify the failed allocation or JNI acquisition without recovery.
++    if (n >= 0 && n < context->message_buf_len) {
++        jio_snprintf(context->message + n, context->message_buf_len - n,
++                     "[PS5 verifier site=%d errno=%d JNI-pending=%d]",
++                     site, failure_errno, (*context->env)->ExceptionCheck(context->env));
++        errno = failure_errno;
++    }
++#else
++    (void)site;
++#endif
+     context->err_code = CC_OutOfMemory;
+     longjmp(context->jump_buffer, 1);
+ }
+@@ -4167,7 +4182,7 @@
+ {
+     alloc_stack_type *p;
+     if (ptr == 0)
+-        CCout_of_memory(context);
++        CCout_of_memory(context, __LINE__);
+     if (context->alloc_stack_top < ALLOC_STACK_SIZE)
+         p = &(context->alloc_stack[context->alloc_stack_top++]);
+     else {
+@@ -4176,7 +4191,7 @@
+         if (p == 0) {
+             /* Make sure we clean up. */
+             free_block(ptr, kind);
+-            CCout_of_memory(context);
++            CCout_of_memory(context, __LINE__);
+         }
+     }
+     p->kind = kind;

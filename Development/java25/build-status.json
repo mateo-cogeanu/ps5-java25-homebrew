@@ -232,5 +232,12 @@
     "host_checks": "PASS: actual Settings header under ASan/UBSan, PS5 and non-PS5 defaults, alignment and constrained reservation model",
     "target_checks": "PASS: HotSpot rebuild, invocation exports, embedded VirtualSpaceList::create_new_node 2M-word argument, signed package and rebuilt libjvm byte equality",
     "console": "PASS: external consumer 01.000.005 creates real VM at 192 MiB, verifies official JARs and destroys VM; photo IMG_0438.JPG. Application start fails separately on missing helper-class lookup."
+  },
+  "legacy_verifier_failure_context": {
+    "patch": "0035-ps5-verifier-allocation-failure-context.patch",
+    "implementation": "Adds PS5-only site/errno/JNI-pending context to real legacy-verifier allocation error; original result and longjmp preserved; no verifier bypass",
+    "evidence": "External consumer reports OutOfMemoryError with class/method/signature, matching legacy verifier result=2, not normal Java heap-space message",
+    "checks": "PASS: rebuilt target libverify; real OOM formatter/longjmp under ASan/UBSan for both branches, bounded buffer and JNI callback errno clobber; package embeds diagnostic string",
+    "console": "pending"
   }
 }

@@ -1639,3 +1639,17 @@ The consumer 01.000.005 console result confirms real 192 MiB VM creation,
 artifact preflight and VM destruction with the smaller metaspace nodes.
 Application startup now reaches a separate helper-class lookup failure.
 This result does not establish a ready application server.
+
+### Legacy verifier allocation failure context
+
+Patch `0035-ps5-verifier-allocation-failure-context.patch` appends the failing
+source line, saved errno and pending-JNI-exception state to PS5 legacy
+verifier allocation errors. A class/method/signature-only OutOfMemoryError
+is emitted by this native verifier path; it should not automatically be
+treated as Java heap exhaustion. The original failure result, cleanup and
+longjmp remain in place. No verification checks are disabled.
+
+Target libverify rebuild and package inspection pass. ASan/UBSan tests run
+the actual error formatter with bounded context/JNI stubs, check preserved
+errno even if the JNI callback changes it, and confirm the desktop message
+is unchanged. Console diagnostic validation is pending.
