@@ -125,7 +125,7 @@ if args.startup:
     native_libs=ROOT/".tools/java25/openjdk/build/ps5-bootstrap/support/modules_libs/java.base"
     (assets/"lib/server").mkdir(parents=True,exist_ok=True)
     shutil.copy2(native_libs/"server/libjvm.so",assets/"lib/server/libjvm.so")
-    for name in ("java","zip","jimage","net","nio"):
+    for name in ("java","zip","jimage","net","nio","verify"):
         shutil.copy2(native_libs/("lib"+name+".so"),assets/"lib"/("lib"+name+".so"))
     module_names=re.search(r'^MODULES="([^"]+)"',(WORK/"boot-image/release").read_text(),re.M).group(1)
     (assets/"release").write_text('JAVA_VERSION="25.0.4"\nMODULES="'+module_names+'"\nOS_NAME="FreeBSD"\nOS_ARCH="amd64"\nIMPLEMENTOR="Experimental PS5 port"\n')

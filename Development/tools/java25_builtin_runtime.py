@@ -15,7 +15,7 @@ WORK = ROOT / 'build/java25'
 SDK = ROOT / '.tools/native-sdk/ps5-payload-sdk'
 LLVM = Path(subprocess.check_output(['/opt/homebrew/opt/llvm/bin/llvm-config','--bindir'],text=True).strip())
 LLD = Path(subprocess.check_output(['brew','--prefix','lld'],text=True).strip())/'bin/ld.lld'
-LIBRARIES = ['java','zip','jimage','net','nio']
+LIBRARIES = ['java','zip','jimage','net','nio','verify']
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)

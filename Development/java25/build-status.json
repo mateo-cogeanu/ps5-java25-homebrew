@@ -219,5 +219,10 @@
     "target": "PASS: external consumer package compilation and signed binary integrity",
     "console": "pending",
     "scope": "Reusable bounded native output capture before JNI_CreateJavaVM returns; consumer owns persistent report and UI"
+  },
+  "legacy_verifier": {
+    "implementation": "Real target-built libverify/check_code.o linked into resident library adapter; VerifyClassForMajorVersion exposed globally and through libverify.so; real target library packaged",
+    "checks": "PASS: generated lookup/discovery/library-scope tests, target link/signature/integrity and packaged target library byte equality",
+    "console": "pending"
   }
 }

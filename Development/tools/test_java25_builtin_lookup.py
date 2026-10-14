@@ -30,7 +30,7 @@ int main() {
  assert(parse && parse(AF_INET6,"::1",address)==1 && address[15]==1);
  assert(parse(AF_INET6,"invalid",address)==0);
  assert(!__dlsym(__dlopen("libjava.so",0),"inet_pton"));
- for(const char *name : {"java","zip","jimage","net","nio"}) {
+ for(const char *name : {"java","zip","jimage","net","nio","verify"}) {
   char symbol[64];std::snprintf(symbol,sizeof(symbol),"JNI_OnLoad_%s",name);
   auto load=reinterpret_cast<int (*)(void *,void *)>(__dlsym(process,symbol));
   assert(load && load(nullptr,nullptr)>=0x00010008);
@@ -39,6 +39,10 @@ int main() {
  auto nio_load=reinterpret_cast<int (*)(void *,void *)>(__dlsym(process,"JNI_OnLoad_nio"));
  load_version=-1;
  assert(nio_load(nullptr,nullptr)==-1); // failed hook must not become success
+ void *verify=__dlopen("/app0/assets/java25/lib/libverify.so",0);
+ assert(verify && __dlsym(verify,"VerifyClassForMajorVersion"));
+ assert(__dlsym(process,"VerifyClassForMajorVersion"));
+ assert(!__dlsym(__dlopen("libjava.so",0),"VerifyClassForMajorVersion"));
  void *nio=__dlopen("/app0/assets/java25/lib/libnio.so",0);
  assert(nio);
  assert(__dlsym(nio,"Java_sun_nio_fs_UnixNativeDispatcher_init"));

@@ -1609,3 +1609,11 @@ for the JVM vfprintf callback, including failures before JNI_CreateJavaVM
 returns. Consumers own persistence and display of the captured error. The
 ASan/UBSan test checks formatting, retention of the recent output and reset.
 Target compilation passes; console diagnostic capture remains pending.
+
+The embedded core now includes the target-built legacy bytecode verifier
+(`libverify`, `VerifyClassForMajorVersion`). Older class versions require
+this in addition to HotSpot’s modern stack-map verifier. Its omission caused
+“Could not link verifier” for an external consumer. Verification remains
+enabled; real upstream verifier code is linked and its target library is
+packaged. Lookup/scope and target packaging checks pass; console retest
+is pending.
