@@ -1387,3 +1387,19 @@ Discovery regression checks match MAC addresses, preserve scope and reject
 missing neighbor evidence. No host result is claimed as a console pass.
 Target signatures/integrity, ZIP CRC/title/version, exact fixture bytes and
 absence of device endpoint data pass. Older milestones remain frozen.
+
+
+### LAN Endurance first console results — 2026-10-14
+
+IMG_0433.JPG shows PPSA99872 01.000.000 initialization/VM creation and both
+60-second external LAN load rows passing. Their assertions require actual
+non-loopback peers, sequence/payload checks, minimum duration/traffic counts
+and final helper confirmations. These are real IPv4 LAN endurance results;
+exact throughput counters were not supplied.
+
+IPv6 reached TCP accept and timed out; its UDP stage was not reached.
+This does not establish an IPv6 routing failure or a Java socket defect.
+The external helper may not have discovered a PS5 IPv6 destination; its
+Terminal discovery result is requested. VM destruction remains unreported
+in this photo. The source/package are unchanged and the partial build is
+not frozen as a passing milestone. Existing seven snapshots remain intact.
