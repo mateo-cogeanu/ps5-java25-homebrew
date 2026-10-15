@@ -238,6 +238,12 @@
     "implementation": "Adds PS5-only site/errno/JNI-pending context to real legacy-verifier allocation error; original result and longjmp preserved; no verifier bypass",
     "evidence": "External consumer reports OutOfMemoryError with class/method/signature, matching legacy verifier result=2, not normal Java heap-space message",
     "checks": "PASS: rebuilt target libverify; real OOM formatter/longjmp under ASan/UBSan for both branches, bounded buffer and JNI callback errno clobber; package embeds diagnostic string",
-    "console": "pending"
+    "console": "CONFIRMED: consumer logs show site 3586 (CCalloc oversized native block), JNI-pending=0; Java heap still has about 56 MiB free. errno 35 may be stale."
+  },
+  "legacy_verifier_method_scratch": {
+    "patch": "0036-ps5-release-verifier-method-scratch.patch",
+    "implementation": "PS5-only CCreinit frees non-root method scratch segments between methods, retaining original verifier logic and class-lifetime allocations",
+    "checks": "PASS: real allocator ASan/UBSan constrained 512 KiB budget over 600 methods; original desktop retention exhausts that budget; patched complete legacy verifier validates JOML Matrix3f, Matrix4f and Quaternionf on host JNI",
+    "console": "pending: native allocation failure mitigation, not a proven complete server fix"
   }
 }

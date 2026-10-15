@@ -1,0 +1,24 @@
+diff --git a/src/java.base/share/native/libverify/check_code.c b/src/java.base/share/native/libverify/check_code.c
+--- a/src/java.base/share/native/libverify/check_code.c
++++ b/src/java.base/share/native/libverify/check_code.c
+@@ -3548,6 +3548,20 @@
+ static void CCreinit(context_type *context)
+ {
+     struct CCpool *first = context->CCroot;
++#ifdef __PROSPERO__
++    /* All CCpool allocations are method scratch (verify_method resets here).
++     * Oversized blocks are never reused by CCalloc; retaining them until class
++     * completion grows native memory with the sum of method sizes. Keep only
++     * the root segment on PS5. Class-lifetime tables use separate allocations.
++     */
++    struct CCpool *block = first->next;
++    first->next = NULL;
++    while (block != NULL) {
++        struct CCpool *next = block->next;
++        free(block);
++        block = next;
++    }
++#endif
+     context->CCcurrent = first;
+     context->CCfree_size = CCSegSize;
+     context->CCfree_ptr = &first->space[0];
