@@ -61,7 +61,7 @@ char previous_log[7][160]={{},{},{},{},{},{},"No previous startup log."};
 struct NativeTraceScope {
  NativeTraceScope() {
 #ifdef __PROSPERO__
-  ps5_vm_native_call_record() = {nullptr,0,0,0,0,false};
+  ps5_vm_reset_native_call_record();
 #endif
   ps5_native_trace::enable();
  }

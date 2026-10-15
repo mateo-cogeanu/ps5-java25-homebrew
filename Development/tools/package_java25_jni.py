@@ -202,7 +202,7 @@ if args.startup:
     if external:
         app_source=external["source"];app_param=external["param"]
         extra_args.extend([item for path in external.get("include_dirs",[]) for item in ("--include-dir",path)])
-wrapped_calls=["--wrap="+name for name in ("memcpy","memmove","memcmp","strcmp","strlen","memset","strncmp","strncpy","strchr","memchr","strcpy","malloc","strdup")] if args.startup else []
+wrapped_calls=["--wrap="+name for name in ("memcpy","memmove","memcmp","strcmp","strlen","memset","strncmp","strncpy","strchr","memchr","strcpy","malloc","calloc","realloc","free","strdup")] if args.startup else []
 if args.fileio or args.zipjar or args.network or args.lan or args.inbound or args.advanced_network or args.lan_endurance or args.dependencies or bool(external):
     wrapped_calls.append("--wrap=open")
 response(link_response, [*wrapped_calls,*("--defsym=" + name + "=0" for name in absent_callbacks),

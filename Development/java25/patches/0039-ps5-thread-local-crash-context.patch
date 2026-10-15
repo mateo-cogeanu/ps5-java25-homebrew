@@ -1,0 +1,97 @@
+--- a/src/hotspot/share/runtime/ps5StartupTrace.hpp
++++ b/src/hotspot/share/runtime/ps5StartupTrace.hpp
+@@ -10,34 +10,83 @@
+ #include <string.h>
+ #include <errno.h>
+ #include <stdio.h>
+-inline bool& ps5_vm_signal_trace_active() {
+-  static bool active = false; return active;
+-}
++// Allocation wrappers and signal handlers cannot lazily allocate TLS storage.
++// The target implements C++ thread_local through allocating __emutls helpers.
++// Use bounded, process-lifetime slots; exhaustion suppresses call capture safely.
++#include <pthread.h>
++#include <stdint.h>
+ struct Ps5NativeCallRecord {
+   const char* operation;
+   unsigned long long caller, source, destination, bytes;
+   bool completed;
+ };
++struct Ps5TraceThreadContext {
++  uintptr_t owner;
++  bool signal_active, io_active, busy;
++  Ps5NativeCallRecord record;
++  char stage[144];
++};
++inline Ps5TraceThreadContext* ps5_vm_context_for_key(uintptr_t key) {
++  static Ps5TraceThreadContext slots[1024] = {};
++  if (key == 0) return nullptr;
++  const size_t start = (key >> 4) % 1024;
++  for (size_t n = 0; n < 1024; ++n) {
++    Ps5TraceThreadContext* slot = &slots[(start + n) % 1024];
++    uintptr_t owner = __atomic_load_n(&slot->owner, __ATOMIC_ACQUIRE);
++    if (owner == key) return slot;
++    if (owner == 0 && __atomic_compare_exchange_n(&slot->owner, &owner, key,
++                            false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) return slot;
++    if (owner == key) return slot;
++  }
++  return nullptr;
++}
++inline Ps5TraceThreadContext* ps5_vm_thread_context() {
++  return ps5_vm_context_for_key((uintptr_t)pthread_self());
++}
++struct Ps5TraceFlag {
++  bool* value;
++  operator bool() const { return value == nullptr || *value; }
++  void operator=(bool active) { if (value != nullptr) *value = active; }
++};
++inline Ps5TraceFlag ps5_vm_signal_trace_active() {
++  Ps5TraceThreadContext* context = ps5_vm_thread_context();
++  return {context ? &context->signal_active : nullptr};
++}
++inline Ps5TraceFlag ps5_vm_trace_io_active() {
++  Ps5TraceThreadContext* context = ps5_vm_thread_context();
++  return {context ? &context->io_active : nullptr};
++}
++inline Ps5TraceFlag ps5_vm_native_trace_busy() {
++  Ps5TraceThreadContext* context = ps5_vm_thread_context();
++  return {context ? &context->busy : nullptr};
++}
+ inline Ps5NativeCallRecord& ps5_vm_native_call_record() {
+-  static Ps5NativeCallRecord record = {nullptr, 0, 0, 0, 0, false};
+-  return record;
++  Ps5TraceThreadContext* context = ps5_vm_thread_context();
++  static Ps5NativeCallRecord unavailable = {nullptr, 0, 0, 0, 0, false};
++  // A missing slot makes the guards above true; wrappers never write fallback.
++  return context ? context->record : unavailable;
+ }
+-inline bool& ps5_vm_trace_io_active() { static bool active = false; return active; }
++inline void ps5_vm_reset_native_call_record() {
++  Ps5TraceThreadContext* context = ps5_vm_thread_context();
++  if (context) context->record = {nullptr, 0, 0, 0, 0, false};
++}
+ struct Ps5TraceIOScope {
+   bool saved;
+   Ps5TraceIOScope() : saved(ps5_vm_trace_io_active()) { ps5_vm_trace_io_active() = true; }
+   ~Ps5TraceIOScope() { ps5_vm_trace_io_active() = saved; }
+ };
+-inline char* ps5_vm_last_stage() {
+-  static char previous[144] = "No startup stage recorded";
+-  return previous;
++inline const char* ps5_vm_last_stage() {
++  Ps5TraceThreadContext* context = ps5_vm_thread_context();
++  if (!context) return "Trace thread table exhausted; call context unavailable";
++  return context->stage[0] ? context->stage : "No startup stage recorded";
+ }
+ inline void ps5_vm_trace(const char *stage) {
+   Ps5TraceIOScope io_scope;
+   int saved_errno = errno;
+-  if (::strncmp(stage, "SIGNAL:", 7) != 0 && ::strncmp(stage, "CALL:", 5) != 0 &&
++  Ps5TraceThreadContext* context = ps5_vm_thread_context();
++  if (context != nullptr && ::strncmp(stage, "SIGNAL:", 7) != 0 && ::strncmp(stage, "CALL:", 5) != 0 &&
+       ::strncmp(stage, "DONE: Traced", 12) != 0 && stage != ps5_vm_last_stage()) {
+-    char* previous = ps5_vm_last_stage();
++    char* previous = context->stage;
+     size_t i = 0;
+     for (; stage[i] && i < 143; ++i) previous[i] = stage[i];
+     previous[i] = 0;

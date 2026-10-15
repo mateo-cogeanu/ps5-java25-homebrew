@@ -275,5 +275,13 @@
     "implementation": "Reusable pthread worker with an explicit 8 MiB stack, AttachCurrentThread-owned JNIEnv, detach, release/acquire completion and main-thread join; UI must hide mutable result buffers until joined.",
     "checks": "PASS: real host JVM under UBSan/full verification; distinct worker/main JNI environments, stack/start/duplicate/join guards, context class loader inheritance, main-loop progress and main-thread VM destruction. Consumer integration starts real server, saves world and stops from the attached worker; target package links successfully.",
     "console": "PARTIAL: consumer 01.000.014 startup log confirms JNI worker attachment; user reports whole-app crash at 19 seconds. Retrieved native trace captures SIGSEGV matching the 014 handler anchor; exact faulting call unestablished. UI worker does not isolate native crashes. No console server pass."
+  },
+  "native_crash_capture": {
+    "patch": "0039-ps5-thread-local-crash-context.patch",
+    "implementation": "Preallocated 1024-slot per-thread call/stage/recursion/signal state keyed by pthread identity; lock-free claiming, no lazy TLS allocation; quiet mode retains call evidence for all participating threads without per-call disk logging. calloc/realloc/free wrappers preserve original calls.",
+    "evidence": "Consumer 014 captures SIGSEGV outside application image with unavailable call record after startup explicitly disabled recording. Global diagnostic guards/stages/records could also be overwritten by concurrent threads. Neither finding proves original fault origin.",
+    "host_checks": "PASS: original semantics of 16 native wrappers, actual signal interrupting mocked allocation, quiet mode produces no per-call IO, parallel-thread records/stages/guards remain separate, full-table exhaustion preserves existing contexts; ASan/UBSan. Actual trace IO regression passes. Target LLVM IR proves context access has no allocator/emulated TLS/initialization guard dependencies.",
+    "target_checks": "PASS: rebuilt HotSpot and signed native package; ZIP CRC/version and matching target libjvm/JAR bytes; final app has one static context table and allocator wrappers, no emulated TLS objects for tracing.",
+    "console": "pending: consumer 01.000.015. This repairs crash evidence; original native SIGSEGV remains unresolved and real server startup/save/stop has not passed."
   }
 }

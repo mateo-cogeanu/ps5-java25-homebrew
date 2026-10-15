@@ -6,20 +6,25 @@
 #include <pthread.h>
 namespace ps5_native_trace {
 inline std::atomic<bool> enabled{false};
-inline pthread_t owner{};
-inline bool busy=false;
-inline void enable() {owner=pthread_self();enabled.store(true);}
+inline std::atomic<pthread_t> owner{};
+
+inline std::atomic<bool> verbose{true};
+inline void enable() {owner=pthread_self();verbose.store(true);enabled.store(true);}
+// Retain per-thread call context without writing every call to disk.
+inline void quiet() {verbose.store(false);}
 inline void disable() {enabled.store(false);}
 inline bool begin(const char* operation,const void* caller,const void* from,void* to,size_t count) {
- if(!enabled.load()||!pthread_equal(owner,pthread_self())||busy||ps5_vm_signal_trace_active()||ps5_vm_trace_io_active()) return false;
- busy=true;
+ if(!enabled.load()||(verbose.load()&&!pthread_equal(owner,pthread_self()))||ps5_vm_native_trace_busy()||ps5_vm_signal_trace_active()||ps5_vm_trace_io_active()) return false;
+ ps5_vm_native_trace_busy()=true;
  ps5_vm_native_call_record() = {operation,(unsigned long long)caller,(unsigned long long)from,(unsigned long long)to,(unsigned long long)count,false};
- ps5_vm_trace_memory(operation,from,count,0,0);
- ps5_vm_trace_values(operation,(unsigned long long)caller," src=",(unsigned long long)from," dst=",(unsigned long long)to);
- busy=false;return true;
+ if(verbose.load()) {
+  ps5_vm_trace_memory(operation,from,count,0,0);
+  ps5_vm_trace_values(operation,(unsigned long long)caller," src=",(unsigned long long)from," dst=",(unsigned long long)to);
+ }
+ ps5_vm_native_trace_busy()=false;return true;
 }
 inline void end(bool traced) {
- if(traced) {busy=true;ps5_vm_native_call_record().completed=true;ps5_vm_trace("DONE: Traced native memory/string call");busy=false;}
+ if(traced) {ps5_vm_native_trace_busy()=true;ps5_vm_native_call_record().completed=true;if(verbose.load())ps5_vm_trace("DONE: Traced native memory/string call");ps5_vm_native_trace_busy()=false;}
 }
 }
 extern "C" {
@@ -29,6 +34,9 @@ int __real_memcmp(const void*,const void*,size_t);
 int __real_strcmp(const char*,const char*);
 size_t __real_strlen(const char*);
 void* __real_malloc(size_t);
+void* __real_calloc(size_t,size_t);
+void* __real_realloc(void*,size_t);
+void __real_free(void*);
 void* __real_memset(void*,int,size_t);
 int __real_strncmp(const char*,const char*,size_t);
 char* __real_strncpy(char*,const char*,size_t);
@@ -89,6 +97,24 @@ __attribute__((noinline)) void* __wrap_malloc(size_t count) {
  ps5_native_trace::end(traced);return result;
 }
 
+__attribute__((noinline)) void* __wrap_calloc(size_t count,size_t size) {
+ size_t bytes=(size && count>static_cast<size_t>(-1)/size)?static_cast<size_t>(-1):count*size;
+ bool traced=ps5_native_trace::begin("CALL: calloc caller=",__builtin_return_address(0),nullptr,nullptr,bytes);
+ void* result=__real_calloc(count,size);
+ if(traced)ps5_vm_native_call_record().destination=(unsigned long long)result;
+ ps5_native_trace::end(traced);return result;
+}
+__attribute__((noinline)) void* __wrap_realloc(void* previous,size_t count) {
+ bool traced=ps5_native_trace::begin("CALL: realloc caller=",__builtin_return_address(0),previous,nullptr,count);
+ void* result=__real_realloc(previous,count);
+ if(traced)ps5_vm_native_call_record().destination=(unsigned long long)result;
+ ps5_native_trace::end(traced);return result;
+}
+__attribute__((noinline)) void __wrap_free(void* memory) {
+ bool traced=ps5_native_trace::begin("CALL: free caller=",__builtin_return_address(0),memory,nullptr,0);
+ __real_free(memory);ps5_native_trace::end(traced);
+}
+
 __attribute__((noinline)) char* __wrap_strdup(const char* text) {
  bool traced=ps5_native_trace::begin("CALL: strdup caller=",__builtin_return_address(0),text,nullptr,0);
  char* result=__real_strdup(text);
@@ -98,5 +124,5 @@ __attribute__((noinline)) char* __wrap_strdup(const char* text) {
 
 }
 #else
-namespace ps5_native_trace {inline void enable(){} inline void disable(){}}
+namespace ps5_native_trace {inline void enable(){} inline void quiet(){} inline void disable(){}}
 #endif

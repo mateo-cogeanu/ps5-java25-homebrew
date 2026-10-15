@@ -1653,3 +1653,13 @@ Target libverify rebuild and package inspection pass. ASan/UBSan tests run
 the actual error formatter with bounded context/JNI stubs, check preserved
 errno even if the JNI callback changes it, and confirm the desktop message
 is unchanged. Console diagnostic validation is pending.
+
+### Quiet native crash context
+
+Patch `0039-ps5-thread-local-crash-context.patch` isolates diagnostic state by thread. Shared stage, call and recursion guards could race between runtime threads; disabling verbose native tracing also discarded the call evidence needed when a consumer crashed. This is a diagnostic defect, not an established cause of that crash.
+
+The probe now offers `ps5_native_trace::quiet()`: it retains caller, pointers, byte count and completion state in memory, with no per-call file writes. Added calloc/realloc/free wrappers call the original allocator functions unchanged. Explicit JVM stages and fatal signal output still reach the trace file. A completed record describes an earlier call; an incomplete record indicates interruption before its wrapper returned. Neither alone is a stack backtrace.
+
+Contexts live in a preallocated 1024-slot table with lock-free claiming by pthread identity. No C++ `thread_local` is used for capture: the target emulates TLS using allocation, which could recurse into these wrappers during first access. Exhaustion suppresses new call capture, reports context unavailable and preserves existing slots. This table is process-lifetime diagnostic storage; thread identities may be reused by the platform.
+
+The native-wrapper ASan/UBSan test covers quiet IO suppression, signal-time evidence, independent thread state, allocator semantics and bounded-table exhaustion. `python3 tools/test_java25_trace_storage.py` compiles context access for the PS5 target and checks its LLVM IR for allocation, emulated TLS and initializer-guard dependencies. The trace IO regression retains partial-write/errno checks. Host and target package checks pass; the original consumer SIGSEGV still requires PS5 diagnosis.
