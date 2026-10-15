@@ -16,11 +16,46 @@
 namespace ps5::log_share {
 struct Entry {const char *url,*path;};
 inline constexpr Entry files[]={
+ {"/build.txt","/download0/probe-build.txt"},
+ {"/session.txt","/download0/probe-session.txt"},
+ {"/previous-exception.txt","/download0/previous-probe-exception.txt"},
+ {"/previous-abort.txt","/download0/previous-mc-bootstrap-abort.txt"},
+ {"/previous-server.log","/download0/mc-server-start/previous-server-console.log"},
  {"/startup.log","/download0/java25-startup.log"},
  {"/vm-trace.log","/download0/java25-vm-trace.log"},
  {"/server.log","/download0/mc-server-start/server-console.log"},
  {"/abort.txt","/download0/mc-bootstrap-abort.txt"},
  {"/exception.txt","/download0/probe-exception.txt"}};
+// Preserve the last failure before starting a new run. On relaunch these
+// files are left alone until the user explicitly initializes another run.
+inline bool write_note(const char *path,const char *text) {
+ FILE *file=std::fopen(path,"wb");if(!file)return false;
+ size_t length=std::strlen(text);bool ok=std::fwrite(text,1,length,file)==length;
+ return std::fclose(file)==0&&ok;
+}
+inline bool archive_report(const char *path,const char *previous) {
+ FILE *input=std::fopen(path,"rb");if(!input)return errno==ENOENT;
+ FILE *output=std::fopen(previous,"wb");if(!output){std::fclose(input);return false;}
+ bool ok=true;char bytes[4096];size_t count;
+ while((count=std::fread(bytes,1,sizeof(bytes),input))>0)if(std::fwrite(bytes,1,count,output)!=count){ok=false;break;}
+ if(std::ferror(input))ok=false;
+ if(std::fclose(output)!=0)ok=false;std::fclose(input);return ok;
+}
+inline bool begin_session(const char *build,const char *run,const char *root="/download0") {
+ char path[640],backup[640],note[512];bool ok=true;
+ const char *current[]={"probe-exception.txt","mc-bootstrap-abort.txt","mc-server-start/server-console.log"};
+ const char *old[]={"previous-probe-exception.txt","previous-mc-bootstrap-abort.txt","mc-server-start/previous-server-console.log"};
+ for(size_t i=0;i<3;++i){
+  std::snprintf(path,sizeof(path),"%s/%s",root,current[i]);std::snprintf(backup,sizeof(backup),"%s/%s",root,old[i]);
+  if(!archive_report(path,backup)){ok=false;continue;}
+  std::snprintf(note,sizeof(note),"Build: %s\nRun: %s\nNo %s captured yet in this run. See session.txt and startup.log.\n",build,run,i==0?"Java exception":i==1?"VM abort":"server output");
+  // Missing server directory is normal before the first server attempt.
+  if(!write_note(path,note)&&!(i==2&&errno==ENOENT))ok=false;
+ }
+ std::snprintf(path,sizeof(path),"%s/probe-session.txt",root);
+ std::snprintf(note,sizeof(note),"Build: %s\nRun: %s\nNew run initialized. Previous reports archived; startup.log retains run history.\nArchive status: %s\n",build,run,ok?"OK":"incomplete; some files may be from a prior run");
+ return write_note(path,note)&&ok;
+}
 inline std::atomic<int> state{0}; // 1 listening; negative errno on startup failure
 inline std::atomic<bool> stopping{false};
 inline int listener=-1;
@@ -63,7 +98,7 @@ inline void serve(int fd,const Entry *available=files,size_t count=sizeof(files)
  if(std::sscanf(request,"%15s %255s %15s",method,url,version)!=3){reply(fd,400,"Bad Request","Bad request\n");return;}
  if(std::strcmp(method,"GET")){reply(fd,405,"Method Not Allowed","GET only\n");return;}
  if(!std::strcmp(url,"/")) {
-  reply(fd,200,"OK","<!doctype html><meta charset=utf-8><title>PS5 probe logs</title><h1>PS5 probe logs</h1><p>Read-only LAN downloads. Keep the probe open. Refresh to collect newer output. Missing files return 404.</p><ul><li><a href=/startup.log>Startup log</a><li><a href=/vm-trace.log>Native VM trace</a><li><a href=/server.log>Full Minecraft console</a><li><a href=/abort.txt>Last JVM abort</a><li><a href=/exception.txt>Latest probe exception</a></ul>","text/html; charset=utf-8");return;
+  reply(fd,200,"OK","<!doctype html><meta charset=utf-8><title>PS5 probe logs</title><h1>PS5 probe logs</h1><p>Read-only LAN downloads. Keep the probe open. Refresh to collect newer output. Missing files return 404. Build identifies the open app; session identifies the recorded run. Startup log contains historical runs.</p><ul><li><a href=/build.txt>Open app build</a><li><a href=/session.txt>Recorded run status</a><li><a href=/startup.log>Startup log</a><li><a href=/vm-trace.log>Native VM trace</a><li><a href=/server.log>Full Minecraft console</a><li><a href=/abort.txt>Last JVM abort</a><li><a href=/exception.txt>Current-run probe exception</a><li><a href=/previous-exception.txt>Previous-run exception</a><li><a href=/previous-abort.txt>Previous-run abort</a><li><a href=/previous-server.log>Previous-run server output</a></ul>","text/html; charset=utf-8");return;
  }
  const char *path=nullptr;for(size_t i=0;i<count;++i)if(!std::strcmp(url,available[i].url))path=available[i].path;
  if(!path){reply(fd,404,"Not Found","Unknown log\n");return;}

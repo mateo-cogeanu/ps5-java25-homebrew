@@ -258,5 +258,17 @@
     "implementation": "Real target java.management libmanagement objects are embedded on consumer module request; original JNI_OnLoad obtains JVM_GetManagement JMM table; standard management natives in resident lookup and target libmanagement.so packaged",
     "checks": "PASS: actual native management sources loaded on host JVM, heap/non-heap data and real -Xint arguments through JMM; generated loader/hook/library-scope contract; target management build, app symbol definitions, package library byte equality",
     "console": "pending: consumer 01.000.012 adds real memory/flags queries to preflight; no console pass claimed"
+  },
+  "classloader_native_scratch": {
+    "patch": "0038-ps5-classloader-scratch-page-fallback.patch",
+    "evidence": "Latest consumer console excerpt reaches MobEffects initialization and reports bare OutOfMemoryError from ClassLoader.defineClass1. This is consistent with libjava scratch malloc failure, but the exact failing native allocation is not proven. Supplied startup history ends in VM ABORT; supplied exception report is from the older MemUtilNIO attempt.",
+    "implementation": "PS5 class-byte and UTF scratch first use libc then real page-rounded anonymous RW mmap; per-buffer backend metadata selects matching free/munmap. Bytecode checks and JVM definition entry points unchanged. Allocation and post-JVM failure context logged via JVM vfprintf hook.",
+    "checks": "PASS: actual ClassLoader.c compiled and invoked via host JNI under UBSan/full JVM verification; byte-array, direct-buffer and hidden class definitions execute real valid code with forced heap rejection; long UTF source, malformed class, invalid range and both-backend OOM release scratch correctly; target native rebuild and package integrity",
+    "console": "pending: consumer 01.000.013. Do not infer complete native memory resolution or a PS5 server pass from host tests."
+  },
+  "log_sharing_sessions": {
+    "implementation": "Open-build/recorded-run metadata, explicit startup history markers, current-run report placeholders and separately accessible previous reports; archive failure preserves current source reports",
+    "checks": "PASS: native helper archives exact report bytes, clears current reports only after successful archive, preserves source if archive destination is unavailable; actual HTTP/collector test includes build/session metadata",
+    "console": "pending: consumer 01.000.013"
   }
 }

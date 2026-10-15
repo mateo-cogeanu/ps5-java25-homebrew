@@ -23,8 +23,18 @@ The collector reports missing files individually; a missing abort or server log
 can be normal before that event/test. A partial transfer is discarded. Existing
 ZIPs are never overwritten. Generated logs stay out of Git.
 
-Only these exact routes exist: `/startup.log`, `/vm-trace.log`, `/server.log`,
-`/abort.txt` and `/exception.txt`, plus the index page. There is no directory
+The exact current-log routes are `/startup.log`, `/vm-trace.log`, `/server.log`,
+`/abort.txt` and `/exception.txt`. `/build.txt` identifies the open app;
+`/session.txt` identifies the recorded run and last test state. These identifiers
+can differ after relaunch because logs from the crashed process are preserved.
+When a user explicitly initializes a new run, exception/abort/server reports are
+archived before current-run placeholders are written. Previous reports are
+available separately at `/previous-exception.txt`, `/previous-abort.txt`, and
+`/previous-server.log`. Archive failure preserves the current source report and
+is recorded in session status. The startup log keeps its history with explicit
+run/build markers. A newly opened app does not rotate failure logs merely by
+showing the menu. The collector includes build/session files in the ZIP.
+All other routes except the index page are rejected. There is no directory
 browser, path input, upload, deletion, remote command or CORS access. Responses
 are uncached and streamed with a fixed initial file length; actively growing logs
 may contain an incomplete final line. Refresh after the test for later output.
