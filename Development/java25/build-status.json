@@ -253,5 +253,10 @@
     "checks": "PASS: actual scratch allocator ASan/UBSan including forced heap rejection, real mmap writable storage and matching munmap, both-backend failure cleanup; complete patched host legacy verifier validates Matrix3f, MemUtil$MemUtilNIO, Matrix4f and Quaternionf; target java.base native rebuild and OOM formatter regression",
     "diagnostics": "vfprintf callback records requested bytes, malloc errno (cleared before call), mapped bytes and mmap errno when fallback attempted",
     "console": "pending"
+  },
+  "embedded_management": {
+    "implementation": "Real target java.management libmanagement objects are embedded on consumer module request; original JNI_OnLoad obtains JVM_GetManagement JMM table; standard management natives in resident lookup and target libmanagement.so packaged",
+    "checks": "PASS: actual native management sources loaded on host JVM, heap/non-heap data and real -Xint arguments through JMM; generated loader/hook/library-scope contract; target management build, app symbol definitions, package library byte equality",
+    "console": "pending: consumer 01.000.012 adds real memory/flags queries to preflight; no console pass claimed"
   }
 }

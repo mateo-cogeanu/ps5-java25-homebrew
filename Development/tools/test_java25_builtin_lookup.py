@@ -35,7 +35,14 @@ int main() {
   auto load=reinterpret_cast<int (*)(void *,void *)>(__dlsym(process,symbol));
   assert(load && load(nullptr,nullptr)>=0x00010008);
  }
- assert(loads==3); // original library hooks still execute
+ int expected_loads=3;
+ if(void *management=__dlopen("libmanagement.so",0)) {
+  auto load=reinterpret_cast<int (*)(void *,void *)>(__dlsym(process,"JNI_OnLoad_management"));
+  assert(load && load(nullptr,nullptr)>=0x00010008);++expected_loads;
+  assert(__dlsym(management,"Java_sun_management_MemoryImpl_getMemoryUsage0"));
+  assert(!__dlsym(__dlopen("libjava.so",0),"Java_sun_management_MemoryImpl_getMemoryUsage0"));
+ }
+ assert(loads==expected_loads); // original library hooks still execute
  auto nio_load=reinterpret_cast<int (*)(void *,void *)>(__dlsym(process,"JNI_OnLoad_nio"));
  load_version=-1;
  assert(nio_load(nullptr,nullptr)==-1); // failed hook must not become success

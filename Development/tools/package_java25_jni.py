@@ -112,7 +112,10 @@ app_source="java25/probe/jni.cpp"
 app_param="java25/probe/jni-param.json"
 if args.startup:
     subprocess.run(["python3",str(ROOT/"tools/java25_boot_image.py"),*(["--modules",",".join(external.get("modules",["java.base"]))] if external else [])],check=True)
-    subprocess.run(["python3",str(ROOT/"tools/java25_builtin_runtime.py"),*(["--jni-fixture"] if args.dependencies else [])],check=True)
+    management=bool(external and "java.management" in external.get("modules",[]))
+    if management:
+        subprocess.run(["gmake","-C",str(ROOT/".tools/java25/openjdk"),"CONF=ps5-bootstrap","java.management-libs"],env=env,check=True)
+    subprocess.run(["python3",str(ROOT/"tools/java25_builtin_runtime.py"),*(["--jni-fixture"] if args.dependencies else []),*(["--management"] if management else [])],check=True)
     extra_objects=json.loads((WORK/"builtin-link-inputs.json").read_text())
     absent_callbacks=[name for name in absent_callbacks if not name.startswith("__dl")]
     if external:shutil.rmtree(WORK/"external-assets",ignore_errors=True)
@@ -127,6 +130,8 @@ if args.startup:
     shutil.copy2(native_libs/"server/libjvm.so",assets/"lib/server/libjvm.so")
     for name in ("java","zip","jimage","net","nio","verify"):
         shutil.copy2(native_libs/("lib"+name+".so"),assets/"lib"/("lib"+name+".so"))
+    if management:
+        shutil.copy2(native_libs.parent/"java.management/libmanagement.so",assets/"lib/libmanagement.so")
     module_names=re.search(r'^MODULES="([^"]+)"',(WORK/"boot-image/release").read_text(),re.M).group(1)
     (assets/"release").write_text('JAVA_VERSION="25.0.4"\nMODULES="'+module_names+'"\nOS_NAME="FreeBSD"\nOS_ARCH="amd64"\nIMPLEMENTOR="Experimental PS5 port"\n')
     (assets/"classes").mkdir(exist_ok=True)

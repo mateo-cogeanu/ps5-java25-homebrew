@@ -19,12 +19,15 @@ LIBRARIES = ['java','zip','jimage','net','nio','verify']
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--management",action="store_true",help="Embed the target java.management native library")
     parser.add_argument("--jni-fixture",action="store_true",help="Include real dependency-probe JNI test library")
     args=parser.parse_args()
     declarations=[]; tables=[]; mapped=[]; links=[]; alias_index=0; builtin_loaders=[]
     libraries=[('jvm',WORK/'embedded-jvm.o')]
-    for name in LIBRARIES:
-        objects=sorted((BUILD/'support/native/java.base'/('lib'+name)).glob('*.o'))
+    resident=LIBRARIES+(['management'] if args.management else [])
+    for name in resident:
+        module='java.management' if name=='management' else 'java.base'
+        objects=sorted((BUILD/'support/native'/module/('lib'+name)).glob('*.o'))
         if not objects: raise SystemExit('Missing built native objects: '+name)
         rsp=WORK/(name+'-objects.rsp')
         rsp.write_text('\n'.join(json.dumps(str(p)) for p in objects)+'\n')
@@ -74,7 +77,7 @@ def main():
             alias='embedded_symbol_'+str(alias_index);alias_index+=1
             declarations.append('extern "C" void '+alias+'() __asm__("'+symbol+'");')
             entries.append('{"'+display+'", reinterpret_cast<void *>(&'+alias+')}')
-        if name in LIBRARIES or name=='ps5probe':
+        if name in resident or name=='ps5probe':
             # Advertise known resident libraries through OpenJDK's standard
             # JNI_OnLoad_<name> discovery. This avoids File.exists/canonical
             # path checks before their filesystem natives are registered.
