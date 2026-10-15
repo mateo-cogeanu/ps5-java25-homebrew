@@ -283,5 +283,14 @@
     "host_checks": "PASS: original semantics of 16 native wrappers, actual signal interrupting mocked allocation, quiet mode produces no per-call IO, parallel-thread records/stages/guards remain separate, full-table exhaustion preserves existing contexts; ASan/UBSan. Actual trace IO regression passes. Target LLVM IR proves context access has no allocator/emulated TLS/initialization guard dependencies.",
     "target_checks": "PASS: rebuilt HotSpot and signed native package; ZIP CRC/version and matching target libjvm/JAR bytes; final app has one static context table and allocator wrappers, no emulated TLS objects for tracing.",
     "console": "PARTIAL: consumer 015 quiet call capture confirmed on PS5. Completed malloc(128) returned null; saved caller resolves to HotSpot os::malloc in matching ELF. Subsequent SIGSEGV remains outside app text; allocation failure reason and later fault origin unproven. No application console pass."
+  },
+  "hotspot_native_heap_fallback": {
+    "patch": "0040-ps5-hotspot-native-heap-page-fallback.patch",
+    "evidence": "Consumer 015 signal record retains completed malloc(128) returning null; saved caller/disassembly identify HotSpot os::malloc. The reason libc refused and the subsequent SIGSEGV causal chain are not established.",
+    "implementation": "PS5-only raw storage beneath os::malloc/realloc/free and matching NMT preinit bridges. Try libc first; failed small allocations use eight size classes sharing real 64 KiB anonymous RW mappings; larger failures use rounded direct mappings. Prefix records exact payload size and backend; full slabs/direct maps are unmapped. No fixed address hints or fabricated memory.",
+    "nmt_contract": "Same raw prefix before and after NMT initialization; existing admission limits, malloc headers, accounting, free-info handling and failed-realloc header revival retained. Backend header/slab overhead is not included in NMT logical allocation sizes. Other platforms retain original branches.",
+    "checks": "PASS: actual allocator under ASan/UBSan with forced libc/map/realloc failures; all size classes, alignment, pooled sharing, normal/mapped resize migration, failed resize preserving bytes, overflow, eight-thread stress and complete matching cleanup. Actual os.cpp allocation bodies with a narrow NMT contract model preserve limits/accounting/header revival; actual pre-init raw bridges remain compatible with post-init NMT-off APIs. This is not a real host JMM test.",
+    "target_checks": "PASS: HotSpot rebuild, single pool-head/lock definitions in app ELF, signed-container integrity, ZIP CRC/version 016, exact rebuilt target libjvm and prepared JAR identity; native fallback labels embedded.",
+    "console": "pending: consumer 01.000.016. Addresses confirmed failed allocation; does not yet establish resolution of later native SIGSEGV or successful application startup/save/stop."
   }
 }
