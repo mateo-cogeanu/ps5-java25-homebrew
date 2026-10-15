@@ -270,5 +270,10 @@
     "implementation": "Open-build/recorded-run metadata, explicit startup history markers, current-run report placeholders and separately accessible previous reports; archive failure preserves current source reports",
     "checks": "PASS: native helper archives exact report bytes, clears current reports only after successful archive, preserves source if archive destination is unavailable; actual HTTP/collector test includes build/session metadata",
     "console": "pending: consumer 01.000.013"
+  },
+  "jni_probe_worker": {
+    "implementation": "Reusable pthread worker with an explicit 8 MiB stack, AttachCurrentThread-owned JNIEnv, detach, release/acquire completion and main-thread join; UI must hide mutable result buffers until joined.",
+    "checks": "PASS: real host JVM under UBSan/full verification; distinct worker/main JNI environments, stack/start/duplicate/join guards, context class loader inheritance, main-loop progress and main-thread VM destruction. Consumer integration starts real server, saves world and stops from the attached worker; target package links successfully.",
+    "console": "pending: consumer 01.000.014. Prior 013 user reports whole-app crash in server row, no abort report or crash code; cause remains unconfirmed. Worker avoids blocking UI but does not isolate native process crashes."
   }
 }
