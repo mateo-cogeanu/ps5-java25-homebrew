@@ -274,6 +274,6 @@
   "jni_probe_worker": {
     "implementation": "Reusable pthread worker with an explicit 8 MiB stack, AttachCurrentThread-owned JNIEnv, detach, release/acquire completion and main-thread join; UI must hide mutable result buffers until joined.",
     "checks": "PASS: real host JVM under UBSan/full verification; distinct worker/main JNI environments, stack/start/duplicate/join guards, context class loader inheritance, main-loop progress and main-thread VM destruction. Consumer integration starts real server, saves world and stops from the attached worker; target package links successfully.",
-    "console": "pending: consumer 01.000.014. Prior 013 user reports whole-app crash in server row, no abort report or crash code; cause remains unconfirmed. Worker avoids blocking UI but does not isolate native process crashes."
+    "console": "PARTIAL: consumer 01.000.014 startup log confirms JNI worker attachment; user reports whole-app crash at 19 seconds. Retrieved native trace captures SIGSEGV matching the 014 handler anchor; exact faulting call unestablished. UI worker does not isolate native crashes. No console server pass."
   }
 }
