@@ -244,6 +244,14 @@
     "patch": "0036-ps5-release-verifier-method-scratch.patch",
     "implementation": "PS5-only CCreinit frees non-root method scratch segments between methods, retaining original verifier logic and class-lifetime allocations",
     "checks": "PASS: real allocator ASan/UBSan constrained 512 KiB budget over 600 methods; original desktop retention exhausts that budget; patched complete legacy verifier validates JOML Matrix3f, Matrix4f and Quaternionf on host JNI",
-    "console": "pending: native allocation failure mitigation, not a proven complete server fix"
+    "console": "PARTIAL PROGRESS: consumer 01.000.010 gets past Matrix3f verification, then fails native CCalloc for MemUtil$MemUtilNIO.copy4x4; no full server pass."
+  },
+  "legacy_verifier_scratch_page_fallback": {
+    "patch": "0037-ps5-verifier-scratch-page-fallback.patch",
+    "implementation": "PS5 verifier scratch blocks first use libc malloc, then real page-rounded anonymous RW mmap on failure; per-block backend metadata selects free or munmap at reset/destroy. Other allocations and verification checks unchanged.",
+    "evidence": "010 console log identifies special-block CCalloc failure site 3600, no pending JNI exception, Java heap free=58020336 bytes. Native heap limit and exact failed block size remain unestablished.",
+    "checks": "PASS: actual scratch allocator ASan/UBSan including forced heap rejection, real mmap writable storage and matching munmap, both-backend failure cleanup; complete patched host legacy verifier validates Matrix3f, MemUtil$MemUtilNIO, Matrix4f and Quaternionf; target java.base native rebuild and OOM formatter regression",
+    "diagnostics": "vfprintf callback records requested bytes, malloc errno (cleared before call), mapped bytes and mmap errno when fallback attempted",
+    "console": "pending"
   }
 }

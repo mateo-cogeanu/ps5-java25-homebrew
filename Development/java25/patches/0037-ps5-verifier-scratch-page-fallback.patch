@@ -1,0 +1,123 @@
+diff --git a/src/java.base/share/native/libverify/check_code.c b/src/java.base/share/native/libverify/check_code.c
+--- a/src/java.base/share/native/libverify/check_code.c
++++ b/src/java.base/share/native/libverify/check_code.c
+@@ -83,6 +83,10 @@
+ #include <stdlib.h>
+ #include <errno.h>
+ #include <stdint.h>
++#ifdef __PROSPERO__
++#include <sys/mman.h>
++#include <unistd.h>
++#endif
+ 
+ #include "jni.h"
+ #include "jni_util.h"
+@@ -3525,13 +3529,69 @@
+     struct CCpool *next;
+     int segSize;                /* almost always CCSegSize */
+     int poolPad;
++#ifdef __PROSPERO__
++    size_t mapped_size;         /* zero for libc allocations */
++#endif
+     char space[CCSegSize];
+ };
+ 
++/* Use real anonymous RW pages if the PS5 libc heap cannot supply scratch.
++ * These blocks never cross the verifier boundary and must be released with
++ * their matching backend. Verification and OOM propagation stay unchanged.
++ */
++static struct CCpool *CCpool_allocate(size_t bytes)
++{
++#ifdef __PROSPERO__
++    int saved_errno = errno;
++    errno = 0;
++#endif
++    struct CCpool *pool = (struct CCpool *)malloc(bytes);
++#ifdef __PROSPERO__
++    if (pool != NULL) {
++        pool->mapped_size = 0;
++        errno = saved_errno;
++    } else {
++        int heap_error = errno;
++        long page_size = sysconf(_SC_PAGESIZE);
++        if (page_size <= 0 || bytes > SIZE_MAX - (size_t)page_size) {
++            errno = ENOMEM;
++            return NULL;
++        }
++        size_t mapped = ((bytes + (size_t)page_size - 1) /
++                          (size_t)page_size) * (size_t)page_size;
++        void *memory = mmap(NULL, mapped, PROT_READ | PROT_WRITE,
++                            MAP_PRIVATE | MAP_ANON, -1, 0);
++        int map_error = memory == MAP_FAILED ? errno : 0;
++        jio_fprintf(stderr, "PS5 verifier scratch: bytes=%zu malloc_errno=%d "
++                    "mapped_bytes=%zu mmap_errno=%d\n",
++                    bytes, heap_error, mapped, map_error);
++        if (memory == MAP_FAILED) {
++            errno = map_error;
++            return NULL;
++        }
++        pool = (struct CCpool *)memory;
++        pool->mapped_size = mapped;
++        errno = saved_errno;
++    }
++#endif
++    return pool;
++}
++
++static void CCpool_release(struct CCpool *pool)
++{
++#ifdef __PROSPERO__
++    if (pool->mapped_size != 0) {
++        munmap(pool, pool->mapped_size);
++        return;
++    }
++#endif
++    free(pool);
++}
++
+ /* Initialize the context's heap. */
+ static void CCinit(context_type *context)
+ {
+-    struct CCpool *new = (struct CCpool *) malloc(sizeof(struct CCpool));
++    struct CCpool *new = CCpool_allocate(sizeof(struct CCpool));
+     /* Set context->CCroot to 0 if new == 0 to tell CCdestroy to lay off */
+     context->CCroot = context->CCcurrent = new;
+     if (new == 0) {
+@@ -3558,7 +3618,7 @@
+     first->next = NULL;
+     while (block != NULL) {
+         struct CCpool *next = block->next;
+-        free(block);
++        CCpool_release(block);
+         block = next;
+     }
+ #endif
+@@ -3573,7 +3633,7 @@
+     struct CCpool *this = context->CCroot;
+     while (this) {
+         struct CCpool *next = this->next;
+-        free(this);
++        CCpool_release(this);
+         this = next;
+     }
+     /* These two aren't necessary.  But can't hurt either */
+@@ -3594,8 +3654,8 @@
+         struct CCpool *current = context->CCcurrent;
+         struct CCpool *new;
+         if (size > CCSegSize) { /* we need to allocate a special block */
+-            new = (struct CCpool *)malloc(sizeof(struct CCpool) +
+-                                          (size - CCSegSize));
++            new = CCpool_allocate(sizeof(struct CCpool) +
++                                  (size - CCSegSize));
+             if (new == 0) {
+                 CCout_of_memory(context, __LINE__);
+             }
+@@ -3605,7 +3665,7 @@
+         } else {
+             new = current->next;
+             if (new == NULL) {
+-                new = (struct CCpool *) malloc(sizeof(struct CCpool));
++                new = CCpool_allocate(sizeof(struct CCpool));
+                 if (new == 0) {
+                     CCout_of_memory(context, __LINE__);
+                 }

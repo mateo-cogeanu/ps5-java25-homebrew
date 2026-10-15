@@ -14,12 +14,23 @@ prefix=r'''
 #include <assert.h>
 #include <setjmp.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <errno.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#define jio_fprintf fprintf
 typedef int jboolean;
 typedef struct CCpool CCpool;
 typedef struct {CCpool *CCroot,*CCcurrent;int CCfree_size;char *CCfree_ptr;} context_type;
+static int deny_heap,deny_map;static size_t mappings;
+static void *test_map(void *p,size_t size,int prot,int flags,int fd,off_t off){if(deny_map){errno=ENOMEM;return MAP_FAILED;}void *result=mmap(p,size,prot,flags,fd,off);if(result!=MAP_FAILED)++mappings;return result;}
+static int test_unmap(void *p,size_t size){int result=munmap(p,size);assert(result==0);--mappings;return result;}
+#define mmap test_map
+#define munmap test_unmap
 static size_t live,peak;static jmp_buf exhausted;static int expected_oom;
 static void CCout_of_memory(context_type *c,int site){(void)c;(void)site;assert(expected_oom);longjmp(exhausted,1);}
 static void *budget_malloc(size_t n){
+ if(deny_heap)return NULL;
  if(n>512*1024 || live+n>512*1024)return NULL;
  size_t *p=malloc(n+sizeof(max_align_t));assert(p);*p=n;live+=n;if(live>peak)peak=live;return (char*)p+sizeof(max_align_t);
 }
@@ -45,7 +56,17 @@ int main(){
  expected_oom=1;
  if(!setjmp(exhausted)){for(int method=0;method<600;method++){CCreinit(&c);CCalloc(&c,100000,1);CCalloc(&c,150000,0);}assert(!"expected budget exhaustion");}
 #endif
- CCdestroy(&c);assert(live==0);puts("PASS: actual verifier pool allocation/reset/cleanup with constrained native budget");
+ CCdestroy(&c);assert(live==0);
+#ifdef __PROSPERO__
+ // Real mmap must supply writable memory when libc refuses every block.
+ deny_heap=1;CCinit(&c);CCalloc(&c,80000,1);CCalloc(&c,32,0);
+ assert(mappings>=2);CCreinit(&c);assert(mappings==1);CCdestroy(&c);assert(mappings==0);
+ // Exhaustion of both real allocation backends still propagates OOM safely.
+ deny_map=1;expected_oom=1;
+ if(!setjmp(exhausted)){CCinit(&c);assert(!"expected real OOM");}
+ CCdestroy(&c);assert(mappings==0&&live==0);
+#endif
+ puts("PASS: actual verifier pool allocation/reset/cleanup with constrained native budget");
 }
 '''
 source=WORK/'test-verifier-pool.c';source.write_text(prefix+code+suffix)
