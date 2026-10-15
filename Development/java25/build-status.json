@@ -282,6 +282,6 @@
     "evidence": "Consumer 014 captures SIGSEGV outside application image with unavailable call record after startup explicitly disabled recording. Global diagnostic guards/stages/records could also be overwritten by concurrent threads. Neither finding proves original fault origin.",
     "host_checks": "PASS: original semantics of 16 native wrappers, actual signal interrupting mocked allocation, quiet mode produces no per-call IO, parallel-thread records/stages/guards remain separate, full-table exhaustion preserves existing contexts; ASan/UBSan. Actual trace IO regression passes. Target LLVM IR proves context access has no allocator/emulated TLS/initialization guard dependencies.",
     "target_checks": "PASS: rebuilt HotSpot and signed native package; ZIP CRC/version and matching target libjvm/JAR bytes; final app has one static context table and allocator wrappers, no emulated TLS objects for tracing.",
-    "console": "pending: consumer 01.000.015. This repairs crash evidence; original native SIGSEGV remains unresolved and real server startup/save/stop has not passed."
+    "console": "PARTIAL: consumer 015 quiet call capture confirmed on PS5. Completed malloc(128) returned null; saved caller resolves to HotSpot os::malloc in matching ELF. Subsequent SIGSEGV remains outside app text; allocation failure reason and later fault origin unproven. No application console pass."
   }
 }
