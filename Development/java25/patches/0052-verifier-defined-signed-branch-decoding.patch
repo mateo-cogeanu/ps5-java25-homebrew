@@ -1,0 +1,31 @@
+--- a/src/java.base/share/native/libverify/check_code.c
++++ b/src/java.base/share/native/libverify/check_code.c
+@@ -1125,7 +1125,9 @@
+ static jint _ck_ntohl(jint n)
+ {
+     unsigned char *p = (unsigned char *)&n;
+-    return (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
++    /* Sign extension by arithmetic avoids signed-shift overflow/negative shifts. */
++    int high = p[0] < 128 ? p[0] : (int)p[0] - 256;
++    return high * 16777216 + (p[1] << 16) + (p[2] << 8) + p[3];
+ }
+ 
+ static void
+@@ -1161,7 +1163,7 @@
+     case JVM_OPC_if_acmpeq: case JVM_OPC_if_acmpne:
+     case JVM_OPC_goto: {
+         /* Set the ->operand to be the instruction number of the target. */
+-        int jump = (((signed char)(code[offset+1])) << 8) + code[offset+2];
++        int jump = (((signed char)(code[offset+1])) * 256) + code[offset+2];
+         if (!isLegalOffset(context, offset, jump))
+             CCerror(context, "Illegal target of jump or branch");
+         int target = offset + jump;
+@@ -1175,7 +1177,7 @@
+         /* FALLTHROUGH */
+     case JVM_OPC_goto_w: {
+         /* Set the ->operand to be the instruction number of the target. */
+-        int jump = (((signed char)(code[offset+1])) << 24) +
++        int jump = (((signed char)(code[offset+1])) * 16777216) +
+                      (code[offset+2] << 16) + (code[offset+3] << 8) +
+                      (code[offset + 4]);
+         if (!isLegalOffset(context, offset, jump))

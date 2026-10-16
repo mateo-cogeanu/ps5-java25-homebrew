@@ -1,0 +1,391 @@
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5PthreadChecks.hpp
+@@ -0,0 +1,17 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHARE_RUNTIME_PS5PTHREADCHECKS_HPP
++#define SHARE_RUNTIME_PS5PTHREADCHECKS_HPP
++#ifdef __PROSPERO__
++#include "runtime/ps5StartupTrace.hpp"
++inline void ps5_pthread_check(bool valid,int status,const char*operation) {
++  if (!valid) {
++    ps5_vm_trace("FAIL: PS5 native synchronization status");
++    ps5_vm_trace_values(operation,(unsigned int)status," self=",(uintptr_t)pthread_self()," errno=",(unsigned int)errno);
++    guarantee(false,"PS5 native synchronization %s failed with status %d",operation,status);
++  }
++}
++#define PS5_PTHREAD_CHECK(p,status,msg) ps5_pthread_check((p),(status),(msg))
++#else
++#define PS5_PTHREAD_CHECK(p,status,msg) assert_status(p,status,msg)
++#endif
++#endif
+--- a/src/hotspot/os/posix/os_posix.cpp
++++ b/src/hotspot/os/posix/os_posix.cpp
+@@ -45,6 +45,7 @@
+ #include "utilities/align.hpp"
+ #include "utilities/checkedCast.hpp"
+ #include "utilities/debug.hpp"
++#include "runtime/ps5PthreadChecks.hpp"
+ #include "utilities/defaultStream.hpp"
+ #include "utilities/events.hpp"
+ #include "utilities/formatBuffer.hpp"
+@@ -1625,9 +1626,9 @@
+ 
+ PlatformEvent::PlatformEvent() {
+   int status = pthread_cond_init(_cond, _condAttr);
+-  assert_status(status == 0, status, "cond_init");
++  PS5_PTHREAD_CHECK(status == 0, status, "cond_init");
+   status = pthread_mutex_init(_mutex, _mutexAttr);
+-  assert_status(status == 0, status, "mutex_init");
++  PS5_PTHREAD_CHECK(status == 0, status, "mutex_init");
+   _event   = 0;
+   _nParked = 0;
+ }
+@@ -1653,20 +1654,20 @@
+ 
+   if (v == 0) { // Do this the hard way by blocking ...
+     int status = pthread_mutex_lock(_mutex);
+-    assert_status(status == 0, status, "mutex_lock");
++    PS5_PTHREAD_CHECK(status == 0, status, "mutex_lock");
+     guarantee(_nParked == 0, "invariant");
+     ++_nParked;
+     while (_event < 0) {
+       // OS-level "spurious wakeups" are ignored
+       status = pthread_cond_wait(_cond, _mutex);
+-      assert_status(status == 0 MACOS_ONLY(|| status == ETIMEDOUT),
++      PS5_PTHREAD_CHECK(status == 0 MACOS_ONLY(|| status == ETIMEDOUT),
+                     status, "cond_wait");
+     }
+     --_nParked;
+ 
+     _event = 0;
+     status = pthread_mutex_unlock(_mutex);
+-    assert_status(status == 0, status, "mutex_unlock");
++    PS5_PTHREAD_CHECK(status == 0, status, "mutex_unlock");
+     // Paranoia to ensure our locked and lock-free paths interact
+     // correctly with each other.
+     OrderAccess::fence();
+@@ -1704,13 +1705,13 @@
+ 
+     int ret = OS_TIMEOUT;
+     int status = pthread_mutex_lock(_mutex);
+-    assert_status(status == 0, status, "mutex_lock");
++    PS5_PTHREAD_CHECK(status == 0, status, "mutex_lock");
+     guarantee(_nParked == 0, "invariant");
+     ++_nParked;
+ 
+     while (_event < 0) {
+       status = pthread_cond_timedwait(_cond, _mutex, &abst);
+-      assert_status(status == 0 || status == ETIMEDOUT,
++      PS5_PTHREAD_CHECK(status == 0 || status == ETIMEDOUT,
+                     status, "cond_timedwait");
+       // OS-level "spurious wakeups" are ignored
+       if (status == ETIMEDOUT) break;
+@@ -1723,7 +1724,7 @@
+ 
+     _event = 0;
+     status = pthread_mutex_unlock(_mutex);
+-    assert_status(status == 0, status, "mutex_unlock");
++    PS5_PTHREAD_CHECK(status == 0, status, "mutex_unlock");
+     // Paranoia to ensure our locked and lock-free paths interact
+     // correctly with each other.
+     OrderAccess::fence();
+@@ -1753,11 +1754,11 @@
+   if (Atomic::xchg(&_event, 1) >= 0) return;
+ 
+   int status = pthread_mutex_lock(_mutex);
+-  assert_status(status == 0, status, "mutex_lock");
++  PS5_PTHREAD_CHECK(status == 0, status, "mutex_lock");
+   int anyWaiters = _nParked;
+   assert(anyWaiters == 0 || anyWaiters == 1, "invariant");
+   status = pthread_mutex_unlock(_mutex);
+-  assert_status(status == 0, status, "mutex_unlock");
++  PS5_PTHREAD_CHECK(status == 0, status, "mutex_unlock");
+ 
+   // Note that we signal() *after* dropping the lock for "immortal" Events.
+   // This is safe and avoids a common class of futile wakeups.  In rare
+@@ -1769,7 +1770,7 @@
+ 
+   if (anyWaiters != 0) {
+     status = pthread_cond_signal(_cond);
+-    assert_status(status == 0, status, "cond_signal");
++    PS5_PTHREAD_CHECK(status == 0, status, "cond_signal");
+   }
+ }
+ 
+@@ -1777,20 +1778,20 @@
+ 
+  PlatformParker::PlatformParker() : _counter(0), _cur_index(-1) {
+   int status = pthread_cond_init(&_cond[REL_INDEX], _condAttr);
+-  assert_status(status == 0, status, "cond_init rel");
++  PS5_PTHREAD_CHECK(status == 0, status, "cond_init rel");
+   status = pthread_cond_init(&_cond[ABS_INDEX], nullptr);
+-  assert_status(status == 0, status, "cond_init abs");
++  PS5_PTHREAD_CHECK(status == 0, status, "cond_init abs");
+   status = pthread_mutex_init(_mutex, _mutexAttr);
+-  assert_status(status == 0, status, "mutex_init");
++  PS5_PTHREAD_CHECK(status == 0, status, "mutex_init");
+ }
+ 
+ PlatformParker::~PlatformParker() {
+   int status = pthread_cond_destroy(&_cond[REL_INDEX]);
+-  assert_status(status == 0, status, "cond_destroy rel");
++  PS5_PTHREAD_CHECK(status == 0, status, "cond_destroy rel");
+   status = pthread_cond_destroy(&_cond[ABS_INDEX]);
+-  assert_status(status == 0, status, "cond_destroy abs");
++  PS5_PTHREAD_CHECK(status == 0, status, "cond_destroy abs");
+   status = pthread_mutex_destroy(_mutex);
+-  assert_status(status == 0, status, "mutex_destroy");
++  PS5_PTHREAD_CHECK(status == 0, status, "mutex_destroy");
+ }
+ 
+ // Parker::park decrements count if > 0, else does a condvar wait.  Unpark
+@@ -1845,7 +1846,7 @@
+   if (_counter > 0)  { // no wait needed
+     _counter = 0;
+     status = pthread_mutex_unlock(_mutex);
+-    assert_status(status == 0, status, "invariant");
++    PS5_PTHREAD_CHECK(status == 0, status, "invariant");
+     // Paranoia to ensure our locked and lock-free paths interact
+     // correctly with each other and Java-level accesses.
+     OrderAccess::fence();
+@@ -1858,20 +1859,20 @@
+   if (time == 0) {
+     _cur_index = REL_INDEX; // arbitrary choice when not timed
+     status = pthread_cond_wait(&_cond[_cur_index], _mutex);
+-    assert_status(status == 0 MACOS_ONLY(|| status == ETIMEDOUT),
++    PS5_PTHREAD_CHECK(status == 0 MACOS_ONLY(|| status == ETIMEDOUT),
+                   status, "cond_wait");
+   }
+   else {
+     _cur_index = isAbsolute ? ABS_INDEX : REL_INDEX;
+     status = pthread_cond_timedwait(&_cond[_cur_index], _mutex, &absTime);
+-    assert_status(status == 0 || status == ETIMEDOUT,
++    PS5_PTHREAD_CHECK(status == 0 || status == ETIMEDOUT,
+                   status, "cond_timedwait");
+   }
+   _cur_index = -1;
+ 
+   _counter = 0;
+   status = pthread_mutex_unlock(_mutex);
+-  assert_status(status == 0, status, "invariant");
++  PS5_PTHREAD_CHECK(status == 0, status, "invariant");
+   // Paranoia to ensure our locked and lock-free paths interact
+   // correctly with each other and Java-level accesses.
+   OrderAccess::fence();
+@@ -1879,13 +1880,13 @@
+ 
+ void Parker::unpark() {
+   int status = pthread_mutex_lock(_mutex);
+-  assert_status(status == 0, status, "invariant");
++  PS5_PTHREAD_CHECK(status == 0, status, "invariant");
+   const int s = _counter;
+   _counter = 1;
+   // must capture correct index before unlocking
+   int index = _cur_index;
+   status = pthread_mutex_unlock(_mutex);
+-  assert_status(status == 0, status, "invariant");
++  PS5_PTHREAD_CHECK(status == 0, status, "invariant");
+ 
+   // Note that we signal() *after* dropping the lock for "immortal" Events.
+   // This is safe and avoids a common class of futile wakeups.  In rare
+@@ -1898,7 +1899,7 @@
+   if (s < 1 && index != -1) {
+     // thread is definitely parked
+     status = pthread_cond_signal(&_cond[index]);
+-    assert_status(status == 0, status, "invariant");
++    PS5_PTHREAD_CHECK(status == 0, status, "invariant");
+   }
+ }
+ 
+@@ -1908,12 +1909,12 @@
+ 
+ PlatformMutex::Mutex::Mutex() : _next(nullptr) {
+   int status = pthread_mutex_init(&_mutex, _mutexAttr);
+-  assert_status(status == 0, status, "mutex_init");
++  PS5_PTHREAD_CHECK(status == 0, status, "mutex_init");
+ }
+ 
+ PlatformMutex::Mutex::~Mutex() {
+   int status = pthread_mutex_destroy(&_mutex);
+-  assert_status(status == 0, status, "mutex_destroy");
++  PS5_PTHREAD_CHECK(status == 0, status, "mutex_destroy");
+ }
+ 
+ pthread_mutex_t PlatformMutex::_freelist_lock;
+@@ -1921,18 +1922,18 @@
+ 
+ void PlatformMutex::init() {
+   int status = pthread_mutex_init(&_freelist_lock, _mutexAttr);
+-  assert_status(status == 0, status, "freelist lock init");
++  PS5_PTHREAD_CHECK(status == 0, status, "freelist lock init");
+ }
+ 
+ struct PlatformMutex::WithFreeListLocked : public StackObj {
+   WithFreeListLocked() {
+     int status = pthread_mutex_lock(&_freelist_lock);
+-    assert_status(status == 0, status, "freelist lock");
++    PS5_PTHREAD_CHECK(status == 0, status, "freelist lock");
+   }
+ 
+   ~WithFreeListLocked() {
+     int status = pthread_mutex_unlock(&_freelist_lock);
+-    assert_status(status == 0, status, "freelist unlock");
++    PS5_PTHREAD_CHECK(status == 0, status, "freelist unlock");
+   }
+ };
+ 
+@@ -1958,12 +1959,12 @@
+ 
+ PlatformMonitor::Cond::Cond() : _next(nullptr) {
+   int status = pthread_cond_init(&_cond, _condAttr);
+-  assert_status(status == 0, status, "cond_init");
++  PS5_PTHREAD_CHECK(status == 0, status, "cond_init");
+ }
+ 
+ PlatformMonitor::Cond::~Cond() {
+   int status = pthread_cond_destroy(&_cond);
+-  assert_status(status == 0, status, "cond_destroy");
++  PS5_PTHREAD_CHECK(status == 0, status, "cond_destroy");
+ }
+ 
+ PlatformMonitor::Cond* PlatformMonitor::_cond_freelist = nullptr;
+@@ -1992,22 +1993,22 @@
+ 
+ PlatformMutex::PlatformMutex() {
+   int status = pthread_mutex_init(&_mutex, _mutexAttr);
+-  assert_status(status == 0, status, "mutex_init");
++  PS5_PTHREAD_CHECK(status == 0, status, "mutex_init");
+ }
+ 
+ PlatformMutex::~PlatformMutex() {
+   int status = pthread_mutex_destroy(&_mutex);
+-  assert_status(status == 0, status, "mutex_destroy");
++  PS5_PTHREAD_CHECK(status == 0, status, "mutex_destroy");
+ }
+ 
+ PlatformMonitor::PlatformMonitor() {
+   int status = pthread_cond_init(&_cond, _condAttr);
+-  assert_status(status == 0, status, "cond_init");
++  PS5_PTHREAD_CHECK(status == 0, status, "cond_init");
+ }
+ 
+ PlatformMonitor::~PlatformMonitor() {
+   int status = pthread_cond_destroy(&_cond);
+-  assert_status(status == 0, status, "cond_destroy");
++  PS5_PTHREAD_CHECK(status == 0, status, "cond_destroy");
+ }
+ 
+ #endif // PLATFORM_MONITOR_IMPL_INDIRECT
+@@ -2027,7 +2028,7 @@
+ 
+     int ret = OS_TIMEOUT;
+     int status = pthread_cond_timedwait(cond(), mutex(), &abst);
+-    assert_status(status == 0 || status == ETIMEDOUT,
++    PS5_PTHREAD_CHECK(status == 0 || status == ETIMEDOUT,
+                   status, "cond_timedwait");
+     if (status == 0) {
+       ret = OS_OK;
+@@ -2035,7 +2036,7 @@
+     return ret;
+   } else {
+     int status = pthread_cond_wait(cond(), mutex());
+-    assert_status(status == 0 MACOS_ONLY(|| status == ETIMEDOUT),
++    PS5_PTHREAD_CHECK(status == 0 MACOS_ONLY(|| status == ETIMEDOUT),
+                   status, "cond_wait");
+     return OS_OK;
+   }
+--- a/src/hotspot/os/posix/os_posix.inline.hpp
++++ b/src/hotspot/os/posix/os_posix.inline.hpp
+@@ -26,6 +26,7 @@
+ #define OS_POSIX_OS_POSIX_INLINE_HPP
+ 
+ #include "os_posix.hpp"
++#include "runtime/ps5PthreadChecks.hpp"
+ 
+ #include "runtime/mutex.hpp"
+ #include "runtime/os.hpp"
+@@ -41,28 +42,28 @@
+ 
+ inline void PlatformMutex::lock() {
+   int status = pthread_mutex_lock(mutex());
+-  assert_status(status == 0, status, "mutex_lock");
++  PS5_PTHREAD_CHECK(status == 0, status, "mutex_lock");
+ }
+ 
+ inline void PlatformMutex::unlock() {
+   int status = pthread_mutex_unlock(mutex());
+-  assert_status(status == 0, status, "mutex_unlock");
++  PS5_PTHREAD_CHECK(status == 0, status, "mutex_unlock");
+ }
+ 
+ inline bool PlatformMutex::try_lock() {
+   int status = pthread_mutex_trylock(mutex());
+-  assert_status(status == 0 || status == EBUSY, status, "mutex_trylock");
++  PS5_PTHREAD_CHECK(status == 0 || status == EBUSY, status, "mutex_trylock");
+   return status == 0;
+ }
+ 
+ inline void PlatformMonitor::notify() {
+   int status = pthread_cond_signal(cond());
+-  assert_status(status == 0, status, "cond_signal");
++  PS5_PTHREAD_CHECK(status == 0, status, "cond_signal");
+ }
+ 
+ inline void PlatformMonitor::notify_all() {
+   int status = pthread_cond_broadcast(cond());
+-  assert_status(status == 0, status, "cond_broadcast");
++  PS5_PTHREAD_CHECK(status == 0, status, "cond_broadcast");
+ }
+ 
+ #endif // OS_POSIX_OS_POSIX_INLINE_HPP
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -757,14 +757,26 @@
+   // handshaking with parent thread
+   {
+     MutexLocker ml(sync, Mutex::_no_safepoint_check_flag);
++#ifdef __PROSPERO__
++    ps5_vm_trace_values("THREAD: child handshake locked self=",(uintptr_t)pthread_self()," monitor=",(uintptr_t)sync," phase=",10);
++#endif
+ 
+     // notify parent thread
+     osthread->set_state(INITIALIZED);
+     sync->notify_all();
++#ifdef __PROSPERO__
++    ps5_vm_trace_values("THREAD: child handshake notified self=",(uintptr_t)pthread_self()," monitor=",(uintptr_t)sync," phase=",11);
++#endif
+ 
+     // wait until os::start_thread()
+     while (osthread->get_state() == INITIALIZED) {
++#ifdef __PROSPERO__
++      ps5_vm_trace_values("THREAD: child handshake waiting self=",(uintptr_t)pthread_self()," monitor=",(uintptr_t)sync," phase=",12);
++#endif
+       sync->wait_without_safepoint_check();
++#ifdef __PROSPERO__
++      ps5_vm_trace_values("THREAD: child handshake woke self=",(uintptr_t)pthread_self()," state=",osthread->get_state()," phase=",13);
++#endif
+     }
+   }
+ 
+@@ -923,9 +935,21 @@
+     // Wait until child thread is either initialized or aborted
+     {
+       Monitor* sync_with_child = osthread->startThread_lock();
++#ifdef __PROSPERO__
++      ps5_vm_trace_values("THREAD: parent handshake locking self=",(uintptr_t)pthread_self()," monitor=",(uintptr_t)sync_with_child," child=",(uintptr_t)tid);
++#endif
+       MutexLocker ml(sync_with_child, Mutex::_no_safepoint_check_flag);
++#ifdef __PROSPERO__
++      ps5_vm_trace_values("THREAD: parent handshake locked self=",(uintptr_t)pthread_self()," monitor=",(uintptr_t)sync_with_child," child=",(uintptr_t)tid);
++#endif
+       while ((state = osthread->get_state()) == ALLOCATED) {
++#ifdef __PROSPERO__
++        ps5_vm_trace_values("THREAD: parent handshake waiting self=",(uintptr_t)pthread_self()," monitor=",(uintptr_t)sync_with_child," child=",(uintptr_t)tid);
++#endif
+         sync_with_child->wait_without_safepoint_check();
++#ifdef __PROSPERO__
++        ps5_vm_trace_values("THREAD: parent handshake woke self=",(uintptr_t)pthread_self()," monitor=",(uintptr_t)sync_with_child," child=",(uintptr_t)tid);
++#endif
+       }
+     }
+ 

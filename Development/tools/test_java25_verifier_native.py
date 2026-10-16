@@ -16,4 +16,4 @@ subprocess.run([*common,'-D__PROSPERO__','-DNDEBUG','-D_LITTLE_ENDIAN','-Dmalloc
 subprocess.run([*common,'-c',str(work/'verifier-native-bridge.c'),'-o',str(work/'verifier-native-bridge.o')],check=True)
 subprocess.run(['clang','-fsanitize=undefined','-dynamiclib','-undefined','dynamic_lookup',str(work/'verifier-native.o'),str(work/'verifier-native-bridge.o'),'-o',str(work/'libverify-native-host.dylib')],check=True)
 subprocess.run([str(JDK/'bin/javac'),'-d',str(work),str(work/'VerifyPoolCheck.java')],check=True)
-subprocess.run([str(JDK/'bin/java'),'--enable-native-access=ALL-UNNAMED','-cp',str(work)+':'+args.class_path,'VerifyPoolCheck',str(work/'libverify-native-host.dylib'),*args.classes],check=True,env={**os.environ,'UBSAN_OPTIONS':'handle_segv=0:handle_sigbus=0:handle_sigfpe=0'})
+subprocess.run([str(JDK/'bin/java'),'--enable-native-access=ALL-UNNAMED','-cp',str(work)+':'+args.class_path,'VerifyPoolCheck',str(work/'libverify-native-host.dylib'),*args.classes],check=True,env={**os.environ,'UBSAN_OPTIONS':'halt_on_error=1:handle_segv=0:handle_sigbus=0:handle_sigfpe=0'})
