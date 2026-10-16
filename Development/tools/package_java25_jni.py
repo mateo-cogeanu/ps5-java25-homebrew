@@ -106,6 +106,27 @@ subprocess.run([str(llvm / "llvm-ar"), "d", str(native_libc), "mman.o"], check=T
 # this does not implement dynamic loading or change any strong import.
 absent_callbacks = ["__cxa_thread_atexit_impl", "__dladdr", "__dlclose", "__dlerror",
                     "__dlopen", "__dlsym", "collector_func_load", "kernel_mprotect"]
+# Adapt only the compiler-rt object's allocator references. Keep SDK archives
+# untouched, and leave every other libc allocator reference unchanged.
+emutls_backend=[]
+if args.startup:
+    emutls_dir=WORK/"emutls-adapter";emutls_dir.mkdir(exist_ok=True)
+    subprocess.run([str(llvm/"llvm-ar"),"x",str(native_libc),"emutls.o"],cwd=emutls_dir,check=True)
+    emutls_obj=emutls_dir/"emutls.o"
+    subprocess.run([str(llvm/"llvm-objcopy"),*["--redefine-sym="+name+"=ps5_emutls_"+name for name in ("malloc","realloc","free","pthread_setspecific")],str(emutls_obj)],check=True)
+    # pthread_setspecific has a shorter exported adapter name.
+    subprocess.run([str(llvm/"llvm-objcopy"),"--redefine-sym=ps5_emutls_pthread_setspecific=ps5_emutls_setspecific",str(emutls_obj)],check=True)
+    emutls_symbols=subprocess.check_output([str(llvm/"llvm-nm"),"--undefined-only",str(emutls_obj)],text=True)
+    for name in ("malloc","realloc","free","setspecific"):
+        if not re.search(r"\bU\s+ps5_emutls_"+name+r"$",emutls_symbols,re.M):
+            raise SystemExit("Missing scoped compiler-TLS adapter: "+name)
+    for name in ("malloc","realloc","free","pthread_setspecific"):
+        if re.search(r"\bU\s+"+name+r"$",emutls_symbols,re.M):
+            raise SystemExit("Unadapted compiler-TLS dependency: "+name)
+    subprocess.run([str(llvm/"llvm-ar"),"r",str(native_libc),str(emutls_obj)],check=True)
+    backend=emutls_dir/"backend.o"
+    subprocess.run([str(llvm/"clang++"),"-target","x86_64-sie-ps5","-fvisibility-nodllstorageclass=default","-isysroot",str(SDK),"-isystem",str(SDK/"target/include/c++/v1"),"-isystem",str(SDK/"target/include"),"-std=c++20","-O2","-Wall","-Wextra","-Werror","-fno-exceptions","-fno-rtti","-fno-stack-protector","-femulated-tls","-c",str(ROOT/"java25/probe/emutls_alloc.cpp"),"-o",str(backend)],check=True)
+    emutls_backend=[backend]
 extra_objects=[]
 extra_args=[]
 app_source="java25/probe/jni.cpp"
@@ -206,7 +227,7 @@ wrapped_calls=["--wrap="+name for name in ("memcpy","memmove","memcmp","strcmp",
 if args.fileio or args.zipjar or args.network or args.lan or args.inbound or args.advanced_network or args.lan_endurance or args.dependencies or bool(external):
     wrapped_calls.append("--wrap=open")
 response(link_response, [*wrapped_calls,*("--defsym=" + name + "=0" for name in absent_callbacks),
-                        "-L" + str(SDK / "target/lib"), merged,*extra_objects, native_libc, SDK / "target/lib/libpthread.a",
+                        "-L" + str(SDK / "target/lib"), merged,*extra_objects,*emutls_backend, native_libc, SDK / "target/lib/libpthread.a",
                         SDK / "target/lib/libc++.a", SDK / "target/lib/libc++abi.a",
                         SDK / "target/lib/libunwind.a"])
 subprocess.run(["python3", str(ROOT / "tools/package_native.py"),
