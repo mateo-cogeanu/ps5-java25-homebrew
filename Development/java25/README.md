@@ -60,7 +60,7 @@ boot JDK, and the server VM configuration. Compiler checks pass; configure
 stops because ALSA headers are absent. Headless mode still configures desktop
 audio dependencies.
 
-The bootstrap commands apply seventeen tracked patches under `patches/` and use an
+The bootstrap commands apply the tracked patches under `patches/` and use an
 explicit `--enable-ps5-bootstrap` configuration. This excludes desktop library
 requirements; the script builds only the scoped HotSpot and java.base targets,
 it is not suitable for building a full desktop JDK image. Host Mac SDK paths
@@ -1673,3 +1673,7 @@ Patch `0040-ps5-hotspot-native-heap-page-fallback.patch` adds a PS5-only storage
 The same prefix is used before NMT initialization, including allocations that survive into NMT-off operation. Existing NMT admission limits, headers, logical-size accounting and failed-resize header revival remain. Backend headers and unused slab capacity are allocator overhead, outside those logical NMT sizes. Failed growth leaves the original allocation and bytes intact; failure of both storage backends remains a real allocation failure. Other platforms retain their original allocator paths. No Java heap-size increase or reserved-address overwrite is involved.
 
 Run `python3 tools/test_java25_native_heap.py`. It executes the actual backend with forced failures under ASan/UBSan, checks pooling/alignment/reallocation/cleanup, and stresses concurrent callers. It also compiles the actual `os.cpp` API bodies with a narrow NMT contract model and the actual pre-init raw bridges to check accounting, limits and cross-initialization compatibility. These modeled checks are distinct from real target execution. The target HotSpot build and matching package checks pass. Console validation remains pending; the later native crash is not claimed fixed until retested.
+
+## Native synchronization allocation
+
+A console capture now confirms pthread mutex initialization returns ENOMEM. [Patch 0054 and its host regression](../docs/java25-native-synchronization-pools.md) add bounded early pools of real mutexes/conditions with exclusive stable-address leases, exact clock attributes and genuine failure propagation. Console validation remains pending.

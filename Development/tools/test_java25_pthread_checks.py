@@ -26,6 +26,7 @@ int test_cond_init(pthread_cond_t*,const pthread_condattr_t*){++cond_calls;retur
 int test_mutex_init(pthread_mutex_t*,const pthread_mutexattr_t*){++mutex_calls;return fail_mutex;}
 #define pthread_cond_init test_cond_init
 #define pthread_mutex_init test_mutex_init
+#include "runtime/ps5Synchronization.hpp"
 '''+ctor+r'''
 int main(){
  PlatformEvent ok;assert(ok._event==0&&ok._nParked==0&&notes==0);
