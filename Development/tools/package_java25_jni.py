@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Embed the real HotSpot objects in a native app for staged JNI setup tests."""
 import os
+import hashlib
 import re
 import json
 from pathlib import Path
@@ -113,14 +114,16 @@ if args.startup:
     emutls_dir=WORK/"emutls-adapter";emutls_dir.mkdir(exist_ok=True)
     subprocess.run([str(llvm/"llvm-ar"),"x",str(native_libc),"emutls.o"],cwd=emutls_dir,check=True)
     emutls_obj=emutls_dir/"emutls.o"
-    subprocess.run([str(llvm/"llvm-objcopy"),*["--redefine-sym="+name+"=ps5_emutls_"+name for name in ("malloc","realloc","free","pthread_setspecific")],str(emutls_obj)],check=True)
-    # pthread_setspecific has a shorter exported adapter name.
-    subprocess.run([str(llvm/"llvm-objcopy"),"--redefine-sym=ps5_emutls_pthread_setspecific=ps5_emutls_setspecific",str(emutls_obj)],check=True)
+    if hashlib.sha256(emutls_obj.read_bytes()).hexdigest() != "f12a423ab50bab567caab55986904949f3b15074d253e95b151374054b57d94d":
+        raise SystemExit("Unsupported SDK compiler-TLS object/address-array ABI")
+    subprocess.run([str(llvm/"llvm-objcopy"),*["--redefine-sym="+name+"=ps5_emutls_"+name for name in ("malloc","realloc","free","pthread_setspecific","pthread_getspecific","pthread_key_create")],str(emutls_obj)],check=True)
+    # Scoped pthread adapters have shorter exported names.
+    subprocess.run([str(llvm/"llvm-objcopy"),*["--redefine-sym=ps5_emutls_pthread_"+name+"=ps5_emutls_"+name for name in ("setspecific","getspecific","key_create")],str(emutls_obj)],check=True)
     emutls_symbols=subprocess.check_output([str(llvm/"llvm-nm"),"--undefined-only",str(emutls_obj)],text=True)
-    for name in ("malloc","realloc","free","setspecific"):
+    for name in ("malloc","realloc","free","setspecific","getspecific","key_create"):
         if not re.search(r"\bU\s+ps5_emutls_"+name+r"$",emutls_symbols,re.M):
             raise SystemExit("Missing scoped compiler-TLS adapter: "+name)
-    for name in ("malloc","realloc","free","pthread_setspecific"):
+    for name in ("malloc","realloc","free","pthread_setspecific","pthread_getspecific","pthread_key_create"):
         if re.search(r"\bU\s+"+name+r"$",emutls_symbols,re.M):
             raise SystemExit("Unadapted compiler-TLS dependency: "+name)
     subprocess.run([str(llvm/"llvm-ar"),"r",str(native_libc),str(emutls_obj)],check=True)
@@ -223,7 +226,7 @@ if args.startup:
     if external:
         app_source=external["source"];app_param=external["param"]
         extra_args.extend([item for path in external.get("include_dirs",[]) for item in ("--include-dir",path)])
-wrapped_calls=["--wrap="+name for name in ("memcpy","memmove","memcmp","strcmp","strlen","memset","strncmp","strncpy","strchr","memchr","strcpy","malloc","calloc","realloc","free","strdup","abort","exit","_exit")] if args.startup else []
+wrapped_calls=["--wrap="+name for name in ("memcpy","memmove","memcmp","strcmp","strlen","memset","strncmp","strncpy","strchr","memchr","strcpy","malloc","calloc","realloc","free","strdup","abort","exit","_exit","pthread_create","pthread_join")] if args.startup else []
 if args.fileio or args.zipjar or args.network or args.lan or args.inbound or args.advanced_network or args.lan_endurance or args.dependencies or bool(external):
     wrapped_calls.append("--wrap=open")
 response(link_response, [*wrapped_calls,*("--defsym=" + name + "=0" for name in absent_callbacks),

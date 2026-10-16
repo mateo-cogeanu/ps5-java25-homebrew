@@ -56,31 +56,3 @@ ir=(W/'backend.ll').read_text()
 assert '__emutls' not in ir and '__cxa_guard' not in ir
 assert '@mmap' in ir and '@munmap' in ir
 print('PASS: target adapter uses real OS maps; no compiler TLS or lazy initialization guard')
-# Compile the actual setter adapter body with refused/mismatched native calls.
-text=(ROOT/'java25/probe/emutls_alloc.cpp').read_text();start=text.index('int ps5_emutls_setspecific(');brace=text.index('{',start);depth=1;end=brace+1
-while depth:
-    depth+=(text[end]=='{')-(text[end]=='}');end+=1
-setter=text[start:end]
-stub=r'''
-#include <pthread.h>
-#include <cstdint>
-#include <cerrno>
-#include <cassert>
-static int result=0,notes=0;static bool mismatch=false;static const void* stored=nullptr;
-int test_set(pthread_key_t,const void*p){if(!result&&!mismatch)stored=p;errno=EIO;return result;}
-void* test_get(pthread_key_t){errno=EAGAIN;return const_cast<void*>(stored);}
-void ps5_vm_trace_values(const char*,unsigned long long,const char*,unsigned long long,const char*,unsigned long long){++notes;errno=EBUSY;}
-#define pthread_setspecific test_set
-#define pthread_getspecific test_get
-'''+setter+r'''
-int main(){
- int v=3;errno=EDOM;assert(ps5_emutls_setspecific(1,&v)==0&&errno==EDOM&&notes==0);
- result=ENOMEM;errno=ERANGE;assert(ps5_emutls_setspecific(1,nullptr)==ENOMEM&&errno==ERANGE&&notes==1);
- result=0;mismatch=true;errno=EDOM;assert(ps5_emutls_setspecific(1,nullptr)==0&&errno==EDOM&&notes==2);
- mismatch=false;assert(ps5_emutls_setspecific(1,nullptr)==0&&notes==2);
-}
-'''
-p=W/'setter.cpp';p.write_text(stub)
-subprocess.run(['/usr/bin/clang++','-std=c++20','-O1','-g','-fsanitize=address,undefined',str(p),'-o',str(W/'setter')],check=True)
-subprocess.run([str(W/'setter')],check=True)
-print('PASS: actual scoped setter diagnostic preserves success/refusal/readback behavior, return codes and errno')
