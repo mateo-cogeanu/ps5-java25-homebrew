@@ -70,3 +70,11 @@ in https://github.com/mateo-cogeanu/ps5-minecraft-java and must be committed
 and pushed there. Reusable Java runtime fixes, patches and packaging/image
 tools belong here and are published through tools/sync_github.py. Do not
 copy consumer game code or downloaded game JARs into this repository.
+
+## Log retrieval and follow-through
+
+When the user asks to retrieve probe logs, collect and inspect the current-run
+reports, then proceed with repairs for concrete issues found within the existing
+Java/Minecraft scope. Build, check and publish the resulting changes under the
+repository ownership rules above. Do not wait for a separate repair request.
+Keep unresolved causes and console validation explicit; raw logs remain local.

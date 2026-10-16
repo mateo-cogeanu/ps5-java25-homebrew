@@ -1,0 +1,120 @@
+--- a/src/java.base/share/native/libjava/io_util.c
++++ b/src/java.base/share/native/libjava/io_util.c
+@@ -26,6 +26,12 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <stddef.h>
++#ifdef __PROSPERO__
++#include <errno.h>
++#include <stdint.h>
++#include <sys/mman.h>
++#include <unistd.h>
++#endif
+ 
+ #include "jni.h"
+ #include "jni_util.h"
+@@ -70,6 +76,52 @@
+             ((*env)->GetArrayLength(env, array) - off < len));
+ }
+ 
++/* Temporary bulk-I/O buffers are independent of the HotSpot native heap.
++ * Retain the exact mapping length: writeBytes consumes its len argument.
++ */
++static void *io_scratch_allocate(size_t bytes, size_t *mapped_size)
++{
++    *mapped_size = 0;
++#ifdef __PROSPERO__
++    int saved_errno = errno;
++    errno = 0;
++#endif
++    void *buffer = malloc(bytes);
++#ifdef __PROSPERO__
++    if (buffer == NULL) {
++        int heap_error = errno;
++        long page = sysconf(_SC_PAGESIZE);
++        if (page <= 0 || bytes > SIZE_MAX - ((size_t)page - 1)) {
++            errno = ENOMEM;
++            return NULL;
++        }
++        size_t rounded = ((bytes + (size_t)page - 1) / (size_t)page) * (size_t)page;
++        buffer = mmap(NULL, rounded, PROT_READ | PROT_WRITE,
++                      MAP_PRIVATE | MAP_ANON, -1, 0);
++        int map_error = buffer == MAP_FAILED ? errno : 0;
++        jio_fprintf(stderr, "PS5 file I/O scratch: bytes=%zu malloc_errno=%d "
++                    "mapped_bytes=%zu mmap_errno=%d\n", bytes, heap_error,
++                    buffer == MAP_FAILED ? 0 : rounded, map_error);
++        if (buffer == MAP_FAILED) { errno = map_error; return NULL; }
++        *mapped_size = rounded;
++    }
++    errno = saved_errno;
++#endif
++    return buffer;
++}
++
++static void io_scratch_release(void *buffer, size_t mapped_size)
++{
++#ifdef __PROSPERO__
++    int saved_errno = errno;
++    if (mapped_size != 0) munmap(buffer, mapped_size);
++    else free(buffer);
++    errno = saved_errno;
++#else
++    free(buffer);
++#endif
++}
++
+ jint
+ readBytes(JNIEnv *env, jobject this, jbyteArray bytes,
+           jint off, jint len, jfieldID fid)
+@@ -77,6 +129,7 @@
+     jint nread;
+     char stackBuf[BUF_SIZE];
+     char *buf = NULL;
++    size_t mapped_size = 0;
+     FD fd;
+ 
+     if (IS_NULL(bytes)) {
+@@ -92,7 +145,7 @@
+     if (len == 0) {
+         return 0;
+     } else if (len > BUF_SIZE) {
+-        buf = malloc(len);
++        buf = io_scratch_allocate((size_t)len, &mapped_size);
+         if (buf == NULL) {
+             JNU_ThrowOutOfMemoryError(env, NULL);
+             return 0;
+@@ -117,7 +170,7 @@
+     }
+ 
+     if (buf != stackBuf) {
+-        free(buf);
++        io_scratch_release(buf, mapped_size);
+     }
+     return nread;
+ }
+@@ -149,6 +202,7 @@
+     jint n;
+     char stackBuf[BUF_SIZE];
+     char *buf = NULL;
++    size_t mapped_size = 0;
+     FD fd;
+ 
+     if (IS_NULL(bytes)) {
+@@ -164,7 +218,7 @@
+     if (len == 0) {
+         return;
+     } else if (len > BUF_SIZE) {
+-        buf = malloc(len);
++        buf = io_scratch_allocate((size_t)len, &mapped_size);
+         if (buf == NULL) {
+             JNU_ThrowOutOfMemoryError(env, NULL);
+             return;
+@@ -197,7 +251,7 @@
+         }
+     }
+     if (buf != stackBuf) {
+-        free(buf);
++        io_scratch_release(buf, mapped_size);
+     }
+ }
+ 
