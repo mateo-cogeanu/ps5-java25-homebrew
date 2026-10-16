@@ -1,0 +1,145 @@
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5ThreadAttributes.hpp
+@@ -0,0 +1,62 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef PS5_THREAD_ATTRIBUTES_HPP
++#define PS5_THREAD_ATTRIBUTES_HPP
++#include <pthread.h>
++#include <errno.h>
++// Real pthread attributes initialized before native-heap pressure. Slots are
++// borrowed exclusively, passed by address without copying opaque objects, and
++// retained for the process lifetime. pthread_create consumes attributes before
++// it returns; the lease may then return its slot even for a detached child.
++namespace ps5_thread_attributes {
++constexpr unsigned capacity = 32;
++struct Slot { pthread_attr_t value; bool valid, busy; };
++inline Slot* slots() { static Slot values[capacity] = {}; return values; }
++inline unsigned* state() { static unsigned value = 0; return &value; }
++inline unsigned* lock_word() { static unsigned value = 0; return &value; }
++inline void pause() {
++#if defined(__x86_64__)
++    __asm__ volatile("pause");
++#elif defined(__aarch64__)
++    __asm__ volatile("yield");
++#endif
++}
++inline void lock() { while (__atomic_exchange_n(lock_word(),1u,__ATOMIC_ACQUIRE)) pause(); }
++inline void unlock() { __atomic_store_n(lock_word(),0u,__ATOMIC_RELEASE); }
++inline void initialize() {
++    unsigned expected = 0;
++    if (__atomic_compare_exchange_n(state(),&expected,1u,false,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE)) {
++        for (unsigned i=0;i<capacity;++i) slots()[i].valid = pthread_attr_init(&slots()[i].value) == 0;
++        __atomic_store_n(state(),2u,__ATOMIC_RELEASE);
++    } else while (__atomic_load_n(state(),__ATOMIC_ACQUIRE) != 2u) pause();
++}
++class Lease {
++    Slot* slot = nullptr;
++    pthread_attr_t local;
++    bool local_valid = false;
++public:
++    pthread_attr_t* value = nullptr;
++    Lease() = default;
++    Lease(const Lease&) = delete;
++    Lease& operator=(const Lease&) = delete;
++    int acquire() {
++        initialize();
++        lock();
++        for (unsigned i=0;i<capacity;++i) if (slots()[i].valid && !slots()[i].busy) {
++            slot=&slots()[i]; slot->busy=true; value=&slot->value; break;
++        }
++        unlock();
++        if (slot != nullptr) return 0;
++        int result=pthread_attr_init(&local);
++        if (result == 0) { local_valid=true; value=&local; }
++        return result;
++    }
++    void release() {
++        int saved_errno=errno;
++        if (slot != nullptr) { lock(); slot->busy=false; unlock(); slot=nullptr; }
++        if (local_valid) { pthread_attr_destroy(&local); local_valid=false; }
++        value=nullptr; errno=saved_errno;
++    }
++    ~Lease() { release(); }
++};
++}
++#endif
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -768,6 +768,10 @@
+   return nullptr;
+ }
+ 
++#ifdef __PROSPERO__
++#include "runtime/ps5ThreadAttributes.hpp"
++#endif
++
+ bool os::create_thread(Thread* thread, ThreadType thr_type,
+                        size_t req_stack_size) {
+   assert(thread->osthread() == nullptr, "caller responsible");
+@@ -787,8 +791,15 @@
+   thread->set_osthread(osthread);
+ 
+   // init thread attributes
+-  pthread_attr_t attr;
+-  int rslt = pthread_attr_init(&attr);
++#ifdef __PROSPERO__
++  ps5_thread_attributes::Lease attr_lease;
++  int rslt = attr_lease.acquire();
++  pthread_attr_t* attr = attr_lease.value;
++#else
++  pthread_attr_t attr_storage;
++  pthread_attr_t* attr = &attr_storage;
++  int rslt = pthread_attr_init(attr);
++#endif
+   if (rslt != 0) {
+ #ifdef __PROSPERO__
+     ps5_vm_trace_values("PS5 thread attr init failed: result=", rslt, " errno=", errno, " type=", thr_type);
+@@ -797,11 +808,11 @@
+     delete osthread;
+     return false;
+   }
+-  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
++  pthread_attr_setdetachstate(attr, PTHREAD_CREATE_DETACHED);
+ 
+   // calculate stack size if it's not specified by caller
+   size_t stack_size = os::Posix::get_initial_stack_size(thr_type, req_stack_size);
+-  int status = pthread_attr_setstacksize(&attr, stack_size);
++  int status = pthread_attr_setstacksize(attr, stack_size);
+   if (status != 0) {
+ #ifdef __PROSPERO__
+     ps5_vm_trace_values("PS5 thread stack attr failed: result=", status, " bytes=", stack_size, " errno=", errno);
+@@ -827,7 +838,7 @@
+     int trials_remaining = 4;
+     useconds_t next_delay = 1000;
+     while (true) {
+-      ret = pthread_create(&tid, &attr, (void* (*)(void*)) thread_native_entry, thread);
++      ret = pthread_create(&tid, attr, (void* (*)(void*)) thread_native_entry, thread);
+ #ifdef __PROSPERO__
+       if (ret != 0) ps5_vm_trace_values("PS5 pthread create failed: result=", ret, " stack_bytes=", stack_size, " errno=", errno);
+ #endif
+@@ -848,10 +859,10 @@
+     char buf[64];
+     if (ret == 0) {
+       log_info(os, thread)("Thread \"%s\" started (pthread id: %zu, attributes: %s). ",
+-                           thread->name(), (uintx) tid, os::Posix::describe_pthread_attr(buf, sizeof(buf), &attr));
++                           thread->name(), (uintx) tid, os::Posix::describe_pthread_attr(buf, sizeof(buf), attr));
+     } else {
+       log_warning(os, thread)("Failed to start thread \"%s\" - pthread_create failed (%s) for attributes: %s.",
+-                              thread->name(), os::errno_name(ret), os::Posix::describe_pthread_attr(buf, sizeof(buf), &attr));
++                              thread->name(), os::errno_name(ret), os::Posix::describe_pthread_attr(buf, sizeof(buf), attr));
+       // Log some OS information which might explain why creating the thread failed.
+       log_info(os, thread)("Number of threads approx. running in the VM: %d", Threads::number_of_threads());
+       LogStream st(Log(os, thread)::info());
+@@ -859,7 +870,11 @@
+       os::print_memory_info(&st);
+     }
+ 
+-    pthread_attr_destroy(&attr);
++#ifdef __PROSPERO__
++    attr_lease.release();
++#else
++    pthread_attr_destroy(attr);
++#endif
+ 
+     if (ret != 0) {
+       // Need to clean up stuff we've allocated so far
