@@ -1,0 +1,135 @@
+--- /dev/null
++++ b/src/java.base/share/native/libverify/ps5_verify_alloc.h
+@@ -0,0 +1,59 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef PS5_VERIFY_ALLOC_H
++#define PS5_VERIFY_ALLOC_H
++#ifdef __PROSPERO__
++#include <stddef.h>
++#include <stdint.h>
++#include <errno.h>
++#include <string.h>
++#include <sys/mman.h>
++#include <unistd.h>
++/* Every allocation remains inside check_code.c and uses matching cleanup,
++ * including class hashes, names, constants and the longjmp cleanup stack. */
++typedef union { size_t mapped; max_align_t alignment; } VerifyNativeHeader;
++static void *verify_native_allocate(size_t size) {
++    int saved_errno = errno;
++    if (size > SIZE_MAX - sizeof(VerifyNativeHeader)) { errno = ENOMEM; return NULL; }
++    size_t bytes = sizeof(VerifyNativeHeader) + (size == 0 ? 1 : size);
++    errno = 0;
++    VerifyNativeHeader *header = malloc(bytes);
++    if (header != NULL) header->mapped = 0;
++    else {
++        int heap_error = errno;
++        long page = sysconf(_SC_PAGESIZE);
++        if (page <= 0 || bytes > SIZE_MAX - ((size_t)page - 1)) { errno = ENOMEM; return NULL; }
++        size_t mapped = ((bytes + (size_t)page - 1) / (size_t)page) * (size_t)page;
++        void *memory = mmap(NULL, mapped, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
++        int error = memory == MAP_FAILED ? errno : 0;
++        jio_fprintf(stderr, "PS5 verifier native: bytes=%zu malloc_errno=%d mapped_bytes=%zu mmap_errno=%d\n",
++                    size, heap_error, memory == MAP_FAILED ? 0 : mapped, error);
++        if (memory == MAP_FAILED) { errno = error; return NULL; }
++        header = memory; header->mapped = mapped;
++    }
++    errno = saved_errno;
++    return header + 1;
++}
++static void *verify_native_callocate(size_t count, size_t size) {
++    if (size != 0 && count > SIZE_MAX / size) { errno = ENOMEM; return NULL; }
++    size_t bytes = count * size;
++    void *result = verify_native_allocate(bytes);
++    if (result != NULL) memset(result, 0, bytes);
++    return result;
++}
++static void verify_native_release(void *buffer) {
++    int saved_errno = errno;
++    if (buffer != NULL) {
++        VerifyNativeHeader *header = ((VerifyNativeHeader *)buffer) - 1;
++        if (header->mapped != 0) munmap(header, header->mapped);
++        else free(header);
++    }
++    errno = saved_errno;
++}
++#undef malloc
++#undef calloc
++#undef free
++#define malloc verify_native_allocate
++#define calloc verify_native_callocate
++#define free verify_native_release
++#endif
++#endif
+--- a/src/java.base/share/native/libverify/check_code.c
++++ b/src/java.base/share/native/libverify/check_code.c
+@@ -128,6 +128,8 @@
+ #define calloc aix_calloc
+ #define free aix_free
+ #endif
++
++#include "ps5_verify_alloc.h"
+ 
+ #ifdef __APPLE__
+ /* use setjmp/longjmp versions that do not save/restore the signal mask */
+@@ -3529,9 +3531,6 @@
+     struct CCpool *next;
+     int segSize;                /* almost always CCSegSize */
+     int poolPad;
+-#ifdef __PROSPERO__
+-    size_t mapped_size;         /* zero for libc allocations */
+-#endif
+     char space[CCSegSize];
+ };
+ 
+@@ -3541,50 +3540,11 @@
+  */
+ static struct CCpool *CCpool_allocate(size_t bytes)
+ {
+-#ifdef __PROSPERO__
+-    int saved_errno = errno;
+-    errno = 0;
+-#endif
+-    struct CCpool *pool = (struct CCpool *)malloc(bytes);
+-#ifdef __PROSPERO__
+-    if (pool != NULL) {
+-        pool->mapped_size = 0;
+-        errno = saved_errno;
+-    } else {
+-        int heap_error = errno;
+-        long page_size = sysconf(_SC_PAGESIZE);
+-        if (page_size <= 0 || bytes > SIZE_MAX - (size_t)page_size) {
+-            errno = ENOMEM;
+-            return NULL;
+-        }
+-        size_t mapped = ((bytes + (size_t)page_size - 1) /
+-                          (size_t)page_size) * (size_t)page_size;
+-        void *memory = mmap(NULL, mapped, PROT_READ | PROT_WRITE,
+-                            MAP_PRIVATE | MAP_ANON, -1, 0);
+-        int map_error = memory == MAP_FAILED ? errno : 0;
+-        jio_fprintf(stderr, "PS5 verifier scratch: bytes=%zu malloc_errno=%d "
+-                    "mapped_bytes=%zu mmap_errno=%d\n",
+-                    bytes, heap_error, mapped, map_error);
+-        if (memory == MAP_FAILED) {
+-            errno = map_error;
+-            return NULL;
+-        }
+-        pool = (struct CCpool *)memory;
+-        pool->mapped_size = mapped;
+-        errno = saved_errno;
+-    }
+-#endif
+-    return pool;
++    return (struct CCpool *)malloc(bytes);
+ }
+ 
+ static void CCpool_release(struct CCpool *pool)
+ {
+-#ifdef __PROSPERO__
+-    if (pool->mapped_size != 0) {
+-        munmap(pool, pool->mapped_size);
+-        return;
+-    }
+-#endif
+     free(pool);
+ }
+ 

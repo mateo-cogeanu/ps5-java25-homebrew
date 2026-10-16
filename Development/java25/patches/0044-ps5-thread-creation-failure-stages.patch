@@ -1,0 +1,42 @@
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -775,6 +775,9 @@
+   // Allocate the OSThread object
+   OSThread* osthread = new (std::nothrow) OSThread();
+   if (osthread == nullptr) {
++#ifdef __PROSPERO__
++    ps5_vm_trace_values("PS5 thread OSThread allocation failed: requested=", sizeof(OSThread), " errno=", errno, " type=", thr_type);
++#endif
+     return false;
+   }
+ 
+@@ -787,6 +790,9 @@
+   pthread_attr_t attr;
+   int rslt = pthread_attr_init(&attr);
+   if (rslt != 0) {
++#ifdef __PROSPERO__
++    ps5_vm_trace_values("PS5 thread attr init failed: result=", rslt, " errno=", errno, " type=", thr_type);
++#endif
+     thread->set_osthread(nullptr);
+     delete osthread;
+     return false;
+@@ -797,6 +803,9 @@
+   size_t stack_size = os::Posix::get_initial_stack_size(thr_type, req_stack_size);
+   int status = pthread_attr_setstacksize(&attr, stack_size);
+   if (status != 0) {
++#ifdef __PROSPERO__
++    ps5_vm_trace_values("PS5 thread stack attr failed: result=", status, " bytes=", stack_size, " errno=", errno);
++#endif
+     // pthread_attr_setstacksize() function can fail
+     // if the stack size exceeds a system-imposed limit.
+     assert_status(status == EINVAL, status, "pthread_attr_setstacksize");
+@@ -819,6 +828,9 @@
+     useconds_t next_delay = 1000;
+     while (true) {
+       ret = pthread_create(&tid, &attr, (void* (*)(void*)) thread_native_entry, thread);
++#ifdef __PROSPERO__
++      if (ret != 0) ps5_vm_trace_values("PS5 pthread create failed: result=", ret, " stack_bytes=", stack_size, " errno=", errno);
++#endif
+ 
+       if (ret != EAGAIN) {
+         break;

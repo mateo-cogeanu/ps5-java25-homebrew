@@ -38,8 +38,13 @@ static void budget_free(void *p){if(!p)return;size_t *base=(size_t*)((char*)p-si
 #define malloc budget_malloc
 #define free budget_free
 '''
+prefix+='\n'+(ROOT/'.tools/java25/openjdk/src/java.base/share/native/libverify/ps5_verify_alloc.h').read_text()+'\n'
 suffix=r'''
 int main(){
+#ifdef __PROSPERO__
+ assert(verify_native_callocate(SIZE_MAX, 2)==NULL);
+ unsigned char *zero=calloc(37,7);assert(zero);for(int i=0;i<259;i++)assert(zero[i]==0);free(zero);assert(live==0);
+#endif
  context_type c={0};CCinit(&c);size_t root=live;
 #ifdef __PROSPERO__
  for(int method=0;method<600;method++){
