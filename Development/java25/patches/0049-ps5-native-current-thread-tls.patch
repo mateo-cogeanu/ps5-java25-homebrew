@@ -1,0 +1,74 @@
+--- a/src/hotspot/share/runtime/thread.hpp
++++ b/src/hotspot/share/runtime/thread.hpp
+@@ -115,7 +115,9 @@
+  private:
+ 
+   // Current thread is maintained as a thread-local variable
++#ifndef __PROSPERO__
+   static THREAD_LOCAL Thread* _thr_current;
++#endif
+ 
+   // On AArch64, the high order 32 bits are used by a "patching epoch" number
+   // which reflects if this thread has executed the required fences, after
+@@ -662,7 +664,13 @@
+ }
+ 
+ inline Thread* Thread::current_or_null() {
++#ifdef __PROSPERO__
++  // Compiler TLS on this target uses allocating emulation on first access.
++  // The VM already maintains a native pthread key for signal-safe lookups.
++  return current_or_null_safe();
++#else
+   return _thr_current;
++#endif
+ }
+ 
+ inline Thread* Thread::current_or_null_safe() {
+--- a/src/hotspot/share/runtime/thread.cpp
++++ b/src/hotspot/share/runtime/thread.cpp
+@@ -56,7 +56,9 @@
+ #include "runtime/ps5StartupTrace.hpp"
+ #endif
+ 
++#ifndef __PROSPERO__
+ THREAD_LOCAL Thread* Thread::_thr_current = nullptr;
++#endif
+ 
+ // ======= Thread ========
+ // Base class for all threads: VMThread, WatcherThread, ConcurrentMarkSweepThread,
+@@ -178,25 +180,26 @@
+ }
+ 
+ void Thread::initialize_thread_current() {
+-  assert(_thr_current == nullptr, "Thread::current already initialized");
++  assert(Thread::current_or_null() == nullptr, "Thread::current already initialized");
++#ifndef __PROSPERO__
++  _thr_current = this;
++#endif
++  assert(ThreadLocalStorage::thread() == nullptr, "ThreadLocalStorage::thread already initialized");
+ #ifdef __PROSPERO__
+-  ps5_vm_trace("THREAD: before compiler TLS assignment");
+-#endif
+-  _thr_current = this;
+-#ifdef __PROSPERO__
+-  ps5_vm_trace("THREAD: compiler TLS assigned");
+-#endif
+-  assert(ThreadLocalStorage::thread() == nullptr, "ThreadLocalStorage::thread already initialized");
++  ps5_vm_trace("THREAD: before native pthread TLS assignment");
++#endif
+   ThreadLocalStorage::set_thread(this);
+ #ifdef __PROSPERO__
+-  ps5_vm_trace("THREAD: pthread TLS assigned");
++  ps5_vm_trace("THREAD: native pthread TLS assigned");
+ #endif
+   assert(Thread::current() == ThreadLocalStorage::thread(), "TLS mismatch!");
+ }
+ 
+ void Thread::clear_thread_current() {
+   assert(Thread::current() == ThreadLocalStorage::thread(), "TLS mismatch!");
++#ifndef __PROSPERO__
+   _thr_current = nullptr;
++#endif
+   ThreadLocalStorage::set_thread(nullptr);
+ }
+ 
