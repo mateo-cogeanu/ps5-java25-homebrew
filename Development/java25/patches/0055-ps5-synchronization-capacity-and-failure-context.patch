@@ -1,0 +1,63 @@
+--- a/src/hotspot/share/runtime/ps5Synchronization.hpp
++++ b/src/hotspot/share/runtime/ps5Synchronization.hpp
+@@ -5,10 +5,13 @@
+ #ifdef __PROSPERO__
+ #include <errno.h>
+ #include <stddef.h>
++#include "runtime/ps5StartupTrace.hpp"
+ namespace ps5_sync {
+ template<class Handle,size_t Count> struct Pool {
+  struct Slot {Handle native;bool initialized,busy;};
++ struct Stats {size_t initialized,leased;};
+  Slot slots[Count];unsigned lock_word,ready;
++ Stats stats(){Stats result{};lock();for(auto&s:slots){result.initialized+=s.initialized;result.leased+=s.busy;}unlock();return result;}
+  void lock(){while(__atomic_exchange_n(&lock_word,1u,__ATOMIC_ACQUIRE)){
+   while(__atomic_load_n(&lock_word,__ATOMIC_RELAXED)){
+ #if defined(__x86_64__)
+@@ -32,7 +35,8 @@
+  }
+  bool release(Handle*p){bool found=false;lock();for(auto&s:slots)if(&s.native==p){found=s.initialized&&s.busy;if(found)s.busy=false;break;}unlock();return found;}
+ };
+-inline Pool<pthread_mutex_t,512>& mutex_pool(){static Pool<pthread_mutex_t,512> p{};return p;}
++enum { mutex_capacity=4096 };
++inline Pool<pthread_mutex_t,mutex_capacity>& mutex_pool(){static Pool<pthread_mutex_t,mutex_capacity> p{};return p;}
+ inline Pool<pthread_cond_t,512>& relative_pool(){static Pool<pthread_cond_t,512> p{};return p;}
+ inline Pool<pthread_cond_t,256>& absolute_pool(){static Pool<pthread_cond_t,256> p{};return p;}
+ struct Configuration {const pthread_mutexattr_t* mutex;const pthread_condattr_t* relative;unsigned state;};
+@@ -51,8 +55,15 @@
+  MutexLease()=default;MutexLease(const MutexLease&)=delete;MutexLease&operator=(const MutexLease&)=delete;
+  int init(const pthread_mutexattr_t*attr){
+   if(active)return EBUSY;int saved=errno;
+-  if(__atomic_load_n(&configuration().state,__ATOMIC_ACQUIRE)==2&&attr==configuration().mutex){active=mutex_pool().acquire();pooled=active!=nullptr;}
++  unsigned state=__atomic_load_n(&configuration().state,__ATOMIC_ACQUIRE);
++  bool matching=state==2&&attr==configuration().mutex;
++  if(matching){active=mutex_pool().acquire();pooled=active!=nullptr;}
+   int result=0;if(!active){result=pthread_mutex_init(&local,attr);if(!result)active=&local;}
++  if(result){
++   const auto counts=mutex_pool().stats();
++   ps5_vm_trace_values("SYNC: mutex native init failure status=",(unsigned)result," leased=",counts.leased," initialized=",counts.initialized);
++   ps5_vm_trace_values("SYNC: mutex fallback config=",state," attr_match=",matching," caller=",(uintptr_t)__builtin_return_address(0));
++  }
+   errno=saved;return result;
+  }
+  int destroy(){
+--- a/src/hotspot/os/posix/os_posix.cpp
++++ b/src/hotspot/os/posix/os_posix.cpp
+@@ -1632,7 +1632,7 @@
+   int status = ps5_sync::cond_init(_cond, _condAttr);
+   PS5_PTHREAD_CHECK(status == 0, status, "cond_init");
+   status = ps5_sync::mutex_init(_mutex, _mutexAttr);
+-  PS5_PTHREAD_CHECK(status == 0, status, "mutex_init");
++  PS5_PTHREAD_CHECK(status == 0, status, "event mutex_init");
+   _event   = 0;
+   _nParked = 0;
+ }
+@@ -1786,7 +1786,7 @@
+   status = ps5_sync::cond_init_at(_cond,ABS_INDEX, nullptr);
+   PS5_PTHREAD_CHECK(status == 0, status, "cond_init abs");
+   status = ps5_sync::mutex_init(_mutex, _mutexAttr);
+-  PS5_PTHREAD_CHECK(status == 0, status, "mutex_init");
++  PS5_PTHREAD_CHECK(status == 0, status, "parker mutex_init");
+ }
+ 
+ PlatformParker::~PlatformParker() {

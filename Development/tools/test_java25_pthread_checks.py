@@ -31,7 +31,7 @@ int test_mutex_init(pthread_mutex_t*,const pthread_mutexattr_t*){++mutex_calls;r
 int main(){
  PlatformEvent ok;assert(ok._event==0&&ok._nParked==0&&notes==0);
  fail_cond=ENOMEM;int before=mutex_calls;try{PlatformEvent bad;assert(false);}catch(int s){assert(s==ENOMEM&&strcmp(last_op,"cond_init")==0);}assert(mutex_calls==before);
- fail_cond=0;fail_mutex=ENOMEM;try{PlatformEvent bad;assert(false);}catch(int s){assert(s==ENOMEM&&strcmp(last_op,"mutex_init")==0);}
+ fail_cond=0;fail_mutex=ENOMEM;try{PlatformEvent bad;assert(false);}catch(int s){assert(s==ENOMEM&&strcmp(last_op,"event mutex_init")==0);}
  assert(notes==2);int status=ETIMEDOUT;PS5_PTHREAD_CHECK(status==0||status==ETIMEDOUT,status,"timeout");status=EBUSY;PS5_PTHREAD_CHECK(status==0||status==EBUSY,status,"trylock");assert(notes==2);
  puts("PASS: actual release-check helper and PlatformEvent constructor report ENOMEM before invalid use; successful init and allowed timeout/busy results retained");
 }

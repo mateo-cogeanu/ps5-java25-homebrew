@@ -2,7 +2,16 @@
 """Exercise real pthread resources while denying all late native initialization."""
 from pathlib import Path
 import subprocess,os
-R=Path(__file__).resolve().parents[1];W=R/'build/java25/sync-pool-test';W.mkdir(parents=True,exist_ok=True)
+R=Path(__file__).resolve().parents[1];W=R/'build/java25/sync-pool-test';(W/'runtime').mkdir(parents=True,exist_ok=True)
+(W/'runtime/ps5StartupTrace.hpp').write_text(r'''#pragma once
+#include <cstdint>
+#include <cstring>
+static unsigned long long seen_status,seen_leased,seen_initialized,seen_state,seen_match,seen_caller;
+inline void ps5_vm_trace_values(const char*label,unsigned long long a,const char*,unsigned long long b,const char*,unsigned long long c){
+ if(std::strstr(label,"failure status=")){seen_status=a;seen_leased=b;seen_initialized=c;}
+ if(std::strstr(label,"fallback config=")){seen_state=a;seen_match=b;seen_caller=c;}
+}
+''')
 cpp=r'''
 #include <pthread.h>
 #include <cassert>
@@ -27,7 +36,7 @@ int main(){
  pthread_mutexattr_t ma,other;pthread_condattr_t ca;assert(pthread_mutexattr_init(&ma)==0);assert(pthread_mutexattr_settype(&ma,PTHREAD_MUTEX_NORMAL)==0);assert(pthread_mutexattr_init(&other)==0);assert(pthread_condattr_init(&ca)==0);
  // Existing early/local objects remain native-owned, rather than copied.
  MutexLease early;assert(early.init(&ma)==0);auto*early_address=early.get();assert(pthread_mutex_lock(early.get())==0);assert(pthread_mutex_unlock(early.get())==0);
- auto counts=prime(&ma,&ca);assert(counts.mutexes==512&&counts.relative==512&&counts.absolute==256);
+ auto counts=prime(&ma,&ca);assert(counts.mutexes==mutex_capacity&&counts.relative==512&&counts.absolute==256);
  assert(early.get()==early_address&&early.destroy()==0);deny=true;
  int before=mutex_calls;MutexLease m;CondLease relative,absolute;errno=EDOM;
  assert(m.init(&ma)==0&&relative.init(&ca)==0&&absolute.init(nullptr)==0&&errno==EDOM&&mutex_calls==before);
@@ -38,9 +47,9 @@ int main(){
  assert(pthread_mutex_unlock(m.get())==0);assert(relative.destroy()==0&&absolute.destroy()==0&&m.destroy()==0);
  // All configured pool entries are exclusive and exhaustion propagates real ENOMEM.
  std::vector<std::unique_ptr<MutexLease>> held;
- for(int i=0;i<512;++i){auto item=std::make_unique<MutexLease>();assert(item->init(&ma)==0);for(auto&other_item:held)assert(other_item->get()!=item->get());held.push_back(std::move(item));}
- MutexLease extra;assert(extra.init(&ma)==ENOMEM&&extra.destroy()==EINVAL);auto*returned=held.back()->get();assert(held.back()->destroy()==0);held.pop_back();assert(extra.init(&ma)==0&&extra.get()==returned);assert(extra.destroy()==0);for(auto&item:held)assert(item->destroy()==0);held.clear();
- MutexLease custom;assert(custom.init(&other)==ENOMEM); // A different attribute never borrows a configured mutex.
+ for(int i=0;i<mutex_capacity;++i){auto item=std::make_unique<MutexLease>();assert(item->init(&ma)==0);for(auto&other_item:held)assert(other_item->get()!=item->get());held.push_back(std::move(item));}
+ MutexLease extra;auto full=mutex_pool().stats();assert(full.initialized==mutex_capacity&&full.leased==mutex_capacity);assert(extra.init(&ma)==ENOMEM&&extra.destroy()==EINVAL);assert(seen_status==ENOMEM&&seen_leased==mutex_capacity&&seen_initialized==mutex_capacity&&seen_state==2&&seen_match==1&&seen_caller);auto*returned=held.back()->get();assert(held.back()->destroy()==0);held.pop_back();assert(extra.init(&ma)==0&&extra.get()==returned);assert(extra.destroy()==0);for(auto&item:held)assert(item->destroy()==0);held.clear();
+ MutexLease custom;assert(custom.init(&other)==ENOMEM);assert(seen_status==ENOMEM&&seen_leased==0&&seen_initialized==mutex_capacity&&seen_state==2&&seen_match==0&&seen_caller); // A different attribute never borrows a configured mutex.
  CondLease custom_cond;pthread_condattr_t different;pthread_condattr_init(&different);assert(custom_cond.init(&different)==ENOMEM);
  // Condition-pair syntax retains distinct relative/absolute resources.
  CondPair pair;assert(cond_init_at(pair,0,&ca)==0&&cond_init_at(pair,1,nullptr)==0);assert(&pair[0]!=&pair[1]);assert(cond_destroy_at(pair,0)==0&&cond_destroy_at(pair,1)==0);
@@ -57,11 +66,11 @@ int main(){
  for(auto&s:relative_pool().slots){assert(s.initialized&&!s.busy);assert(pthread_cond_destroy(&s.native)==0);}
  for(auto&s:absolute_pool().slots){assert(s.initialized&&!s.busy);assert(pthread_cond_destroy(&s.native)==0);}
  pthread_condattr_destroy(&different);pthread_condattr_destroy(&ca);pthread_mutexattr_destroy(&ma);pthread_mutexattr_destroy(&other);
- puts("PASS: real pooled mutex/cond objects, late init ENOMEM, no handle copying, lock/busy and wait/signal/timeout behavior, exact attrs,512-slot exhaustion/reuse,8000 concurrent lease lifetimes and complete native teardown");
+ puts("PASS: real pooled mutex/cond objects, late init ENOMEM, no handle copying, lock/busy and wait/signal/timeout behavior, exact attrs,4096-slot exhaustion/reuse,8000 concurrent lease lifetimes and complete native teardown and distinct exhaustion/attribute-mismatch diagnostics");
 }
 '''
 p=W/'test.cpp';p.write_text(cpp)
-subprocess.run(['/usr/bin/clang++','-std=c++17','-O1','-g','-fsanitize=address,undefined','-pthread','-I',str(R/'.tools/java25/openjdk/src/hotspot/share'),str(p),'-o',str(W/'test')],check=True)
+subprocess.run(['/usr/bin/clang++','-std=c++17','-O1','-g','-fsanitize=address,undefined','-pthread','-I',str(W),'-I',str(R/'.tools/java25/openjdk/src/hotspot/share'),str(p),'-o',str(W/'test')],check=True)
 subprocess.run([str(W/'test')],check=True)
 source=W/'target.cpp';source.write_text('#include "runtime/ps5Synchronization.hpp"\nextern "C" int probe(){ps5_sync::MutexLease m;return m.init(nullptr);}\n')
 env=os.environ.copy();env.setdefault('LLVM_CONFIG','/opt/homebrew/opt/llvm/bin/llvm-config')
