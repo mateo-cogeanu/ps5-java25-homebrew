@@ -25,7 +25,7 @@
      previous[i] = 0;
 +  }
 +  unsigned interval=__atomic_load_n(ps5_vm_metadata_interval(),__ATOMIC_ACQUIRE);
-+  if (context != nullptr && interval > 1 &&
++  if (context != nullptr && !ps5_vm_signal_trace_active() && interval > 1 &&
 +      (::strncmp(stage,"ENTER: Metadata ",16)==0 || ::strncmp(stage,"DONE: Metadata ",15)==0) &&
 +      ++context->metadata_events % interval != 0) {
 +    errno=saved_errno;

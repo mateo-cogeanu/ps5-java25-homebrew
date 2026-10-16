@@ -70,9 +70,11 @@ int main() {
  for(int i=0;i<400;++i){ps5_vm_trace("ENTER: Metadata arena allocation");assert(errno==EBUSY);}
  assert(open_calls-before_sample==6);
  assert(std::string(ps5_vm_last_stage())=="ENTER: Metadata arena allocation");
+ ps5_vm_signal_trace_active()=true;ps5_vm_trace(ps5_vm_last_stage());ps5_vm_signal_trace_active()=false;
+ assert(open_calls-before_sample==7);
  ps5_vm_trace("FAIL: Metadata arena allocation");
  ps5_vm_trace("THREAD: lifecycle retained");
- assert(open_calls-before_sample==8);
- ps5_vm_set_metadata_interval(0);ps5_vm_trace("DONE: Metadata zeroing");assert(open_calls-before_sample==9);
+ assert(open_calls-before_sample==9);
+ ps5_vm_set_metadata_interval(0);ps5_vm_trace("DONE: Metadata zeroing");assert(open_calls-before_sample==10);
  std::puts("Startup trace helper PASS: EINTR, partial writes, append, denied open, memory fields, fault hex formatting, errno preservation, bounded metadata sampling with current last-stage context, unsampled failure/thread lines");
 }
