@@ -8,6 +8,7 @@ inline void ps5_vm_trace(const char*){++notes;}
 inline void ps5_vm_trace_values(const char* op,unsigned long long status,const char*,unsigned long long,const char*,unsigned long long){last_op=op;last_status=status;}
 ''')
 s=(R/'.tools/java25/openjdk/src/hotspot/os/posix/os_posix.cpp').read_text();a=s.index('PlatformEvent::PlatformEvent()');b=s.index('\nvoid PlatformEvent::park()',a);ctor=s[a:b]
+assert 'PlatformMutex::PlatformMutex() {\n  int status = ps5_sync::mutex_init(&_mutex, _mutexAttr);\n  PS5_PTHREAD_CHECK(status == 0, status, "monitor mutex_init");' in s
 p=W/'test.cpp';p.write_text(r'''
 #undef NDEBUG
 #include <cassert>
