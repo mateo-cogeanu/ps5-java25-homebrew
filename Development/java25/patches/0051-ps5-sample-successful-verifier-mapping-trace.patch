@@ -1,0 +1,25 @@
+--- a/src/java.base/share/native/libverify/ps5_verify_alloc.h
++++ b/src/java.base/share/native/libverify/ps5_verify_alloc.h
+@@ -11,6 +11,8 @@
+ /* Every allocation remains inside check_code.c and uses matching cleanup,
+  * including class hashes, names, constants and the longjmp cleanup stack. */
+ typedef union { size_t mapped; max_align_t alignment; } VerifyNativeHeader;
++/* Process-wide sampling avoids C TLS or allocator-dependent initialization. */
++static unsigned long long verify_native_map_successes;
+ static void *verify_native_allocate(size_t size) {
+     int saved_errno = errno;
+     if (size > SIZE_MAX - sizeof(VerifyNativeHeader)) { errno = ENOMEM; return NULL; }
+@@ -25,8 +27,11 @@
+         size_t mapped = ((bytes + (size_t)page - 1) / (size_t)page) * (size_t)page;
+         void *memory = mmap(NULL, mapped, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+         int error = memory == MAP_FAILED ? errno : 0;
+-        jio_fprintf(stderr, "PS5 verifier native: bytes=%zu malloc_errno=%d mapped_bytes=%zu mmap_errno=%d\n",
+-                    size, heap_error, memory == MAP_FAILED ? 0 : mapped, error);
++        unsigned long long events = memory == MAP_FAILED ? 0 :
++            __atomic_add_fetch(&verify_native_map_successes, 1, __ATOMIC_RELAXED);
++        if (memory == MAP_FAILED || events <= 8 || events % 1024 == 0)
++            jio_fprintf(stderr, "PS5 verifier native: bytes=%zu malloc_errno=%d mapped_bytes=%zu mmap_errno=%d success_events=%llu\n",
++                        size, heap_error, memory == MAP_FAILED ? 0 : mapped, error, events);
+         if (memory == MAP_FAILED) { errno = error; return NULL; }
+         header = memory; header->mapped = mapped;
+     }

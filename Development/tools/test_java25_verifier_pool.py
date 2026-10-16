@@ -18,7 +18,9 @@ prefix=r'''
 #include <errno.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#define jio_fprintf fprintf
+static unsigned note_count;
+static int test_note(FILE *f,const char *format,...){(void)f;(void)format;++note_count;return 0;}
+#define jio_fprintf test_note
 typedef int jboolean;
 typedef struct CCpool CCpool;
 typedef struct {CCpool *CCroot,*CCcurrent;int CCfree_size;char *CCfree_ptr;} context_type;
@@ -66,6 +68,12 @@ int main(){
  // Real mmap must supply writable memory when libc refuses every block.
  deny_heap=1;CCinit(&c);CCalloc(&c,80000,1);CCalloc(&c,32,0);
  assert(mappings>=2);CCreinit(&c);assert(mappings==1);CCdestroy(&c);assert(mappings==0);
+ // Successful mappings are sampled, while mmap failures always log.
+ __atomic_store_n(&verify_native_map_successes,0,__ATOMIC_RELAXED);unsigned notes_before=note_count;
+ for(int i=0;i<1200;++i){errno=EBUSY;void *p=malloc(17);assert(p&&errno==EBUSY);free(p);assert(errno==EBUSY);}
+ assert(mappings==0&&note_count-notes_before==9);deny_map=1;
+ assert(malloc(17)==NULL&&errno==ENOMEM);assert(note_count-notes_before==10);
+ deny_map=0;
  // Exhaustion of both real allocation backends still propagates OOM safely.
  deny_map=1;expected_oom=1;
  if(!setjmp(exhausted)){CCinit(&c);assert(!"expected real OOM");}
