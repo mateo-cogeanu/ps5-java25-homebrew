@@ -9,6 +9,7 @@
 #include <thread>
 #include <signal.h>
 #include <sys/stat.h>
+#include <csetjmp>
 static int test_trace_open(const char*,int flags,int mode) {
  return ::open("build/java25/native-call-test.log",flags,mode);
 }
@@ -22,7 +23,12 @@ static void observe_signal(int) {
  auto &record=ps5_vm_native_call_record();
  saw_active_call=record.caller!=0 && !record.completed && record.bytes==987 && record.operation!=nullptr;
 }
+static std::jmp_buf termination_jump;
+static volatile int termination_kind=0, termination_status=0, termination_errno=0;
 extern "C" {
+__attribute__((noreturn)) void __real_abort(){termination_kind=1;termination_errno=errno;std::longjmp(termination_jump,1);}
+__attribute__((noreturn)) void __real_exit(int status){termination_kind=2;termination_status=status;termination_errno=errno;std::longjmp(termination_jump,1);}
+__attribute__((noreturn)) void __real__exit(int status){termination_kind=3;termination_status=status;termination_errno=errno;std::longjmp(termination_jump,1);}
 void* __real_memcpy(void* a,const void* b,size_t n){return std::memcpy(a,b,n);}
 void* __real_memmove(void* a,const void* b,size_t n){return std::memmove(a,b,n);}
 int __real_memcmp(const void* a,const void* b,size_t n){return std::memcmp(a,b,n);}
@@ -108,10 +114,24 @@ int main() {
  assert(__wrap_strlen("logging")==7);
  assert(record.caller==ps5_vm_native_call_record().caller);
  ps5_vm_trace_io_active()=false;ps5_native_trace::disable();
+ // The mocks intercept delegation only; wrapper logging runs in full.
+ errno=EBUSY;
+ if(!setjmp(termination_jump))__wrap_abort();
+ assert(termination_kind==1&&termination_errno==EBUSY);
+ if(!setjmp(termination_jump))__wrap_exit(23);
+ assert(termination_kind==2&&termination_status==23&&termination_errno==EBUSY);
+ if(!setjmp(termination_jump))__wrap__exit(47);
+ assert(termination_kind==3&&termination_status==47&&termination_errno==EBUSY);
+ assert(!ps5_vm_trace_io_active());
  std::ifstream file("build/java25/native-call-test.log");std::string text((std::istreambuf_iterator<char>(file)),{});
  for(const char* name:{"memcpy","memmove","memcmp","strcmp","strlen","memset","strncmp","strncpy","strchr","memchr","strcpy","malloc","calloc","realloc","free","strdup"}) {
   assert(text.find(std::string("CALL: ")+name+" caller=")!=std::string::npos);
  }
+ for(const char* name:{"abort","exit","_exit"}) assert(text.find(std::string("NATIVE TERMINATION: ")+name+" caller=")!=std::string::npos);
+ // A termination originating during trace IO must delegate without recursion.
+ ps5_vm_trace_io_active()=true;
+ if(!setjmp(termination_jump))__wrap_abort();
+ assert(termination_kind==1);ps5_vm_trace_io_active()=false;
  assert(text.find(" src=0x")!=std::string::npos&&text.find(" dst=0x")!=std::string::npos);
  // Fill the actual bounded table with synthetic identities; no allocations,
  // no eviction of the live main thread and explicit exhaustion handling.

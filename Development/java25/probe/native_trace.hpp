@@ -27,7 +27,24 @@ inline void end(bool traced) {
  if(traced) {ps5_vm_native_trace_busy()=true;ps5_vm_native_call_record().completed=true;if(verbose.load())ps5_vm_trace("DONE: Traced native memory/string call");ps5_vm_native_trace_busy()=false;}
 }
 }
+// Native runtime termination can bypass the JNI abort/vfprintf callbacks.
+// Capture its direct caller and previous call context, then preserve semantics.
+namespace ps5_native_trace {
+inline void termination(const char* kind,const void* caller,int status) {
+ if(ps5_vm_trace_io_active()) return; // Do not recurse if logging itself terminates.
+ Ps5TraceIOScope io_scope;
+ const Ps5NativeCallRecord previous=ps5_vm_native_call_record();
+ ps5_vm_trace(ps5_vm_last_stage());
+ ps5_vm_trace_values(kind,(uintptr_t)caller," self=",(uintptr_t)pthread_self()," status=",(unsigned int)status);
+ ps5_vm_trace_values("NATIVE TERMINATION: anchor=",(uintptr_t)&termination," previous caller=",previous.caller," completed=",previous.completed ? 1 : 0);
+ ps5_vm_trace_values(previous.operation ? previous.operation : "CALL: unavailable caller=",previous.caller," src=",previous.source," dst=",previous.destination);
+ ps5_vm_trace_hex("NATIVE TERMINATION: previous bytes=",previous.bytes);
+}
+}
 extern "C" {
+__attribute__((noreturn)) void __real_abort();
+__attribute__((noreturn)) void __real_exit(int);
+__attribute__((noreturn)) void __real__exit(int);
 void* __real_memcpy(void*,const void*,size_t);
 void* __real_memmove(void*,const void*,size_t);
 int __real_memcmp(const void*,const void*,size_t);
@@ -44,6 +61,18 @@ char* __real_strcpy(char*,const char*);
 char* __real_strdup(const char*);
 char* __real_strchr(const char*,int);
 void* __real_memchr(const void*,int,size_t);
+__attribute__((noinline,noreturn)) void __wrap_abort() {
+ ps5_native_trace::termination("NATIVE TERMINATION: abort caller=",__builtin_return_address(0),0);
+ __real_abort();
+}
+__attribute__((noinline,noreturn)) void __wrap_exit(int status) {
+ ps5_native_trace::termination("NATIVE TERMINATION: exit caller=",__builtin_return_address(0),status);
+ __real_exit(status);
+}
+__attribute__((noinline,noreturn)) void __wrap__exit(int status) {
+ ps5_native_trace::termination("NATIVE TERMINATION: _exit caller=",__builtin_return_address(0),status);
+ __real__exit(status);
+}
 __attribute__((noinline)) void* __wrap_memcpy(void* to,const void* from,size_t count) {
  bool traced=ps5_native_trace::begin("CALL: memcpy caller=",__builtin_return_address(0),from,to,count);
  void* result=__real_memcpy(to,from,count);ps5_native_trace::end(traced);return result;
