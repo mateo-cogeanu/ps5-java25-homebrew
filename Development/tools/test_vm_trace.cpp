@@ -12,7 +12,9 @@
 #include <string>
 static bool interrupt_once=true;
 static bool deny_open=false;
+static unsigned open_calls=0;
 static int trace_open(const char *,int flags,int mode) {
+ ++open_calls;
  if(deny_open) {errno=EACCES;return -1;}
  return ::open("build/java25/trace-helper-test.log",flags,mode);
 }
@@ -63,5 +65,14 @@ int main() {
  std::string long_label(200,'x');
  ps5_vm_trace_values(long_label.c_str(),1,long_label.c_str(),2,long_label.c_str(),3);
  assert(errno==EBUSY);
- std::puts("Startup trace helper PASS: EINTR, partial writes, append, denied open, memory fields, fault hex formatting, errno preservation");
+ ps5_vm_set_metadata_interval(64);
+ unsigned before_sample=open_calls;
+ for(int i=0;i<400;++i){ps5_vm_trace("ENTER: Metadata arena allocation");assert(errno==EBUSY);}
+ assert(open_calls-before_sample==6);
+ assert(std::string(ps5_vm_last_stage())=="ENTER: Metadata arena allocation");
+ ps5_vm_trace("FAIL: Metadata arena allocation");
+ ps5_vm_trace("THREAD: lifecycle retained");
+ assert(open_calls-before_sample==8);
+ ps5_vm_set_metadata_interval(0);ps5_vm_trace("DONE: Metadata zeroing");assert(open_calls-before_sample==9);
+ std::puts("Startup trace helper PASS: EINTR, partial writes, append, denied open, memory fields, fault hex formatting, errno preservation, bounded metadata sampling with current last-stage context, unsampled failure/thread lines");
 }

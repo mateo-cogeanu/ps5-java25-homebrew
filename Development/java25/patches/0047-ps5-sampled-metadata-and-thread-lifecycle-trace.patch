@@ -1,0 +1,131 @@
+--- a/src/hotspot/share/runtime/ps5StartupTrace.hpp
++++ b/src/hotspot/share/runtime/ps5StartupTrace.hpp
+@@ -25,6 +25,7 @@
+   bool signal_active, io_active, busy;
+   Ps5NativeCallRecord record;
+   char stage[144];
++  unsigned long long metadata_events;
+ };
+ inline Ps5TraceThreadContext* ps5_vm_context_for_key(uintptr_t key) {
+   static Ps5TraceThreadContext slots[1024] = {};
+@@ -80,6 +81,10 @@
+   if (!context) return "Trace thread table exhausted; call context unavailable";
+   return context->stage[0] ? context->stage : "No startup stage recorded";
+ }
++inline unsigned* ps5_vm_metadata_interval() { static unsigned value=0; return &value; }
++inline void ps5_vm_set_metadata_interval(unsigned interval) {
++  __atomic_store_n(ps5_vm_metadata_interval(), interval, __ATOMIC_RELEASE);
++}
+ inline void ps5_vm_trace(const char *stage) {
+   Ps5TraceIOScope io_scope;
+   int saved_errno = errno;
+@@ -90,6 +95,13 @@
+     size_t i = 0;
+     for (; stage[i] && i < 143; ++i) previous[i] = stage[i];
+     previous[i] = 0;
++  }
++  unsigned interval=__atomic_load_n(ps5_vm_metadata_interval(),__ATOMIC_ACQUIRE);
++  if (context != nullptr && interval > 1 &&
++      (::strncmp(stage,"ENTER: Metadata ",16)==0 || ::strncmp(stage,"DONE: Metadata ",15)==0) &&
++      ++context->metadata_events % interval != 0) {
++    errno=saved_errno;
++    return; // Last-stage context above remains current even when disk IO is sampled.
+   }
+   int fd = ::open("/download0/java25-vm-trace.log", O_CREAT | O_WRONLY | O_APPEND, 0600);
+   if (fd < 0) { errno = saved_errno; return; }
+@@ -142,6 +154,7 @@
+   errno = saved_errno;
+ }
+ #else
++inline void ps5_vm_set_metadata_interval(unsigned) {}
+ inline void ps5_vm_trace_hex(const char *, unsigned long long) {}
+ inline void ps5_vm_trace_values(const char *, unsigned long long, const char *, unsigned long long, const char *, unsigned long long) {}
+ inline void ps5_vm_trace_memory(const char *, const void *, size_t, int, int) {}
+--- a/src/hotspot/share/memory/metaspace.cpp
++++ b/src/hotspot/share/memory/metaspace.cpp
+@@ -884,7 +884,7 @@
+   // Try to allocate metadata.
+   ps5_vm_trace("ENTER: Metadata arena allocation");
+   MetaWord* result = loader_data->metaspace_non_null()->allocate(word_size, mdtype);
+-  ps5_vm_trace_memory("DONE: Metadata arena allocation", result, word_size * BytesPerWord, mdtype, 0);
++  ps5_vm_trace_memory(result == nullptr ? "FAIL: Metadata arena allocation" : "DONE: Metadata arena allocation", result, word_size * BytesPerWord, mdtype, 0);
+ 
+   if (result != nullptr) {
+ #ifdef ASSERT
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -711,9 +711,15 @@
+ 
+ // Thread start routine for all newly created threads
+ static void *thread_native_entry(Thread *thread) {
++#ifdef __PROSPERO__
++  ps5_vm_trace_values("THREAD: native entry: self=",(uintptr_t)pthread_self()," object=",(uintptr_t)thread," phase=",1);
++#endif
+ 
+   thread->record_stack_base_and_size();
+   thread->initialize_thread_current();
++#ifdef __PROSPERO__
++  ps5_vm_trace_values("THREAD: current initialized: self=",(uintptr_t)pthread_self()," object=",(uintptr_t)thread," phase=",2);
++#endif
+ 
+   OSThread* osthread = thread->osthread();
+   Monitor* sync = osthread->startThread_lock();
+@@ -738,6 +744,9 @@
+   }
+ #endif
+ 
++#ifdef __PROSPERO__
++  ps5_vm_trace_values("THREAD: before handshake: self=",(uintptr_t)pthread_self()," object=",(uintptr_t)thread," phase=",3);
++#endif
+   // handshaking with parent thread
+   {
+     MutexLocker ml(sync, Mutex::_no_safepoint_check_flag);
+@@ -755,8 +764,14 @@
+   log_info(os, thread)("Thread is alive (tid: %zu, pthread id: %zu).",
+     os::current_thread_id(), (uintx) pthread_self());
+ 
++#ifdef __PROSPERO__
++  ps5_vm_trace_values("THREAD: before Java run: self=",(uintptr_t)pthread_self()," object=",(uintptr_t)thread," phase=",4);
++#endif
+   // call one more level start routine
+   thread->call_run();
++#ifdef __PROSPERO__
++  ps5_vm_trace_values("THREAD: run returned: self=",(uintptr_t)pthread_self()," object=",(uintptr_t)thread," phase=",5);
++#endif
+ 
+   // Note: at this point the thread object may already have deleted itself.
+   // Prevent dereferencing it from here on out.
+@@ -776,6 +791,9 @@
+                        size_t req_stack_size) {
+   assert(thread->osthread() == nullptr, "caller responsible");
+ 
++#ifdef __PROSPERO__
++  ps5_vm_trace_values("THREAD: create requested: creator=",(uintptr_t)pthread_self()," object=",(uintptr_t)thread," type=",thr_type);
++#endif
+   // Allocate the OSThread object
+   OSThread* osthread = new (std::nothrow) OSThread();
+   if (osthread == nullptr) {
+@@ -808,6 +826,9 @@
+     delete osthread;
+     return false;
+   }
++#ifdef __PROSPERO__
++  ps5_vm_trace_values("THREAD: attributes acquired: creator=",(uintptr_t)pthread_self()," object=",(uintptr_t)thread," attr=",(uintptr_t)attr);
++#endif
+   pthread_attr_setdetachstate(attr, PTHREAD_CREATE_DETACHED);
+ 
+   // calculate stack size if it's not specified by caller
+@@ -838,7 +859,13 @@
+     int trials_remaining = 4;
+     useconds_t next_delay = 1000;
+     while (true) {
++#ifdef __PROSPERO__
++      ps5_vm_trace_values("THREAD: before pthread_create: creator=",(uintptr_t)pthread_self()," object=",(uintptr_t)thread," stack=",stack_size);
++#endif
+       ret = pthread_create(&tid, attr, (void* (*)(void*)) thread_native_entry, thread);
++#ifdef __PROSPERO__
++      ps5_vm_trace_values("THREAD: pthread_create returned: object=",(uintptr_t)thread," result=",ret," child=",ret == 0 ? (uintptr_t)tid : 0);
++#endif
+ #ifdef __PROSPERO__
+       if (ret != 0) ps5_vm_trace_values("PS5 pthread create failed: result=", ret, " stack_bytes=", stack_size, " errno=", errno);
+ #endif
