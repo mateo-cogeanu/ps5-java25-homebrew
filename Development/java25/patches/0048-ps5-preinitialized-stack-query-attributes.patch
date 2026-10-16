@@ -1,0 +1,182 @@
+--- a/src/hotspot/share/runtime/ps5ThreadAttributes.hpp
++++ b/src/hotspot/share/runtime/ps5ThreadAttributes.hpp
+@@ -10,9 +10,9 @@
+ namespace ps5_thread_attributes {
+ constexpr unsigned capacity = 32;
+ struct Slot { pthread_attr_t value; bool valid, busy; };
+-inline Slot* slots() { static Slot values[capacity] = {}; return values; }
+-inline unsigned* state() { static unsigned value = 0; return &value; }
+-inline unsigned* lock_word() { static unsigned value = 0; return &value; }
++template<bool Query=false> inline Slot* slots() { static Slot values[capacity] = {}; return values; }
++template<bool Query=false> inline unsigned* state() { static unsigned value = 0; return &value; }
++template<bool Query=false> inline unsigned* lock_word() { static unsigned value = 0; return &value; }
+ inline void pause() {
+ #if defined(__x86_64__)
+     __asm__ volatile("pause");
+@@ -20,31 +20,34 @@
+     __asm__ volatile("yield");
+ #endif
+ }
+-inline void lock() { while (__atomic_exchange_n(lock_word(),1u,__ATOMIC_ACQUIRE)) pause(); }
+-inline void unlock() { __atomic_store_n(lock_word(),0u,__ATOMIC_RELEASE); }
+-inline void initialize() {
++template<bool Query=false> inline void lock() { while (__atomic_exchange_n(lock_word<Query>(),1u,__ATOMIC_ACQUIRE)) pause(); }
++template<bool Query=false> inline void unlock() { __atomic_store_n(lock_word<Query>(),0u,__ATOMIC_RELEASE); }
++template<bool Query> inline void initialize_pool() {
+     unsigned expected = 0;
+-    if (__atomic_compare_exchange_n(state(),&expected,1u,false,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE)) {
+-        for (unsigned i=0;i<capacity;++i) slots()[i].valid = pthread_attr_init(&slots()[i].value) == 0;
+-        __atomic_store_n(state(),2u,__ATOMIC_RELEASE);
+-    } else while (__atomic_load_n(state(),__ATOMIC_ACQUIRE) != 2u) pause();
++    if (__atomic_compare_exchange_n(state<Query>(),&expected,1u,false,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE)) {
++        for (unsigned i=0;i<capacity;++i) slots<Query>()[i].valid = pthread_attr_init(&slots<Query>()[i].value) == 0;
++        __atomic_store_n(state<Query>(),2u,__ATOMIC_RELEASE);
++    } else while (__atomic_load_n(state<Query>(),__ATOMIC_ACQUIRE) != 2u) pause();
+ }
+-class Lease {
++// Stack-query attributes must never be reused for creation: get_np may set
++// an explicit live stack address in the opaque object. Prime both domains early.
++inline void initialize() { initialize_pool<false>(); initialize_pool<true>(); }
++template<bool Query> class BasicLease {
+     Slot* slot = nullptr;
+     pthread_attr_t local;
+     bool local_valid = false;
+ public:
+     pthread_attr_t* value = nullptr;
+-    Lease() = default;
+-    Lease(const Lease&) = delete;
+-    Lease& operator=(const Lease&) = delete;
++    BasicLease() = default;
++    BasicLease(const BasicLease&) = delete;
++    BasicLease& operator=(const BasicLease&) = delete;
+     int acquire() {
+         initialize();
+-        lock();
+-        for (unsigned i=0;i<capacity;++i) if (slots()[i].valid && !slots()[i].busy) {
+-            slot=&slots()[i]; slot->busy=true; value=&slot->value; break;
++        lock<Query>();
++        for (unsigned i=0;i<capacity;++i) if (slots<Query>()[i].valid && !slots<Query>()[i].busy) {
++            slot=&slots<Query>()[i]; slot->busy=true; value=&slot->value; break;
+         }
+-        unlock();
++        unlock<Query>();
+         if (slot != nullptr) return 0;
+         int result=pthread_attr_init(&local);
+         if (result == 0) { local_valid=true; value=&local; }
+@@ -52,11 +55,13 @@
+     }
+     void release() {
+         int saved_errno=errno;
+-        if (slot != nullptr) { lock(); slot->busy=false; unlock(); slot=nullptr; }
++        if (slot != nullptr) { lock<Query>(); slot->busy=false; unlock<Query>(); slot=nullptr; }
+         if (local_valid) { pthread_attr_destroy(&local); local_valid=false; }
+         value=nullptr; errno=saved_errno;
+     }
+-    ~Lease() { release(); }
++    ~BasicLease() { release(); }
+ };
++using Lease = BasicLease<false>;
++using QueryLease = BasicLease<true>;
+ }
+ #endif
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -709,6 +709,10 @@
+ objc_registerThreadWithCollector_t objc_registerThreadWithCollectorFunction = nullptr;
+ #endif
+ 
++#ifdef __PROSPERO__
++#include "runtime/ps5ThreadAttributes.hpp"
++#endif
++
+ // Thread start routine for all newly created threads
+ static void *thread_native_entry(Thread *thread) {
+ #ifdef __PROSPERO__
+@@ -716,6 +720,9 @@
+ #endif
+ 
+   thread->record_stack_base_and_size();
++#ifdef __PROSPERO__
++  ps5_vm_trace_values("THREAD: stack recorded: self=",(uintptr_t)pthread_self()," base=",(uintptr_t)thread->stack_base()," bytes=",thread->stack_size());
++#endif
+   thread->initialize_thread_current();
+ #ifdef __PROSPERO__
+   ps5_vm_trace_values("THREAD: current initialized: self=",(uintptr_t)pthread_self()," object=",(uintptr_t)thread," phase=",2);
+@@ -3077,27 +3084,38 @@
+   *size = ss.ss_size;
+   bottom = *base - *size;
+ #else
+-  pthread_attr_t attr;
+-
+-  int rslt = pthread_attr_init(&attr);
++#ifdef __PROSPERO__
++  ps5_thread_attributes::QueryLease query;
++  int rslt = query.acquire();
++  pthread_attr_t* attr = query.value;
++  ps5_vm_trace_values("THREAD: stack query attributes: self=",(uintptr_t)pthread_self()," result=",rslt," attr=",(uintptr_t)attr);
++#else
++  pthread_attr_t storage;
++  pthread_attr_t* attr = &storage;
++  int rslt = pthread_attr_init(attr);
++#endif
+ 
+   // JVM needs to know exact stack location, abort if it fails
+   if (rslt != 0)
+     fatal("pthread_attr_init failed with error = %d", rslt);
+ 
+-  rslt = pthread_attr_get_np(pthread_self(), &attr);
++  rslt = pthread_attr_get_np(pthread_self(), attr);
+ 
+   if (rslt != 0)
+     fatal("pthread_attr_get_np failed with error = %d", rslt);
+ 
+-  if (pthread_attr_getstackaddr(&attr, (void **)&bottom) != 0 ||
+-      pthread_attr_getstacksize(&attr, size) != 0) {
++  if (pthread_attr_getstackaddr(attr, (void **)&bottom) != 0 ||
++      pthread_attr_getstacksize(attr, size) != 0) {
+     fatal("Can not locate current stack attributes!");
+   }
+ 
+   *base = bottom + *size;
+ 
+-  pthread_attr_destroy(&attr);
++#ifdef __PROSPERO__
++  query.release();
++#else
++  pthread_attr_destroy(attr);
++#endif
+ #endif
+   assert(os::current_stack_pointer() >= bottom &&
+          os::current_stack_pointer() < *base, "just checking");
+--- a/src/hotspot/share/runtime/thread.cpp
++++ b/src/hotspot/share/runtime/thread.cpp
+@@ -52,6 +52,10 @@
+ #include "jfr/jfr.hpp"
+ #endif
+ 
++#ifdef __PROSPERO__
++#include "runtime/ps5StartupTrace.hpp"
++#endif
++
+ THREAD_LOCAL Thread* Thread::_thr_current = nullptr;
+ 
+ // ======= Thread ========
+@@ -175,9 +179,18 @@
+ 
+ void Thread::initialize_thread_current() {
+   assert(_thr_current == nullptr, "Thread::current already initialized");
++#ifdef __PROSPERO__
++  ps5_vm_trace("THREAD: before compiler TLS assignment");
++#endif
+   _thr_current = this;
++#ifdef __PROSPERO__
++  ps5_vm_trace("THREAD: compiler TLS assigned");
++#endif
+   assert(ThreadLocalStorage::thread() == nullptr, "ThreadLocalStorage::thread already initialized");
+   ThreadLocalStorage::set_thread(this);
++#ifdef __PROSPERO__
++  ps5_vm_trace("THREAD: pthread TLS assigned");
++#endif
+   assert(Thread::current() == ThreadLocalStorage::thread(), "TLS mismatch!");
+ }
+ 
