@@ -1,9 +1,20 @@
 --- a/src/hotspot/share/memory/memoryReserver.cpp
 +++ b/src/hotspot/share/memory/memoryReserver.cpp
-@@ -106,6 +106,27 @@
+@@ -30,6 +30,9 @@
+ #include "runtime/globals_extension.hpp"
+ #include "runtime/java.hpp"
+ #include "runtime/os.inline.hpp"
++#ifdef __PROSPERO__
++#include "runtime/ps5StartupTrace.hpp"
++#endif
+ #include "utilities/formatBuffer.hpp"
+ #include "utilities/globalDefinitions.hpp"
+ #include "utilities/powerOfTwo.hpp"
+@@ -105,6 +108,27 @@
+   if (!os::release_memory(base, size)) {
      fatal("os::release_memory failed");
    }
- 
++
 +#ifdef __PROSPERO__
 +  // Over-reserving size+alignment can exceed the title's available native
 +  // memory even when an exact-size reservation succeeded above. Try nearby
@@ -24,7 +35,6 @@
 +    }
 +  }
 +#endif
-+
+ 
    // Map using the requested alignment.
    return os::reserve_memory_aligned(size, alignment, mem_tag, exec);
- }
