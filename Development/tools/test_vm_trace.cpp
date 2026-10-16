@@ -76,5 +76,15 @@ int main() {
  ps5_vm_trace("THREAD: lifecycle retained");
  assert(open_calls-before_sample==9);
  ps5_vm_set_metadata_interval(0);ps5_vm_trace("DONE: Metadata zeroing");assert(open_calls-before_sample==10);
+ unsigned char raw[274]={};for(unsigned i=0;i<sizeof(raw);++i)raw[i]=(unsigned char)i;
+ unsigned before_raw=open_calls;
+ ps5_vm_trace_raw_context(raw+1,15);assert(open_calls==before_raw);
+ ps5_vm_trace_raw_context(raw+1,16);assert(open_calls==before_raw+1);
+ ps5_vm_trace_raw_context(raw+1,273);assert(open_calls==before_raw+17);
+ ps5_vm_trace_raw_context(nullptr,256);assert(open_calls==before_raw+17);
+ assert(errno==EBUSY);
+ std::ifstream raw_file("build/java25/trace-helper-test.log");
+ std::string raw_content((std::istreambuf_iterator<char>(raw_file)),{});
+ assert(raw_content.find("word0=0x0807060504030201 word1=0x100f0e0d0c0b0a09")!=std::string::npos);
  std::puts("Startup trace helper PASS: EINTR, partial writes, append, denied open, memory fields, fault hex formatting, errno preservation, bounded metadata sampling with current last-stage context, unsampled failure/thread lines");
 }

@@ -1,0 +1,166 @@
+--- a/src/hotspot/os/posix/threadLocalStorage_posix.cpp
++++ b/src/hotspot/os/posix/threadLocalStorage_posix.cpp
+@@ -25,6 +25,10 @@
+ #include "runtime/threadLocalStorage.hpp"
+ #include "utilities/debug.hpp"
+ #include <pthread.h>
++#ifdef __PROSPERO__
++#include "runtime/ps5ThreadLocal.hpp"
++#include "runtime/ps5StartupTrace.hpp"
++#endif
+ 
+ static pthread_key_t _thread_key;
+ static bool _initialized = false;
+@@ -36,6 +40,15 @@
+ // to null and we will not be called again. If detachCurrentThread is never
+ // called we could loop forever depending on the pthread implementation.
+ extern "C" void restore_thread_pointer(void* p) {
++#ifdef __PROSPERO__
++  void* override;
++  if (ps5_thread_local::get(&override)) {
++    // A failed native clear must not resurrect the detached/deleted Thread.
++    // POSIX has already cleared the key before invoking this destructor.
++    if (override == nullptr) { ps5_thread_local::clear_override(); return; }
++    p = override;
++  }
++#endif
+   ThreadLocalStorage::set_thread((Thread*) p);
+ }
+ 
+@@ -44,7 +57,11 @@
+   int rslt = pthread_key_create(&_thread_key, restore_thread_pointer);
+   // If this assert fails we will get a recursive assertion failure
+   // and not see the actual error message or get a hs_err file
++#ifdef __PROSPERO__
++  guarantee(rslt == 0, "pthread_key_create failed: %d", rslt);
++#else
+   assert_status(rslt == 0, rslt, "pthread_key_create");
++#endif
+   _initialized = true;
+ }
+ 
+@@ -59,11 +76,29 @@
+   // the initialization process, which is using Thread::current without
+   // checking TLS is initialized - see java.cpp vm_exit
+   assert(_initialized, "TLS not initialized yet!");
++#ifdef __PROSPERO__
++  void* fallback;
++  if (ps5_thread_local::get(&fallback)) return (Thread*)fallback;
++#endif
+   return (Thread*) pthread_getspecific(_thread_key); // may be null
+ }
+ 
+ void ThreadLocalStorage::set_thread(Thread* current) {
+   assert(_initialized, "TLS not initialized yet!");
+   int rslt = pthread_setspecific(_thread_key, current);
++#ifdef __PROSPERO__
++  void* observed = pthread_getspecific(_thread_key);
++  if (rslt != 0 || observed != current) {
++    // Product builds must not silently continue with a null/stale current
++    // thread. Keep native TLS as the normal path; only override failed updates.
++    bool stored = ps5_thread_local::set(current);
++    ps5_vm_trace_values("TLS: native key update refused: self=",(uintptr_t)pthread_self()," result=",rslt," fallback=",stored ? 1 : 0);
++    ps5_vm_trace_values("TLS: key update values: requested=",(uintptr_t)current," observed=",(uintptr_t)observed," key=",(uintptr_t)_thread_key);
++    guarantee(stored, "PS5 current-thread fallback table exhausted (pthread error %d)", rslt);
++  } else {
++    ps5_thread_local::clear_override();
++  }
++#else
+   assert_status(rslt == 0, rslt, "pthread_setspecific");
++#endif
+ }
+--- a/src/hotspot/share/runtime/ps5StartupTrace.hpp
++++ b/src/hotspot/share/runtime/ps5StartupTrace.hpp
+@@ -143,6 +143,20 @@
+   }
+   line[n] = 0; ps5_vm_trace(line);
+ }
++// Raw little-endian words preserve the signal ABI evidence without trusting
++// the SDK's register offsets. Bound reads to the supplied object and 256 bytes.
++inline void ps5_vm_trace_raw_context(const void* context, size_t bytes) {
++  if (!context) return;
++  const unsigned char* data=(const unsigned char*)context;
++  for (size_t offset=0; offset+16<=bytes && offset<256; offset+=16) {
++    unsigned long long a=0,b=0;
++    for (unsigned n=0;n<8;++n) {
++      a |= (unsigned long long)data[offset+n] << (n*8);
++      b |= (unsigned long long)data[offset+8+n] << (n*8);
++    }
++    ps5_vm_trace_values("SIGNAL: raw context offset=",offset," word0=",a," word1=",b);
++  }
++}
+ inline void ps5_vm_trace_memory(const char *operation, const void *address,
+                                 size_t bytes, int mode, int error) {
+   Ps5TraceIOScope io_scope;
+@@ -157,6 +171,7 @@
+ inline void ps5_vm_set_metadata_interval(unsigned) {}
+ inline void ps5_vm_trace_hex(const char *, unsigned long long) {}
+ inline void ps5_vm_trace_values(const char *, unsigned long long, const char *, unsigned long long, const char *, unsigned long long) {}
++inline void ps5_vm_trace_raw_context(const void*, size_t) {}
+ inline void ps5_vm_trace_memory(const char *, const void *, size_t, int, int) {}
+ inline void ps5_vm_trace(const char *) {}
+ #endif
+--- a/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
++++ b/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
+@@ -417,6 +417,8 @@
+     ps5_vm_trace_hex("SIGNAL: number=", (unsigned long long)sig);
+     ps5_vm_trace_hex("SIGNAL: pc=", uc ? (unsigned long long)os::Posix::ucontext_get_pc(uc) : 0);
+     ps5_vm_trace_hex("SIGNAL: fault address=", info ? (unsigned long long)info->si_addr : 0);
++    ps5_vm_trace_values("SIGNAL: native identity self=",(uintptr_t)pthread_self()," thread=",(uintptr_t)thread," context=",(uintptr_t)uc);
++    ps5_vm_trace_raw_context(uc, sizeof(ucontext_t));
+     const Ps5NativeCallRecord record = ps5_vm_native_call_record();
+     ps5_vm_trace_values(record.operation != nullptr ? record.operation : "CALL: unavailable caller=",
+                         record.caller, " src=", record.source, " dst=", record.destination);
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5ThreadLocal.hpp
+@@ -0,0 +1,50 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef PS5_THREAD_LOCAL_HPP
++#define PS5_THREAD_LOCAL_HPP
++#include <pthread.h>
++#include <stdint.h>
++// Bounded, allocation-free storage only when the native key setter refuses an
++// update. A null value is a real override (e.g. a refused detach/clear).
++// JNI clients must still detach before their native thread exits.
++namespace ps5_thread_local {
++constexpr unsigned capacity = 1024;
++struct Slot { uintptr_t owner, value; bool active; };
++inline Slot* slots() { static Slot table[capacity] = {}; return table; }
++inline Slot* find(bool create) {
++  uintptr_t key=(uintptr_t)pthread_self();
++  if (!key) return nullptr;
++  unsigned start=(unsigned)(key>>4)%capacity;
++  for(unsigned n=0;n<capacity;++n) {
++    Slot* slot=&slots()[(start+n)%capacity];
++    uintptr_t owner=__atomic_load_n(&slot->owner,__ATOMIC_ACQUIRE);
++    if(owner==key) return slot;
++    if(!create && owner==0) return nullptr;
++    if(create && owner==0) {
++      uintptr_t expected=0;
++      if(__atomic_compare_exchange_n(&slot->owner,&expected,key,false,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE) || expected==key) return slot;
++    }
++  }
++  return nullptr;
++}
++inline bool get(void** value) {
++  Slot* slot=find(false);
++  if(!slot || !__atomic_load_n(&slot->active,__ATOMIC_ACQUIRE)) return false;
++  *value=(void*)__atomic_load_n(&slot->value,__ATOMIC_ACQUIRE);return true;
++}
++inline bool set(void* value) {
++  Slot* slot=find(true);
++  if(!slot) return false;
++  __atomic_store_n(&slot->value,(uintptr_t)value,__ATOMIC_RELEASE);
++  __atomic_store_n(&slot->active,true,__ATOMIC_RELEASE);return true;
++}
++inline void clear_override() {
++  Slot* slot=find(false);
++  if(slot) {
++    __atomic_store_n(&slot->active,false,__ATOMIC_RELEASE);
++    __atomic_store_n(&slot->value,(uintptr_t)0,__ATOMIC_RELEASE);
++    // Retain the identity so lookups may stop at the first never-used slot.
++    // At most 1024 distinct identities may require fallback in one process.
++  }
++}
++}
++#endif
