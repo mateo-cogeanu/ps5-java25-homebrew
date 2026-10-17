@@ -1,0 +1,135 @@
+--- a/src/java.base/unix/native/libnio/fs/ps5Directory.h
++++ b/src/java.base/unix/native/libnio/fs/ps5Directory.h
+@@ -9,13 +9,17 @@
+ #include <unistd.h>
+ #include <sys/mman.h>
+ /* libkernel export, not the SDK's desktop syscall wrapper. */
++#ifndef PS5_DIRECTORY_NOTE
++#define PS5_DIRECTORY_NOTE(phase) ((void)0)
++#endif
++#define PS5_DIRECTORY_BUFFER_SIZE 65536
+ extern int sceKernelGetdents(int,void*,int);
+ extern int sceKernelGetdirentries(int,void*,int,long*);
+ typedef struct {
+     int fd, failure, alternate, delivered;
+     long position;
+     size_t cursor, used;
+-    unsigned char data[32768];
++    unsigned char* data;
+     char name[256];
+ } Ps5Directory;
+ static int ps5_directory_errno(int result) {
+@@ -28,6 +32,8 @@
+     if(fd<0)return NULL;
+     Ps5Directory*d=mmap(NULL,sizeof(*d),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+     if(d==MAP_FAILED){int error=errno;close(fd);errno=error;return NULL;}
++    d->data=mmap(NULL,PS5_DIRECTORY_BUFFER_SIZE,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
++    if(d->data==MAP_FAILED){int error=errno;munmap(d,sizeof(*d));close(fd);errno=error;return NULL;}
+     d->fd=fd;d->failure=0;d->alternate=d->delivered=0;d->position=0;d->cursor=d->used=0;return d;
+ }
+ static const char* ps5_directory_read(Ps5Directory*d) {
+@@ -35,21 +41,21 @@
+     for(;;){
+         if(d->cursor==d->used){
+             int count;
+-            do{errno=0;count=d->alternate?sceKernelGetdirentries(d->fd,d->data,sizeof(d->data),&d->position):sceKernelGetdents(d->fd,d->data,sizeof(d->data));
++            do{PS5_DIRECTORY_NOTE(d->alternate?"directory getdirentries enter":"directory getdents enter");errno=0;count=d->alternate?sceKernelGetdirentries(d->fd,d->data,PS5_DIRECTORY_BUFFER_SIZE,&d->position):sceKernelGetdents(d->fd,d->data,PS5_DIRECTORY_BUFFER_SIZE);
+                 // Only before any record is delivered: retry the alternate
+                 // resident ABI after unsupported getdents, without duplicates.
+                 if(count<0&&!d->alternate&&!d->delivered){
+                     int error=ps5_directory_errno(count);
+                     if((error==EINVAL||error==ENOSYS)&&lseek(d->fd,0,SEEK_SET)>=0){
+-                        d->alternate=1;d->position=0;errno=0;
+-                        count=sceKernelGetdirentries(d->fd,d->data,sizeof(d->data),&d->position);
++                        PS5_DIRECTORY_NOTE("directory initial alternate retry");d->alternate=1;d->position=0;errno=0;
++                        count=sceKernelGetdirentries(d->fd,d->data,PS5_DIRECTORY_BUFFER_SIZE,&d->position);
+                     }
+                 }
+             }
+             while(count<0&&ps5_directory_errno(count)==EINTR);
+-            if(count<0){d->failure=ps5_directory_errno(count);errno=d->failure;return NULL;}
++            if(count<0){PS5_DIRECTORY_NOTE("directory enumeration failed");d->failure=ps5_directory_errno(count);errno=d->failure;return NULL;}
+             if(count==0){errno=0;return NULL;}
+-            if((size_t)count>sizeof(d->data))break;
++            if((size_t)count>PS5_DIRECTORY_BUFFER_SIZE)break;
+             d->used=(size_t)count;d->cursor=0;
+         }
+         size_t remaining=d->used-d->cursor;
+@@ -65,8 +71,9 @@
+     d->failure=EIO;errno=EIO;return NULL;
+ }
+ static int ps5_directory_close(Ps5Directory*d) {
+-    int result=close(d->fd),error=errno;
+-    if(munmap(d,sizeof(*d))!=0&&result==0)return -1;
+-    errno=error;return result;
++    int result=close(d->fd),error=result<0?errno:0;
++    if(munmap(d->data,PS5_DIRECTORY_BUFFER_SIZE)!=0&&!error)error=errno;
++    if(munmap(d,sizeof(*d))!=0&&!error)error=errno;
++    if(error){errno=error;return -1;}return 0;
+ }
+ #endif
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -45,6 +45,7 @@
+ }
+ #define PS5_REALPATH_NOTE(phase,path) ps5_realpath_note(phase,path)
+ #include "ps5Realpath.h"
++#define PS5_DIRECTORY_NOTE(phase) PS5_REALPATH_NOTE(phase,"")
+ #include "ps5Directory.h"
+ #endif
+ #include <unistd.h>
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5SignalStack.hpp
+@@ -0,0 +1,28 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHARE_RUNTIME_PS5SIGNALSTACK_HPP
++#define SHARE_RUNTIME_PS5SIGNALSTACK_HPP
++#include <stdint.h>
++#include <stddef.h>
++// Best-effort native evidence only. The caller supplies actual thread bounds.
++// Never follow a non-increasing frame pointer or read beyond those bounds.
++inline bool ps5_signal_stack_pair(uintptr_t at,uintptr_t low,uintptr_t high,uintptr_t*first,uintptr_t*second) {
++    if(at%sizeof(uintptr_t)||at<low||high<low||at>high||high-at<2*sizeof(uintptr_t))return false;
++    const volatile uintptr_t*p=reinterpret_cast<const volatile uintptr_t*>(at);
++    *first=p[0];*second=p[1];return true;
++}
++template<class Emit> inline void ps5_signal_stack_snapshot(uintptr_t sp,uintptr_t fp,uintptr_t low,uintptr_t high,Emit emit) {
++    uintptr_t a,b;
++    for(unsigned n=0;n<16;n++){
++        if(sp>UINTPTR_MAX-n*2*sizeof(uintptr_t))break;
++        uintptr_t at=sp+n*2*sizeof(uintptr_t);
++        if(!ps5_signal_stack_pair(at,low,high,&a,&b))break;
++        emit(false,at,a,b);
++    }
++    for(unsigned n=0;n<16;n++){
++        if(!ps5_signal_stack_pair(fp,low,high,&a,&b))break;
++        emit(true,fp,a,b);
++        if(a<=fp)break;
++        fp=a;
++    }
++}
++#endif
+--- a/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
++++ b/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
+@@ -89,6 +89,9 @@
+ #endif
+ 
+ #include "runtime/ps5SignalContext.hpp"
++#ifdef __PROSPERO__
++#include "runtime/ps5SignalStack.hpp"
++#endif
+ 
+ #ifdef AMD64
+ #define SPELL_REG_SP "rsp"
+@@ -421,6 +424,11 @@
+     ps5_vm_trace_hex("SIGNAL: fault address=", info ? (unsigned long long)info->si_addr : 0);
+     ps5_vm_trace_values("SIGNAL: native identity self=",(uintptr_t)pthread_self()," thread=",(uintptr_t)thread," context=",(uintptr_t)uc);
+     ps5_vm_trace_raw_context(uc, sizeof(ucontext_t));
++    if(uc&&thread&&!trace_signal_scope.saved){
++      ps5_signal_stack_snapshot((uintptr_t)os::Bsd::ucontext_get_sp(uc),(uintptr_t)os::Bsd::ucontext_get_fp(uc),
++        (uintptr_t)thread->stack_end(),(uintptr_t)thread->stack_base(),
++        [](bool frame,uintptr_t at,uintptr_t a,uintptr_t b){ps5_vm_trace_values(frame?"SIGNAL: frame=":"SIGNAL: stack=",at," word0=",a," word1=",b);});
++    }
+     const Ps5NativeCallRecord record = ps5_vm_native_call_record();
+     ps5_vm_trace_values(record.operation != nullptr ? record.operation : "CALL: unavailable caller=",
+                         record.caller, " src=", record.source, " dst=", record.destination);
