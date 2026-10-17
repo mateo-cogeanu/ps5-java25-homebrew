@@ -1,0 +1,94 @@
+--- a/src/java.base/unix/native/libnet/ps5Ifaddrs.h
++++ b/src/java.base/unix/native/libnet/ps5Ifaddrs.h
+@@ -205,4 +205,20 @@
+     PS5_IFADDRS_NOTE("route query retries exhausted",5);
+     errno=ENOMEM;return -1;
+ }
++/* Re-query current flags when the desktop ioctl is denied. Lookup does
++ * not fabricate a missing interface or reuse an earlier enumeration. */
++static int ps5_ifaddrs_get_flags(const char *name,int *flags) {
++    int saved=errno;
++    Ps5Ifaddrs storage={0};struct ifaddrs *list=NULL;
++    if (ps5_getifaddrs(&list,&storage)<0) return -1;
++    for (struct ifaddrs *item=list;item;item=item->ifa_next) {
++        if (item->ifa_name && strcmp(name,item->ifa_name)==0) {
++            *flags=(int)item->ifa_flags;
++            ps5_freeifaddrs(list,&storage);
++            PS5_IFADDRS_NOTE("route flags resolved",*flags);
++            errno=saved;return 0;
++        }
++    }
++    ps5_freeifaddrs(list,&storage);errno=ENODEV;return -1;
++}
+ #endif
+--- a/src/java.base/unix/native/libnet/NetworkInterface.c
++++ b/src/java.base/unix/native/libnet/NetworkInterface.c
+@@ -744,6 +744,7 @@
+     }
+ 
+     if (name_utf == NULL) {
++        NETIF_NOTE("flags name conversion failed",0);
+         if (!(*env)->ExceptionCheck(env))
+             JNU_ThrowOutOfMemoryError(env, NULL);
+         return -1;
+@@ -754,11 +755,14 @@
+     }
+ 
+     ret = getFlags(sock, name_utf, &flags);
++    int query_error=errno;
++    if (ret < 0) NETIF_NOTE("flags query failed",query_error);
+ 
+     close(sock);
+     (*env)->ReleaseStringUTFChars(env, name, name_utf);
+ 
+     if (ret < 0) {
++        errno=query_error;
+         JNU_ThrowByNameWithMessageAndLastError
+             (env, JNU_JAVANETPKG "SocketException", "getFlags() failed");
+         return -1;
+@@ -1930,6 +1934,18 @@
+     strncpy(if2.ifr_name, ifname, sizeof(if2.ifr_name) - 1);
+ 
+     if (ioctl(sock, SIOCGIFFLAGS, (char *)&if2) < 0) {
++#ifdef __PROSPERO__
++        int error=errno;
++        ps5_netif_note("flags ioctl failed",error,0);
++        if (error==EACCES || error==EPERM) {
++            int value;
++            if (ps5_ifaddrs_get_flags(if2.ifr_name,&value)==0) {
++                *flags=sizeof(if2.ifr_flags)==sizeof(short)?value&0xffff:value;
++                return 0;
++            }
++            ps5_netif_note("flags route lookup failed",errno,0);
++        }
++#endif
+         return -1;
+     }
+ 
+--- a/src/java.base/share/native/libjava/jni_util.c
++++ b/src/java.base/share/native/libjava/jni_util.c
+@@ -202,14 +202,24 @@
+         if (messagelen > 0) {
+             jstring s2 = NULL;
+             size_t messageextlen = messagelen + 4;
++            #ifdef __PROSPERO__
++            char local_message[256];
++            char *str1 = messageextlen <= sizeof(local_message)
++                ? local_message : (char *)malloc(messageextlen);
++#else
+             char *str1 = (char *)malloc((messageextlen) * sizeof(char));
++#endif
+             if (str1 == NULL) {
+                 JNU_ThrowOutOfMemoryError(env, 0);
+                 return;
+             }
+             jio_snprintf(str1, messageextlen, " (%s)", message);
+             s2 = (*env)->NewStringUTF(env, str1);
++#ifdef __PROSPERO__
++            if (str1 != local_message) free(str1);
++#else
+             free(str1);
++#endif
+             JNU_CHECK_EXCEPTION(env);
+             if (s2 != NULL) {
+                 jstring s3 = JNU_CallMethodByName(

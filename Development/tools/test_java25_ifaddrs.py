@@ -13,6 +13,8 @@ parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--route-snapshot',type=Path,help='Optional local PS5 binary route snapshot; never published')
 args=parser.parse_args()
 header=root/'.tools/java25/openjdk/src/java.base/unix/native/libnet/ps5Ifaddrs.h'
+native=(header.parent/'NetworkInterface.c').read_text()
+flags_body=native[native.rindex('static int getFlags(int sock, const char *ifname, int *flags) {'):native.index('\n#endif /* _ALLBSD_SOURCE */',native.rindex('static int getFlags(int sock, const char *ifname, int *flags) {'))]
 work=root/'build/java25/ifaddrs-test';work.mkdir(parents=True,exist_ok=True)
 p=work/'test.c'
 p.write_text(r'''
@@ -26,6 +28,7 @@ p.write_text(r'''
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/mman.h>
+#include <sys/ioctl.h>
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/route.h>
@@ -57,6 +60,14 @@ static void note(const char *phase,long value){int saved=errno;int n=snprintf(no
 #define mmap fake_map
 #define munmap fake_unmap
 ''' + header.read_text() + r'''
+static int flags_error=EACCES;
+static int flags_ioctl(int sock,unsigned long op,void *value){(void)sock;assert(op==SIOCGIFFLAGS);if(flags_error){errno=flags_error;return -1;}((struct ifreq*)value)->ifr_flags=(short)(IFF_UP|IFF_LOOPBACK);return 0;}
+static void ps5_netif_note(const char *phase,long value,int pending){(void)pending;note(phase,value);}
+#define __PROSPERO__ 1
+#define ioctl flags_ioctl
+''' + flags_body + r'''
+#undef ioctl
+
 #undef getifaddrs
 #undef freeifaddrs
 #undef sysctl
@@ -64,7 +75,7 @@ static void note(const char *phase,long value){int saved=errno;int n=snprintf(no
 #undef munmap
 static size_t append_addr(const void *a,size_t n){size_t at=wire_size,rounded=(n+sizeof(long)-1)&~(sizeof(long)-1);memcpy(wire+at,a,n);memset(wire+at+n,0,rounded-n);wire_size+=rounded;return at;}
 static void link_record(unsigned index,const char *name){
- size_t start=wire_size;struct if_msghdr info={0};info.ifm_version=RTM_VERSION;info.ifm_type=RTM_IFINFO;info.ifm_addrs=RTA_IFP;info.ifm_flags=IFF_UP|IFF_BROADCAST;info.ifm_index=index;
+ size_t start=wire_size;struct if_msghdr info={0};info.ifm_version=RTM_VERSION;info.ifm_type=RTM_IFINFO;info.ifm_addrs=RTA_IFP;info.ifm_flags=IFF_UP|(!strcmp(name,"lo0")?IFF_LOOPBACK:(IFF_BROADCAST|IFF_MULTICAST));info.ifm_index=index;
  memset(wire+wire_size,0,PS5_IFINFO_HEADER_SIZE);memcpy(wire+wire_size,&info,offsetof(struct if_msghdr,ifm_index)+sizeof(info.ifm_index));wire_size+=PS5_IFINFO_HEADER_SIZE;
  struct sockaddr_dl link={0};link.sdl_family=AF_LINK;link.sdl_index=index;link.sdl_nlen=strlen(name);link.sdl_alen=6;link.sdl_len=offsetof(struct sockaddr_dl,sdl_data)+link.sdl_nlen+6;
  memcpy(link.sdl_data,name,link.sdl_nlen);memcpy(link.sdl_data+link.sdl_nlen,"\x02\x11\x22\x33\x44\x55",6);append_addr(&link,link.sdl_len);
@@ -93,7 +104,15 @@ int main(int argc,char **argv){
   assert(rows==(captured+31)/32);
  }
  notes_used=0;notes[0]=0;
- fixture();Ps5Ifaddrs storage={0};struct ifaddrs *list=NULL;
+ fixture();int flags=0;
+ reset();flags_error=0;assert(!getFlags(1,"lo0",&flags)&&flags==(IFF_UP|IFF_LOOPBACK)&&calls==0);
+ reset();flags_error=EACCES;assert(!getFlags(1,"lo0",&flags)&&(flags&IFF_LOOPBACK)&&calls==2&&live==0);
+ reset();flags_error=EPERM;assert(!getFlags(1,"eth0",&flags)&&(flags&IFF_MULTICAST)&&!(flags&IFF_LOOPBACK)&&calls==2&&live==0);
+ reset();flags_error=EIO;flags=123;assert(getFlags(1,"lo0",&flags)==-1&&flags==123&&errno==EIO&&calls==0);
+ reset();flags_error=EACCES;query_error=EACCES;assert(getFlags(1,"lo0",&flags)==-1&&errno==EACCES&&live==0);
+ reset();flags_error=EPERM;assert(getFlags(1,"missing",&flags)==-1&&errno==ENODEV&&live==0);
+ reset();flags_error=EACCES;fail_map=1;assert(getFlags(1,"lo0",&flags)==-1&&errno==ENOMEM&&live==0);
+ Ps5Ifaddrs storage={0};struct ifaddrs *list=NULL;
  reset();native_error=0;assert(ps5_getifaddrs(&list,&storage)==0&&list==&native_list&&calls==0);errno=EDOM;ps5_freeifaddrs(list,&storage);assert(native_frees==1&&errno==EDOM);
  reset();native_error=EPERM;assert(ps5_getifaddrs(&list,&storage)==-1&&errno==EPERM&&calls==0&&!list);
  reset();native_error=EACCES;errno=EPERM;assert(!ps5_getifaddrs(&list,&storage)&&calls==2&&errno==EPERM);ps5_freeifaddrs(list,&storage);
@@ -119,7 +138,7 @@ int main(int argc,char **argv){
  for(size_t i=0;i<total;i++){memcpy(wire,original,total);wire[i]^=0xff;(void)ps5_ifaddrs_parse(wire,total,nodes,32,&count);}
  memcpy(wire,original,total);assert(ps5_ifaddrs_parse(wire,total,nodes,0,&count)==-1&&errno==EINVAL);
  notes_used=0;notes[0]=0;wire[2]=99;assert(ps5_ifaddrs_parse(wire,total,nodes,32,&count)==-1);assert(strstr(notes,"route parser rejected source line")&&strstr(notes,"route parser rejected offset value=0"));reset();assert(ps5_getifaddrs(&list,&storage)==-1&&live==0&&!list);
- puts("PASS: actual fallback/parser; live-query IPv4/IPv6/link/flags/name/mask/broadcast/scope, native success/ENOMEM/EACCES/errno-less failure, stale errno isolation and preserved other/query errors, mapping failures, query errors/growth/retry cap, malformed/truncated records, cleanup; host BSD fixtures, precise rejection notes and bounded byte-exact0/31/32/33/4096-to2048 hex capture/errno; ASan/UBSan");
+ puts("PASS: actual fallback/parser; live-query IPv4/IPv6/link/flags/name/mask/broadcast/scope, native success/ENOMEM/EACCES/errno-less failure, stale errno isolation and preserved other/query errors, mapping failures, query errors/growth/retry cap, malformed/truncated records, cleanup; actual BSD flags ioctl path/denial/live-route/missing/query errors, host BSD fixtures, precise rejection notes and bounded byte-exact0/31/32/33/4096-to2048 hex capture/errno; ASan/UBSan");
 }
 ''')
 subprocess.run(['clang','-std=c11','-Wall','-Wextra','-Werror','-fsanitize=address,undefined',str(p),'-o',str(work/'test')],check=True)

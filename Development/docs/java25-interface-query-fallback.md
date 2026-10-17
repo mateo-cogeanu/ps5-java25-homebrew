@@ -171,3 +171,38 @@ and EACCES/EIO query failure propagation. Native node regression also injects
 libc refusal without errno. Full captured-route replay, prior ownership/bounds/
 diagnostic tests and target compilation pass. Console IPv6 enumeration, Java
 interface conversion, listener readiness and verified save/stop remain pending.
+
+
+## Build056 evidence and build057 flag-query fallback
+
+Run01.000.056-1792254703-782971695 returned server-row FAIL. Full reports
+were retrieved after reopening the probe without running rows. Both resident
+getifaddrs calls fail with fresh errno0; both live1320-byte route queries parse
+eight records. Six internal nodes use successful16KiB mappings after libc
+refusal, and getAll completes two Java interfaces with no pending exception.
+The server then fails in NetworkInterface.isLoopback0 through Netty MAC/channel
+ID initialization. This establishes enumeration progress, not listener readiness
+or a verified saved world. Discovery DNS still fails. Raw reports remain local.
+
+Patch0081 retries SIOCGIFFLAGS EACCES/EPERM using a fresh route snapshot and
+actual flags for the requested interface. Normal ioctl success and other errors
+are unchanged; missing interfaces, query failures and allocation failures remain
+errors. It preserves the actual query errno across close/string cleanup and
+adds flag-query/name-conversion diagnostics. The056 trace does not identify
+which flag-query substage failed; denied ioctl is a repair candidate supported
+by earlier ioctl errors, not a confirmed056 root cause.
+
+The shared last-error formatter previously needed native malloc even for a
+short diagnostic suffix, potentially replacing SocketException with OOM when
+libc refuses. PS5 now uses a256-byte stack buffer for short suffixes; long
+messages retain allocation/error behavior. Java string/exception failures still
+propagate. No global allocator or fabricated flags are introduced.
+
+Actual BSD getFlags and route fallback regression passes ASan/UBSan, covering
+normal ioctl, both denied errors, loopback/multicast bits, missing interface,
+query/mapping failures and unchanged unrelated errors. The actual last-error
+formatter passes real JNI/-Xcheck:jni and UBSan for PS5 and desktop controls,
+null/empty/252/253-byte boundaries, injected scratch allocation refusal, exact
+exception text and cleanup. Target native compilation passes. All057 console
+rows, flag resolution, actual readiness/save/stop and native capacity remain
+unvalidated.

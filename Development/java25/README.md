@@ -1784,3 +1784,14 @@ failure after a console IPv6 enumeration failure; ENOMEM remains covered.
 It clears stale errno before resident queries/node malloc and preserves caller
 errno on success. Actual kernel-query denials and other errors still fail.
 Host regressions and target build pass; console startup remains pending.
+
+
+Patch0081 adds a fresh route-snapshot fallback for denied interface flag ioctls,
+preserves query errno and diagnoses flag-query/name-conversion failures. It also
+avoids a native diagnostic malloc for short PS5 last-error suffixes, preserving
+the underlying exception when libc refuses scratch memory. Build056 confirms
+both address families and two Java interfaces now enumerate; the subsequent
+isLoopback0 failure's exact substage remains unresolved. Actual flag/parser
+sanitizer and real JNI error-formatter tests pass; target compilation passes.
+Console flag resolution and consumer readiness remain pending. See the
+[interface-query notes](../docs/java25-interface-query-fallback.md).
