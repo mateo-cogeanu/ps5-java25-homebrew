@@ -35,9 +35,14 @@ inline constexpr Entry files[]={
 // Preserve the last failure before starting a new run. On relaunch these
 // files are left alone until the user explicitly initializes another run.
 inline bool write_note(const char *path,const char *text) {
- FILE *file=std::fopen(path,"wb");if(!file)return false;
- size_t length=std::strlen(text);bool ok=std::fwrite(text,1,length,file)==length;
- return std::fclose(file)==0&&ok;
+ // Failure reports must not need a new FILE allocation under native heap pressure.
+ int saved=errno,fd;
+ do{fd=::open(path,O_CREAT|O_WRONLY|O_TRUNC,0600);}while(fd<0&&errno==EINTR);
+ if(fd<0)return false;
+ size_t length=std::strlen(text),offset=0;int error=0;
+ while(offset<length){ssize_t n=::write(fd,text+offset,length-offset);if(n<0&&errno==EINTR)continue;if(n<=0){error=n==0?EIO:errno;break;}offset+=static_cast<size_t>(n);}
+ if(::close(fd)!=0&&!error)error=errno;
+ errno=error?error:saved;return error==0;
 }
 inline bool archive_report(const char *path,const char *previous) {
  FILE *input=std::fopen(path,"rb");if(!input)return errno==ENOENT;

@@ -1681,3 +1681,7 @@ A console capture now confirms pthread mutex initialization returns ENOMEM. [Pat
 Patch 0055 expands the early mutex reserve to 4096 for generated-class workloads and records exact failed native-init pool occupancy, attribute matching and caller; event/parker/monitor checks have distinct labels. The next capture confirms the former pools all initialized, but later ENOMEM persists; pool exhaustion remains an inference until occupancy is captured. Console validation remains pending.
 
 Patch 0056 expands the relative/absolute condition reserves to 4096/2048 and adds failed native-condition occupancy/domain/caller diagnostics and constructor labels. The next console capture reaches later class loading but fails native condition init with ENOMEM; exact pool occupancy and consumer completion remain unvalidated.
+
+## Nofollow metadata
+
+[Patch 0057](../docs/java25-nofollow-metadata.md) adds genuine descriptor metadata after PS5 lstat EPERM, with O_NOFOLLOW leaf protection and real missing-path/error propagation. Final symlinks remain errors when native lstat cannot describe them; no link validation is disabled. Report notes now avoid allocating a new FILE. Console validation remains pending.

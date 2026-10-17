@@ -1,0 +1,26 @@
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -742,6 +742,23 @@
+     }
+ #endif
+     RESTARTABLE(lstat(path, &buf), err);
++#ifdef __PROSPERO__
++    /* Pathname metadata may be denied in the native-title sandbox. A leaf
++     * opened with O_NOFOLLOW can supply genuine descriptor metadata without
++     * accepting a symlink target as the link itself. Symlinks that cannot be
++     * described this way remain errors; never disable Java link validation.
++     * Preserve real open errors, notably ENOENT for an absent world directory. */
++    if (err == -1 && errno == EPERM) {
++        int fd;
++        RESTARTABLE(open(path, O_RDONLY | O_NONBLOCK | O_NOFOLLOW), fd);
++        if (fd >= 0) {
++            RESTARTABLE(fstat(fd, &buf), err);
++            int metadata_error = errno;
++            close(fd);
++            errno = metadata_error;
++        }
++    }
++#endif
+     if (err == -1) {
+         throwUnixException(env, errno);
+     } else {
