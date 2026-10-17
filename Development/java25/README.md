@@ -1707,3 +1707,21 @@ Patch0065 moves directory bytes to a dedicated page-aligned64KiB mapping and add
 Build039's saved native frame chain resolves to ConcurrentHashTable dictionary insertion, AllocateHeap, native out-of-memory reporting, core-dump prerequisites and os::get_core_path. The signal is therefore in fatal reporting, rather than evidence that the last completed malloc itself jumped to the bad PC. The raw trace records refused64KiB slabs for small allocations. It does not establish the process memory limit.
 
 On PS5 get_core_path now returns unavailable without desktop current-directory/program-name queries. Small mapped native allocations retry one minimal page-rounded slab after a64KiB mapping failure; successful ownership/cleanup is unchanged and both failures still propagate real OOM. The host actual-body core-path test and allocator sanitizer tests include a64KiB refusal with smaller mappings accepted, and complete refusal. These repairs need PS5 validation; they do not claim server readiness or eliminate genuine native memory exhaustion. Heap remains192MiB in the consumer probe.
+
+## Generated resources in optional module images
+
+The image builder now runs target `-gendata` goals for requested modules with
+resource generators, in addition to Java compilation. Java compilation alone
+omitted `jdk.jfr/jdk/jfr/internal/types/metadata.bin`, causing JFR metadata
+initialization to fail with a null resource stream in a console consumer.
+The resource is generated from the pinned target metadata XML/XSD; no host
+metadata is copied. The builder verifies SHA-256 identity across the target
+resource, temporary JMOD and extracted linked-image resource, and records the
+generator goals and resource hash in `boot-image-audit.json`. Java desktop's
+requested font/HTML data generators also run.
+
+`python3 tools/test_java25_jfr_image.py` extracts target JFR classes/resources
+from the linked image, patches them into the host Java 25 module, confirms
+resource bytes, and exercises actual `MetadataLoader.createTypes()`. This
+passes on the host JVM; its native JFR remains host behavior. PS5 JFR
+registration and downstream consumer startup still require console validation.

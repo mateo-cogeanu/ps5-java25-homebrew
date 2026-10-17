@@ -13,6 +13,9 @@ import shutil
 import json
 import argparse
 import re
+import hashlib
+import tempfile
+import zipfile
 
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--modules',default='java.base',help='Comma-separated target-built modules to include')
@@ -31,7 +34,21 @@ if not (classes/'java/lang/Object.class').exists():
 # and platform conditionals before it is packaged.
 build_env=dict(os.environ)
 build_env.setdefault('LLVM_CONFIG','/opt/homebrew/opt/llvm/bin/llvm-config')
-subprocess.run(['gmake','-C',str(ROOT/'.tools/java25/openjdk'),'CONF=ps5-bootstrap','java.base-gendata',*[name+'-java' for name in requested if name!='java.base']],env=build_env,check=True)
+source=ROOT/'.tools/java25/openjdk'
+# Java compilation alone omits generated resources (notably JFR metadata.bin).
+# Run the target generators for each requested module that supplies one.
+gendata=[name+'-gendata' for name in dict.fromkeys(['java.base',*requested])
+         if (source/'make/modules'/name/'Gendata.gmk').is_file()]
+subprocess.run(['gmake','-C',str(source),'CONF=ps5-bootstrap',*gendata,
+                *[name+'-java' for name in requested if name!='java.base']],env=build_env,check=True)
+required_resources={'jdk.jfr':['jdk/jfr/internal/types/metadata.bin']}
+resource_hashes={}
+for name, resources in required_resources.items():
+    if name not in requested:continue
+    for resource in resources:
+        data=(BUILD/'jdk/modules'/name/resource).read_bytes()
+        if not data:raise SystemExit('Empty target resource: '+name+'/'+resource)
+        resource_hashes[name+'/'+resource]=hashlib.sha256(data).hexdigest()
 conf=BUILD/'support/modules_conf/java.base'
 security=conf/'security/java.security'
 if not security.is_file() or b'security.provider.tbd' in security.read_bytes():
@@ -50,6 +67,11 @@ for directory in modules:
         '--target-platform','linux-amd64',*options,str(jmods/(directory.name+'.jmod'))],check=True)
 for name in requested:
     if not (jmods/(name+'.jmod')).is_file():raise SystemExit('Requested module not target-built: '+name)
+for resource, digest in resource_hashes.items():
+    name, path=resource.split('/',1)
+    with zipfile.ZipFile(jmods/(name+'.jmod')) as archive:
+        if hashlib.sha256(archive.read('classes/'+path)).hexdigest()!=digest:
+            raise SystemExit('Target resource differs in JMOD: '+resource)
 if image.exists(): shutil.rmtree(image)
 subprocess.run([str(JDK/'bin/jlink'),'--module-path',str(jmods),'--add-modules',args.modules,
                 '--output',str(image),'--strip-debug','--no-header-files','--no-man-pages'],check=True)
@@ -65,11 +87,20 @@ if any(not (jmods/(name+'.jmod')).is_file() for name in included):
     raise SystemExit('Image included a module not supplied by the target build')
 if (image/'bin').exists():
     raise SystemExit('Unexpected native launcher in class-only boot image')
+# Verify the linked image itself, not just its source directory/JMOD.
+with tempfile.TemporaryDirectory(prefix='ps5-image-resources-') as output:
+    for resource,digest in resource_hashes.items():
+        subprocess.run([str(JDK/'bin/jimage'),'extract','--include','glob:/'+resource,
+                        '--dir',output,str(image/'lib/modules')],check=True)
+        if hashlib.sha256((Path(output)/resource).read_bytes()).hexdigest()!=digest:
+            raise SystemExit('Target resource differs in linked image: '+resource)
 report={'input':'PS5/FreeBSD cross-build target module classes/resources',
         'host_tool_jmod_transport_tag':'linux-amd64; host jlink rejects BSD tags',
         'included_linux_or_host_native_binaries':False,
         'requested_target_modules':requested,
         'included_target_modules':included,
+        'target_gendata_targets':gendata,
+        'verified_generated_resource_sha256':resource_hashes,
         'runtime_data':'target-generated tzdb.dat and security/cacerts',
         'runtime_configuration':'target-generated java.base conf including java.security, crypto policies and net.properties',
         'output':'build/java25/boot-image/lib/modules',
