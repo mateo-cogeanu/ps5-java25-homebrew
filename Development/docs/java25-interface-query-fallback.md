@@ -45,3 +45,31 @@ neither establishes PS5 kernel route layout compatibility or permissions.
 Console validation, successful Java interface conversion under pressure, TCP
 listener readiness and downstream consumer save/stop remain pending. The
 fallback does not claim to repair the overall native capacity limit or DNS.
+
+## Build052 result and patch0077 diagnostics
+
+Run01.000.052-1792251903-802361895 returned server-row FAIL. The current
+native trace was inspected in Firefox: resident ENOMEM triggers the route
+fallback, which returns EINVAL; getAll then returns null with an exception.
+The visible server tail again reports Netty channel-ID initialization failing
+through NetworkInterface.getAll. No real readiness/save verification occurred.
+Firefox Save As was disabled and a direct-link download could not be obtained;
+these are UI observations, not a full downloaded trace. No claim is made about
+absent markers elsewhere in that trace.
+
+The existing EINVAL exit does not distinguish kernel query rejection from
+parser/layout rejection. Patch0077 adds size/data query errors, requested and
+received sizes, target SDK header sizes, mapping-stage errors, retry exhaustion,
+exact parser source line and byte offset. Parser/framing failure logs up to
+2048 input bytes as32-byte hex rows in the existing bounded descriptor trace.
+The total and captured lengths distinguish truncation; query failures before
+receiving data produce no snapshot. Raw route data remains local to console
+reports and is not committed. There are no new endpoints or preset addresses.
+
+The diagnostic snapshot uses stack storage and preserves errno. Sanitizer
+checks now reconstruct its exact bytes at0/31/32/33-byte and4096-byte inputs,
+verify the2048-byte cap, and assert query-error/parser-line diagnostics as well
+as prior fallback/cleanup/bounds tests. Target builds and packaging checks
+pass. This is diagnostic development; EINVAL cause, PS5 ABI/permissions and
+consumer readiness/save/stop remain unresolved. Parser acceptance and query
+behavior are unchanged.

@@ -1758,3 +1758,9 @@ and mapped storage. Current interface/MAC data and explicit ownership are
 retained; normal resident success and other errors remain unchanged. Actual
 parser/fallback sanitizer checks and target native compilation pass. PS5
 route ABI/permissions and downstream consumer readiness remain unvalidated.
+
+Patch0077 adds precise route-query error stages, SDK/header sizes and bounded
+rejected-input evidence after a console fallback returns EINVAL. Actual hex
+capture/rejection diagnostics pass sanitizer tests. This diagnoses an unresolved
+fallback failure; it does not claim a kernel-query or route-layout repair.
+See the interface-query notes for current evidence and console limitations.
