@@ -1,0 +1,240 @@
+--- a/src/java.base/unix/native/libnet/NetworkInterface.c
++++ b/src/java.base/unix/native/libnet/NetworkInterface.c
+@@ -70,10 +70,41 @@
+     #define IFNAMESIZE IFNAMSIZ
+ #endif
+ 
++#ifdef __PROSPERO__
++#include <fcntl.h>
++#include <unistd.h>
++#include <errno.h>
++/* Bounded descriptor-only diagnostics: no FILE, heap, TLS or JNI allocation. */
++static void ps5_netif_note(const char *phase, long value, int pending) {
++    int saved = errno;
++    char text[192];
++    int length = snprintf(text, sizeof(text),
++        "PS5 netif: %s value=%ld pending=%d errno=%d\n", phase, value, pending, saved);
++    if (length > 0 && (size_t)length < sizeof(text)) {
++        int fd = open("/download0/java25-vm-trace.log", O_CREAT|O_WRONLY|O_APPEND, 0600);
++        if (fd >= 0) {
++            size_t offset = 0;
++            while (offset < (size_t)length) {
++                ssize_t n = write(fd, text + offset, (size_t)length - offset);
++                if (n < 0 && errno == EINTR) continue;
++                if (n <= 0) break;
++                offset += (size_t)n;
++            }
++            close(fd);
++        }
++    }
++    errno = saved;
++}
++#define NETIF_NOTE(phase,value) ps5_netif_note(phase, (long)(value), (*env)->ExceptionCheck(env))
++#else
++#define NETIF_NOTE(phase,value) ((void)0)
++#endif
++
+ #define CHECKED_MALLOC3(_pointer, _type, _size) \
+     do { \
+         _pointer = (_type)malloc(_size); \
+         if (_pointer == NULL) { \
++            NETIF_NOTE("native malloc " #_pointer, _size); \
+             JNU_ThrowOutOfMemoryError(env, "Native heap allocation failed"); \
+             return ifs; /* return untouched list */ \
+         } \
+@@ -478,7 +509,9 @@
+     jobjectArray netIFArr;
+     jint arr_index, ifCount;
+ 
++    NETIF_NOTE("getAll enter", 0);
+     ifs = enumInterfaces(env);
++    NETIF_NOTE("getAll enumerated", ifs != NULL);
+     if (ifs == NULL) {
+         return NULL;
+     }
+@@ -491,9 +524,12 @@
+         curr = curr->next;
+     }
+ 
++    NETIF_NOTE("getAll interface count", ifCount);
++
+     // allocate a NetworkInterface array
+     netIFArr = (*env)->NewObjectArray(env, ifCount, cls, NULL);
+     if (netIFArr == NULL) {
++        NETIF_NOTE("getAll array failed", ifCount);
+         freeif(ifs);
+         return NULL;
+     }
+@@ -505,8 +541,10 @@
+     while (curr != NULL) {
+         jobject netifObj;
+ 
++        NETIF_NOTE("getAll create index", arr_index);
+         netifObj = createNetworkInterface(env, curr);
+         if (netifObj == NULL) {
++            NETIF_NOTE("getAll create failed", arr_index);
+             freeif(ifs);
+             return NULL;
+         }
+@@ -521,6 +559,7 @@
+     // release the interface list
+     freeif(ifs);
+ 
++    NETIF_NOTE("getAll complete", arr_index);
+     return netIFArr;
+ }
+ 
+@@ -722,9 +761,9 @@
+ 
+     // create a NetworkInterface object and populate it
+     netifObj = (*env)->NewObject(env, ni_class, ni_ctrID);
+-    CHECK_NULL_RETURN(netifObj, NULL);
++    if (netifObj == NULL) { NETIF_NOTE("create object failed", 0); return NULL; }
+     name = (*env)->NewStringUTF(env, ifs->name);
+-    CHECK_NULL_RETURN(name, NULL);
++    if (name == NULL) { NETIF_NOTE("create name failed", 0); return NULL; }
+     (*env)->SetObjectField(env, netifObj, ni_nameID, name);
+     (*env)->SetObjectField(env, netifObj, ni_descID, name);
+     (*env)->SetIntField(env, netifObj, ni_indexID, ifs->index);
+@@ -742,12 +781,12 @@
+     // create the array of InetAddresses
+     addrArr = (*env)->NewObjectArray(env, addr_count, ia_class, NULL);
+     if (addrArr == NULL) {
+-        return NULL;
++        NETIF_NOTE("create failed line", __LINE__); return NULL;
+     }
+ 
+     bindArr = (*env)->NewObjectArray(env, addr_count, ni_ibcls, NULL);
+     if (bindArr == NULL) {
+-       return NULL;
++       NETIF_NOTE("create failed line", __LINE__); return NULL;
+     }
+     addrP = ifs->addr;
+     addr_index = 0;
+@@ -761,9 +800,9 @@
+             if (iaObj) {
+                 setInetAddress_addr(env, iaObj, htonl(
+                     ((struct sockaddr_in*)addrP->addr)->sin_addr.s_addr));
+-                JNU_CHECK_EXCEPTION_RETURN(env, NULL);
++                if ((*env)->ExceptionCheck(env)) { NETIF_NOTE("create address setter failed", __LINE__); return NULL; }
+             } else {
+-                return NULL;
++                NETIF_NOTE("create failed line", __LINE__); return NULL;
+             }
+             ibObj = (*env)->NewObject(env, ni_ibcls, ni_ibctrID);
+             if (ibObj) {
+@@ -774,18 +813,18 @@
+                     if (ia2Obj) {
+                         setInetAddress_addr(env, ia2Obj, htonl(
+                             ((struct sockaddr_in*)addrP->brdcast)->sin_addr.s_addr));
+-                        JNU_CHECK_EXCEPTION_RETURN(env, NULL);
++                        if ((*env)->ExceptionCheck(env)) { NETIF_NOTE("create address setter failed", __LINE__); return NULL; }
+                         (*env)->SetObjectField(env, ibObj, ni_ib4broadcastID, ia2Obj);
+                         (*env)->DeleteLocalRef(env, ia2Obj);
+                     } else {
+-                        return NULL;
++                        NETIF_NOTE("create failed line", __LINE__); return NULL;
+                     }
+                 }
+                 (*env)->SetShortField(env, ibObj, ni_ib4maskID, addrP->mask);
+                 (*env)->SetObjectArrayElement(env, bindArr, bind_index++, ibObj);
+                 (*env)->DeleteLocalRef(env, ibObj);
+             } else {
+-                return NULL;
++                NETIF_NOTE("create failed line", __LINE__); return NULL;
+             }
+         }
+         if (addrP->family == AF_INET6) {
+@@ -795,7 +834,7 @@
+                 jboolean ret = setInet6Address_ipaddress(env, iaObj,
+                     (char *)&(((struct sockaddr_in6*)addrP->addr)->sin6_addr));
+                 if (ret == JNI_FALSE) {
+-                    return NULL;
++                    NETIF_NOTE("create failed line", __LINE__); return NULL;
+                 }
+ 
+                 scope = ((struct sockaddr_in6*)addrP->addr)->sin6_scope_id;
+@@ -805,7 +844,7 @@
+                     setInet6Address_scopeifname(env, iaObj, netifObj);
+                 }
+             } else {
+-                return NULL;
++                NETIF_NOTE("create failed line", __LINE__); return NULL;
+             }
+             ibObj = (*env)->NewObject(env, ni_ibcls, ni_ibctrID);
+             if (ibObj) {
+@@ -814,7 +853,7 @@
+                 (*env)->SetObjectArrayElement(env, bindArr, bind_index++, ibObj);
+                 (*env)->DeleteLocalRef(env, ibObj);
+             } else {
+-                return NULL;
++                NETIF_NOTE("create failed line", __LINE__); return NULL;
+             }
+         }
+ 
+@@ -833,7 +872,7 @@
+ 
+     childArr = (*env)->NewObjectArray(env, child_count, ni_class, NULL);
+     if (childArr == NULL) {
+-        return NULL;
++        NETIF_NOTE("create failed line", __LINE__); return NULL;
+     }
+ 
+     // create the NetworkInterface instances for the sub-interfaces as well
+@@ -842,7 +881,7 @@
+     while(childP) {
+         tmp = createNetworkInterface(env, childP);
+         if (tmp == NULL) {
+-            return NULL;
++            NETIF_NOTE("create failed line", __LINE__); return NULL;
+         }
+         (*env)->SetObjectField(env, tmp, ni_parentID, netifObj);
+         (*env)->SetObjectArrayElement(env, childArr, child_index++, tmp);
+@@ -1704,12 +1743,15 @@
+ static netif *enumIPv4Interfaces(JNIEnv *env, int sock, netif *ifs) {
+     struct ifaddrs *ifa, *origifa;
+ 
++    NETIF_NOTE("IPv4 getifaddrs enter", 0);
+     if (getifaddrs(&origifa) != 0) {
++        NETIF_NOTE("IPv4 getifaddrs failed", 0);
+         JNU_ThrowByNameWithMessageAndLastError
+             (env, JNU_JAVANETPKG "SocketException", "getifaddrs() failed");
+         return ifs;
+     }
+ 
++    NETIF_NOTE("IPv4 getifaddrs complete", origifa != NULL);
+     for (ifa = origifa; ifa != NULL; ifa = ifa->ifa_next) {
+         struct sockaddr *broadaddrP = NULL;
+ 
+@@ -1731,6 +1773,7 @@
+ 
+         // if an exception occurred then free the list
+         if ((*env)->ExceptionCheck(env)) {
++            NETIF_NOTE("IPv4 addif failed", 0);
+             freeifaddrs(origifa);
+             freeif(ifs);
+             return NULL;
+@@ -1748,12 +1791,15 @@
+ static netif *enumIPv6Interfaces(JNIEnv *env, int sock, netif *ifs) {
+     struct ifaddrs *ifa, *origifa;
+ 
++    NETIF_NOTE("IPv6 getifaddrs enter", 0);
+     if (getifaddrs(&origifa) != 0) {
++        NETIF_NOTE("IPv6 getifaddrs failed", 0);
+         JNU_ThrowByNameWithMessageAndLastError
+             (env, JNU_JAVANETPKG "SocketException", "getifaddrs() failed");
+         return ifs;
+     }
+ 
++    NETIF_NOTE("IPv6 getifaddrs complete", origifa != NULL);
+     for (ifa = origifa; ifa != NULL; ifa = ifa->ifa_next) {
+         // ignore non IPv6 addresses
+         if (ifa->ifa_addr == NULL || ifa->ifa_addr->sa_family != AF_INET6)
+@@ -1767,6 +1813,7 @@
+ 
+         // if an exception occurred then free the list
+         if ((*env)->ExceptionCheck(env)) {
++            NETIF_NOTE("IPv6 addif failed", 0);
+             freeifaddrs(origifa);
+             freeif(ifs);
+             return NULL;

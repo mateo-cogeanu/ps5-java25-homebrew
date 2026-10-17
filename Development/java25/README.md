@@ -1725,3 +1725,27 @@ from the linked image, patches them into the host Java 25 module, confirms
 resource bytes, and exercises actual `MetadataLoader.createTypes()`. This
 passes on the host JVM; its native JFR remains host behavior. PS5 JFR
 registration and downstream consumer startup still require console validation.
+
+## Network interface failure diagnostics (0075)
+
+A console consumer now reaches TCP listener setup but fails with an
+OutOfMemoryError rooted in `NetworkInterface.getAll()`. The saved native trace
+returns from the fixture without a captured VM abort or native fatal OOM. The
+exception does not identify whether interface-list malloc or a Java allocation
+failed; available heap after failure does not establish peak heap availability.
+
+Patch0075 adds PS5-only bounded descriptor diagnostics for getAll entry,
+enumeration result/pending exception, interface count, array allocation and
+per-interface conversion, with exact failed conversion source lines. BSD IPv4/6
+getifaddrs and addif errors, and checked native malloc failures with requested
+size, are recorded. It preserves errno and pending exceptions and retains real
+enumeration, allocation and failure behavior. It does not change allocation
+backends or manufacture interfaces. This is diagnostic development, not a
+confirmed OOM repair.
+
+`python3 tools/test_java25_netif_trace.py` tests the actual writer with short
+writes, EINTR, write/open failure, bounded formatting and errno preservation;
+it also runs the actual getAll body with narrow JNI/enumeration stubs covering
+success, enumeration/array/conversion failures, pending exceptions and cleanup.
+ASan/UBSan and target HotSpot/java.base native builds pass. Console validation
+and the underlying OOM cause remain pending.
