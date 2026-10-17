@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """Exercise actual mapped getifaddrs fallback with injected kernel/libc results.
 
-Uses host BSD route structure layouts and synthetic route records. The target
-build checks target SDK compilation; neither proves PS5 route ABI/permissions.
+Uses the observed192-byte PS5 interface-info wire header with host BSD
+sockaddr types, and optionally replays an actual local kernel snapshot.
+This is host execution; target query/conversion still needs console validation.
 """
 from pathlib import Path
 import subprocess
+import argparse
 root=Path(__file__).resolve().parents[1]
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--route-snapshot',type=Path,help='Optional local PS5 binary route snapshot; never published')
+args=parser.parse_args()
 header=root/'.tools/java25/openjdk/src/java.base/unix/native/libnet/ps5Ifaddrs.h'
 work=root/'build/java25/ifaddrs-test';work.mkdir(parents=True,exist_ok=True)
 p=work/'test.c'
@@ -26,6 +31,9 @@ p.write_text(r'''
 #include <net/route.h>
 #include <netinet/in.h>
 #include <ifaddrs.h>
+/* Host sockaddr_in6 layout matches; use the captured PS5 family number. */
+#undef AF_INET6
+#define AF_INET6 28
 static unsigned char wire[4096];static size_t wire_size;
 static int native_error=ENOMEM, native_frees, calls, growth, query_error, oversized, map_calls, fail_map, live;
 static struct ifaddrs native_list;
@@ -57,7 +65,7 @@ static void note(const char *phase,long value){int saved=errno;int n=snprintf(no
 static size_t append_addr(const void *a,size_t n){size_t at=wire_size,rounded=(n+sizeof(long)-1)&~(sizeof(long)-1);memcpy(wire+at,a,n);memset(wire+at+n,0,rounded-n);wire_size+=rounded;return at;}
 static void link_record(unsigned index,const char *name){
  size_t start=wire_size;struct if_msghdr info={0};info.ifm_version=RTM_VERSION;info.ifm_type=RTM_IFINFO;info.ifm_addrs=RTA_IFP;info.ifm_flags=IFF_UP|IFF_BROADCAST;info.ifm_index=index;
- memcpy(wire+wire_size,&info,sizeof info);wire_size+=sizeof info;
+ memset(wire+wire_size,0,PS5_IFINFO_HEADER_SIZE);memcpy(wire+wire_size,&info,offsetof(struct if_msghdr,ifm_index)+sizeof(info.ifm_index));wire_size+=PS5_IFINFO_HEADER_SIZE;
  struct sockaddr_dl link={0};link.sdl_family=AF_LINK;link.sdl_index=index;link.sdl_nlen=strlen(name);link.sdl_alen=6;link.sdl_len=offsetof(struct sockaddr_dl,sdl_data)+link.sdl_nlen+6;
  memcpy(link.sdl_data,name,link.sdl_nlen);memcpy(link.sdl_data+link.sdl_nlen,"\x02\x11\x22\x33\x44\x55",6);append_addr(&link,link.sdl_len);
  unsigned short length=wire_size-start;memcpy(wire+start,&length,2);
@@ -72,7 +80,9 @@ static void ip_record(unsigned index,int ipv6){
 }
 static void fixture(void){wire_size=0;link_record(1,"lo0");ip_record(1,0);link_record(2,"eth0");ip_record(2,1);}
 static void reset(void){assert(live==0);native_error=ENOMEM;calls=growth=query_error=oversized=map_calls=fail_map=0;}
-int main(void){
+int main(int argc,char **argv){
+ if(argc==2){FILE *input=fopen(argv[1],"rb");assert(input);unsigned char captured[16384];size_t length=fread(captured,1,sizeof captured,input);assert(!ferror(input)&&feof(input));fclose(input);Ps5IfaddrNode result[64];size_t count=0;assert(!ps5_ifaddrs_parse(captured,length,result,64,&count));unsigned link=0,v4=0,v6=0;for(size_t i=0;i<count;i++){int family=result[i].address.ifa_addr->sa_family;link+=family==AF_LINK;v4+=family==AF_INET;v6+=family==AF_INET6;}assert(count==8&&link==4&&v4==2&&v6==2);assert(length<=sizeof wire);memcpy(wire,captured,length);wire_size=length;reset();Ps5Ifaddrs owner={0};struct ifaddrs *list=NULL;assert(!ps5_getifaddrs(&list,&owner)&&live==1);size_t mapped_count=0;for(struct ifaddrs *item=list;item;item=item->ifa_next)mapped_count++;assert(mapped_count==count);ps5_freeifaddrs(list,&owner);assert(live==0);puts("PASS: actual local1320-byte PS5 route replay creates8 records:4 link,2 IPv4,2 IPv6");}
+
  unsigned char preview[4096];for(size_t i=0;i<sizeof(preview);i++)preview[i]=(unsigned char)i;
  size_t sizes[]={0,31,32,33,4096};
  for(size_t t=0;t<sizeof(sizes)/sizeof(sizes[0]);t++){
@@ -108,4 +118,4 @@ int main(void){
 }
 ''')
 subprocess.run(['clang','-std=c11','-Wall','-Wextra','-Werror','-fsanitize=address,undefined',str(p),'-o',str(work/'test')],check=True)
-subprocess.run([str(work/'test')],check=True)
+subprocess.run([str(work/'test'),*([str(args.route_snapshot.resolve())] if args.route_snapshot else [])],check=True)

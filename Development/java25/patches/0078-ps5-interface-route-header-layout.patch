@@ -1,0 +1,41 @@
+--- a/src/java.base/unix/native/libnet/ps5Ifaddrs.h
++++ b/src/java.base/unix/native/libnet/ps5Ifaddrs.h
+@@ -10,6 +10,15 @@
+  * Retry only that error using a fresh NET_RT_IFLIST query and owned mappings.
+  * No cached addresses, synthetic interfaces, libc allocator or global leases.
+  */
++/* Captured PS5 NET_RT_IFLIST records place link addresses at byte192,
++ * whereas the SDK's desktop if_msghdr is168 bytes. Only the stable prefix
++ * (bitmap/flags/index) is read; opaque kernel statistics are skipped. */
++#define PS5_IFINFO_HEADER_SIZE 192
++_Static_assert(offsetof(struct if_msghdr,ifm_addrs)==4, "route address bitmap ABI");
++_Static_assert(offsetof(struct if_msghdr,ifm_flags)==8, "route flags ABI");
++_Static_assert(offsetof(struct if_msghdr,ifm_index)==12, "route index ABI");
++_Static_assert(sizeof(struct ifa_msghdr)==20, "route address header ABI");
++_Static_assert(sizeof(long)==8, "route sockaddr alignment ABI");
+ typedef struct {
+     struct ifaddrs address;
+     char name[IFNAMSIZ];
+@@ -83,10 +92,11 @@
+         struct ifa_msghdr address;
+         const struct sockaddr *value=NULL,*mask=NULL,*dst=NULL;
+         if (message[3]==RTM_IFINFO) {
+-            if (length<sizeof(info)) PS5_IFADDRS_INVALID();
+-            memcpy(&info,message,sizeof(info));
++            if (length<PS5_IFINFO_HEADER_SIZE) PS5_IFADDRS_INVALID();
++            memset(&info,0,sizeof(info));
++            memcpy(&info,message,offsetof(struct if_msghdr,ifm_index)+sizeof(info.ifm_index));
+             index=0; name[0]=0;
+-            if (ps5_ifaddrs_addresses(message+sizeof(info),length-sizeof(info),
++            if (ps5_ifaddrs_addresses(message+PS5_IFINFO_HEADER_SIZE,length-PS5_IFINFO_HEADER_SIZE,
+                                      (unsigned)info.ifm_addrs,addresses)) PS5_IFADDRS_INVALID();
+             value=addresses[RTAX_IFP];
+             if (!value) {offset+=length;continue;}
+@@ -156,6 +166,7 @@
+         }
+         PS5_IFADDRS_NOTE("route received bytes",received);
+         PS5_IFADDRS_NOTE("route SDK if_msghdr size",sizeof(struct if_msghdr));
++        PS5_IFADDRS_NOTE("route PS5 ifinfo header size",PS5_IFINFO_HEADER_SIZE);
+         PS5_IFADDRS_NOTE("route SDK ifa_msghdr size",sizeof(struct ifa_msghdr));
+         if (received>size) {munmap(raw,size);errno=EINVAL;return -1;}
+         /* Count messages with the same bounded framing before allocating nodes. */

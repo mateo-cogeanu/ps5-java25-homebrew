@@ -1764,3 +1764,10 @@ rejected-input evidence after a console fallback returns EINVAL. Actual hex
 capture/rejection diagnostics pass sanitizer tests. This diagnoses an unresolved
 fallback failure; it does not claim a kernel-query or route-layout repair.
 See the interface-query notes for current evidence and console limitations.
+
+Patch0078 corrects a captured PS5 route layout mismatch: RTM_IFINFO addresses
+start at byte192, while the SDK declares a168-byte header. The parser now
+skips the actual opaque statistics and reads only stable prefix fields. Host
+ASan/UBSan replay of the complete local1320-byte capture yields eight real
+records and passes mapped ownership/cleanup. Console fallback completion and
+downstream consumer readiness remain pending. Raw route data stays local.

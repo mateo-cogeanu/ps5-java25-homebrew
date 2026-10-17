@@ -73,3 +73,37 @@ as prior fallback/cleanup/bounds tests. Target builds and packaging checks
 pass. This is diagnostic development; EINVAL cause, PS5 ABI/permissions and
 consumer readiness/save/stop remain unresolved. Parser acceptance and query
 behavior are unchanged.
+
+## Build053 capture: confirmed PS5 interface-info header mismatch
+
+The full downloaded current-run trace for
+01.000.053-1792252782-830533839 records a successful route size/data query:
+1320 bytes requested and received. The parser rejects source line90 at offset0.
+Its complete1320-byte hex snapshot shows four248-byte RTM_IFINFO messages.
+Each link sockaddr starts at byte192 of its message, while the target SDK's
+`sizeof(struct if_msghdr)` is168. Reading at168 interprets interface statistics
+as sockaddr lengths; the first apparent length is1 and validation rejects it.
+The address-message header remains20 bytes and sockaddr alignment8.
+
+Patch0078 uses the observed192-byte PS5 interface-info header and copies only
+the stable bitmap/flags/index prefix into the aligned SDK structure. It never
+interprets opaque kernel statistics. Static assertions check prefix offsets
+4/8/12, address-message header size20 and long alignment8 against the build
+headers. Other validation, resident-success path and failure propagation are
+retained. No arbitrary scanning or cached/fabricated interfaces are added.
+
+The host regression now builds synthetic records with the actual192-byte
+wire header and uses the PS5 IPv6 family value28 with the matching host BSD
+sockaddr layout. An optional `--route-snapshot PATH` replays a local binary
+snapshot, both directly through the parser and through the actual mapped
+fallback with injected resident ENOMEM/kernel responses. The actual1320-byte
+capture creates eight records: four link, two IPv4 and two IPv6; mappings are
+released correctly. Raw addresses, MAC data, statistics and logs stay local.
+Only the test driver and generated synthetic fixtures are published. Existing
+query/mapping/bounds/truncation/mutation/diagnostic tests still pass ASan/UBSan.
+
+Target HotSpot/java.base native compilation passes. This repairs the confirmed
+parser layout mismatch; host replay does not establish console fallback
+completion, Java interface conversion, TCP readiness or verified save/stop.
+Resident ENOMEM's internal cause, overall native capacity and service DNS
+remain unresolved.
