@@ -1,0 +1,20 @@
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -1262,6 +1262,17 @@
+     RESTARTABLE(access(path, (int)amode), err);
+ #ifdef __PROSPERO__
+     PS5_REALPATH_NOTE(err==-1?"access refused":"access complete",path);
++    if(err==-1&&errno==EPERM&&(amode&~(R_OK|W_OK))==0) {
++        // Check the requested operation through an actual non-creating open.
++        // Execute/search permissions are never inferred from readable bytes.
++        int flags=O_NONBLOCK|((amode&W_OK)?((amode&R_OK)?O_RDWR:O_WRONLY):O_RDONLY);
++        int fd;do{fd=open(path,flags);}while(fd<0&&errno==EINTR);
++        if(fd>=0){struct stat observed;
++            if(fstat(fd,&observed)==0&&(S_ISREG(observed.st_mode)||S_ISDIR(observed.st_mode))){
++                err=close(fd);PS5_REALPATH_NOTE(err==0?"access descriptor verified":"access close failed",path);
++            }else{int error=errno;close(fd);errno=error?error:EPERM;}
++        }
++    }
+ #endif
+ 
+     return (err == -1) ? errno : 0;

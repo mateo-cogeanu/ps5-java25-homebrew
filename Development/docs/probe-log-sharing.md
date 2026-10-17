@@ -49,3 +49,5 @@ header limits, disconnected clients, service start/stop and the ZIP collector.
 Console download and availability during a JVM failure require actual PS5 testing.
 
 The fixed `/startup-tail.log` endpoint returns the last 512 KiB of startup history (or the complete file when smaller). It can start mid-line and can include earlier runs; use run IDs to distinguish them. `/startup.log` still returns full history. The compact tail avoids downloading historical multi-megabyte logs during crash diagnosis; no arbitrary path or range parameters are accepted.
+
+Consumers may retain verification and server failures independently through fixed `/verification-exception.txt` and `/server-exception.txt` endpoints. The Minecraft harness writes each when that row fails, preserving the other row's report. They are archived/cleared at explicit new-run initialization, and left intact on app relaunch. The collector includes both. A missing endpoint/file is not evidence that its test passed.

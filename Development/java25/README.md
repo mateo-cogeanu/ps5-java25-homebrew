@@ -1693,3 +1693,7 @@ Patch 0056 expands the relative/absolute condition reserves to 4096/2048 and add
 Patch0060 excludes desktop FreeBSD stack-gap kernel queries from PS5 signal recovery while keeping JVM stack guards. The actual triage regression covers both platform branches, and the target signal object no longer references those queries. Build034 confirms corrected PC reads but still crashes during null preflight; live continuation recovery remains pending. See the linked signal-context notes.
 
 Build035 confirms live Java null continuation and progress through40 JAR checks. Patch0061 replaces the fallback canonicalizer's raw desktop openat dependency with verified component-prefix resident opens, and stops advertising unported optional directory-at operations on PS5. Host actual JNI/ZipFS tests and target rebuild pass; asset mounting and the remaining consumer crash require console retest. The signal-context notes describe semantics and limits.
+
+## Resident directory streams and access
+
+[Patches0062/0063 and regressions](../docs/java25-directory-access.md) enumerate real directories through libkernel with bounded native record parsing, and check denied read/write access queries through actual non-creating descriptor operations. Execute permissions are not inferred. Consumer036 now reports Java failures without a whole-app crash; build037 console filesystem/server validation remains pending.

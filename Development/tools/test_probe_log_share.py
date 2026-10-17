@@ -23,21 +23,26 @@ int main(int argc,char **argv){
  int listener=socket(AF_INET,SOCK_STREAM,0);sockaddr_in a{};a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
  if(bind(listener,(sockaddr*)&a,sizeof(a))||listen(listener,8))return 3;
  socklen_t length=sizeof(a);getsockname(listener,(sockaddr*)&a,&length);printf("%u\n",ntohs(a.sin_port));fflush(stdout);
- ps5::log_share::Entry entries[]={{"/startup-tail.log",argv[1]},{"/startup.log",argv[1]},{"/server.log",argv[1]},{"/build.txt",argv[3]},{"/session.txt",argv[4]},{"/hs-error.log",argv[6]},{"/class-load.log",argv[1]},{"/process-usage.log",argv[7]}};
- for(;;){int client=accept(listener,nullptr,nullptr);if(client<0)break;ps5::log_share::serve(client,entries,8);close(client);}
+ ps5::log_share::Entry entries[]={{"/verification-exception.txt",argv[8]},{"/server-exception.txt",argv[9]},{"/startup-tail.log",argv[1]},{"/startup.log",argv[1]},{"/server.log",argv[1]},{"/build.txt",argv[3]},{"/session.txt",argv[4]},{"/hs-error.log",argv[6]},{"/class-load.log",argv[1]},{"/process-usage.log",argv[7]}};
+ for(;;){int client=accept(listener,nullptr,nullptr);if(client<0)break;ps5::log_share::serve(client,entries,10);close(client);}
 }
 ''')
     subprocess.run(['clang++','-std=c++17','-pthread','-fsanitize=address,undefined','-I'+str(ROOT/'java25/probe'),str(root/'server.cpp'),'-o',str(root/'server')],check=True)
     (root/'mc-server-start').mkdir()
-    for name in ['probe-exception.txt','mc-bootstrap-abort.txt','mc-server-start/server-console.log']:(root/name).write_text('prior report: '+name)
+    for name in ['probe-exception.txt','mc-bootstrap-abort.txt','mc-server-start/server-console.log','probe-verification-exception.txt','probe-server-exception.txt']:(root/name).write_text('prior report: '+name)
     (root/'probe-build.txt').write_text('test-build')
     (root/'hs_err_java25.log').write_text('previous real fatal report')
     (root/'fatal-test.log').write_text('current real fatal report')
     for name in ['java25-class-load.log','process-usage.log']:(root/name).write_text('prior diagnostic: '+name)
     failed=root/'failed-archive';failed.mkdir();(failed/'previous-probe-exception.txt').mkdir();(failed/'probe-exception.txt').write_text('preserve me')
-    process=subprocess.Popen([str(root/'server'),str(root/'data'),str(root),str(root/'probe-build.txt'),str(root/'probe-session.txt'),str(failed),str(root/'fatal-test.log'),str(root/'process-usage.log')],stdout=subprocess.PIPE,text=True)
+    (root/'verification-current').write_text('verification failure')
+    (root/'server-current').write_text('server failure')
+    process=subprocess.Popen([str(root/'server'),str(root/'data'),str(root),str(root/'probe-build.txt'),str(root/'probe-session.txt'),str(failed),str(root/'fatal-test.log'),str(root/'process-usage.log'),str(root/'verification-current'),str(root/'server-current')],stdout=subprocess.PIPE,text=True)
     try:
         port=int(process.stdout.readline())
+        for name in ('probe-verification-exception.txt','probe-server-exception.txt'):
+            assert (root/('previous-'+name)).read_text()=='prior report: '+name
+            assert not (root/name).exists()
         for name,backup in [('probe-exception.txt','previous-probe-exception.txt'),('mc-bootstrap-abort.txt','previous-mc-bootstrap-abort.txt'),('mc-server-start/server-console.log','mc-server-start/previous-server-console.log')]:
             assert (root/backup).read_text()=='prior report: '+name
             assert 'test-run' in (root/name).read_text() and 'No ' in (root/name).read_text()
@@ -82,6 +87,8 @@ int main(int argc,char **argv){
             manifest=json.loads(archive.read('manifest.json'))
             assert manifest['files']['vm-trace.log']['status']=='unavailable'
             assert manifest['files']['startup.log']['bytes']==len(payload)
+            assert archive.read('verification-exception.txt')==b'verification failure'
+            assert archive.read('server-exception.txt')==b'server failure'
             assert archive.read('build.txt')==b'test-build'
             assert b'test-run' in archive.read('session.txt')
         print('PASS: native start/stop, HTTP download, bounded large binary streaming, allowlist, disconnect survival and ZIP collector')

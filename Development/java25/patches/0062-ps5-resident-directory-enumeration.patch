@@ -1,0 +1,140 @@
+--- /dev/null
++++ b/src/java.base/unix/native/libnio/fs/ps5Directory.h
+@@ -0,0 +1,60 @@
++/* SPDX-License-Identifier: GPL-2.0-only WITH Classpath-exception-2.0 */
++#ifndef PS5_DIRECTORY_H
++#define PS5_DIRECTORY_H
++#include <stdint.h>
++#include <stddef.h>
++#include <string.h>
++#include <errno.h>
++#include <fcntl.h>
++#include <unistd.h>
++#include <sys/mman.h>
++/* libkernel export, not the SDK's desktop syscall wrapper. */
++extern int sceKernelGetdents(int,void*,int);
++typedef struct {
++    int fd, failure;
++    size_t cursor, used;
++    unsigned char data[32768];
++    char name[256];
++} Ps5Directory;
++static int ps5_directory_errno(int result) {
++    uint32_t bits=(uint32_t)result;
++    if((bits&0xffff0000u)==0x80020000u)return bits&0xffffu;
++    return result==-1&&errno?errno:EIO;
++}
++static Ps5Directory* ps5_directory_open(const char*path) {
++    int fd;do{fd=open(path,O_RDONLY|O_DIRECTORY|O_NONBLOCK);}while(fd<0&&errno==EINTR);
++    if(fd<0)return NULL;
++    Ps5Directory*d=mmap(NULL,sizeof(*d),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
++    if(d==MAP_FAILED){int error=errno;close(fd);errno=error;return NULL;}
++    d->fd=fd;d->failure=0;d->cursor=d->used=0;return d;
++}
++static const char* ps5_directory_read(Ps5Directory*d) {
++    if(d->failure){errno=d->failure;return NULL;}
++    for(;;){
++        if(d->cursor==d->used){
++            int count;
++            do{errno=0;count=sceKernelGetdents(d->fd,d->data,sizeof(d->data));}
++            while(count<0&&ps5_directory_errno(count)==EINTR);
++            if(count<0){d->failure=ps5_directory_errno(count);errno=d->failure;return NULL;}
++            if(count==0){errno=0;return NULL;}
++            if((size_t)count>sizeof(d->data))break;
++            d->used=(size_t)count;d->cursor=0;
++        }
++        size_t remaining=d->used-d->cursor;
++        if(remaining<8)break;
++        const unsigned char*p=d->data+d->cursor;
++        unsigned record=(unsigned)p[4]|((unsigned)p[5]<<8),length=p[7];
++        if(record<8||record>remaining)break;
++        d->cursor+=record;
++        uint32_t inode;memcpy(&inode,p,4);if(inode==0)continue;
++        if(length==0||length+8>=record||p[8+length]!=0||memchr(p+8,0,length))break;
++        memcpy(d->name,p+8,length);d->name[length]=0;errno=0;return d->name;
++    }
++    d->failure=EIO;errno=EIO;return NULL;
++}
++static int ps5_directory_close(Ps5Directory*d) {
++    int result=close(d->fd),error=errno;
++    if(munmap(d,sizeof(*d))!=0&&result==0)return -1;
++    errno=error;return result;
++}
++#endif
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -45,6 +45,7 @@
+ }
+ #define PS5_REALPATH_NOTE(phase,path) ps5_realpath_note(phase,path)
+ #include "ps5Realpath.h"
++#include "ps5Directory.h"
+ #endif
+ #include <unistd.h>
+ #include <errno.h>
+@@ -999,7 +1000,12 @@
+     const char* path = (const char*)jlong_to_ptr(pathAddress);
+ 
+     /* EINTR not listed as a possible error */
++#ifdef __PROSPERO__
++    PS5_REALPATH_NOTE("directory open",path);
++    dir = (DIR*)ps5_directory_open(path);
++#else
+     dir = opendir(path);
++#endif
+     if (dir == NULL) {
+         throwUnixException(env, errno);
+     }
+@@ -1027,7 +1033,12 @@
+ Java_sun_nio_fs_UnixNativeDispatcher_closedir(JNIEnv* env, jclass this, jlong dir) {
+     DIR* dirp = jlong_to_ptr(dir);
+ 
+-    if (closedir(dirp) == -1 && errno != EINTR) {
++#ifdef __PROSPERO__
++    int result=ps5_directory_close((Ps5Directory*)dirp);
++#else
++    int result=closedir(dirp);
++#endif
++    if (result == -1 && errno != EINTR) {
+         throwUnixException(env, errno);
+     }
+ }
+@@ -1038,17 +1049,23 @@
+     struct dirent* ptr;
+ 
+     errno = 0;
++#ifdef __PROSPERO__
++    const char *name=ps5_directory_read((Ps5Directory*)dirp);
++    ptr = name==NULL?NULL:(struct dirent*)dirp; // used only as the EOF discriminator
++#else
+     ptr = readdir(dirp);
++    const char *name=ptr==NULL?NULL:ptr->d_name;
++#endif
+     if (ptr == NULL) {
+         if (errno != 0) {
+             throwUnixException(env, errno);
+         }
+         return NULL;
+     } else {
+-        jsize len = strlen(ptr->d_name);
++        jsize len = strlen(name);
+         jbyteArray bytes = (*env)->NewByteArray(env, len);
+         if (bytes != NULL) {
+-            (*env)->SetByteArrayRegion(env, bytes, 0, len, (jbyte*)(ptr->d_name));
++            (*env)->SetByteArrayRegion(env, bytes, 0, len, (jbyte*)name);
+         }
+         return bytes;
+     }
+@@ -1239,7 +1256,13 @@
+     int err;
+     const char* path = (const char*)jlong_to_ptr(pathAddress);
+ 
++#ifdef __PROSPERO__
++    PS5_REALPATH_NOTE("access enter",path);
++#endif
+     RESTARTABLE(access(path, (int)amode), err);
++#ifdef __PROSPERO__
++    PS5_REALPATH_NOTE(err==-1?"access refused":"access complete",path);
++#endif
+ 
+     return (err == -1) ? errno : 0;
+ }

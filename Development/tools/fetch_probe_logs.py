@@ -11,7 +11,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-NAMES=('build.txt','session.txt','startup.log','vm-trace.log','server.log','abort.txt','exception.txt','hs-error.log','class-load.log','process-usage.log')
+NAMES=('build.txt','session.txt','startup.log','vm-trace.log','server.log','abort.txt','exception.txt','verification-exception.txt','server-exception.txt','hs-error.log','class-load.log','process-usage.log')
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('address',type=ipaddress.IPv4Address,help='Current PS5 IPv4 address (never saved in the app)')
