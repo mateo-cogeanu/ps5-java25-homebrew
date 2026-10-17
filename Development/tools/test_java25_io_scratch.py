@@ -65,18 +65,46 @@ JNIEXPORT jint JNICALL Java_IoScratchCheck_transfer(JNIEnv *env,jclass cls,jstri
  return result;
 }
 '''
+bridge+=r'''
+JNIEXPORT jint JNICALL Java_IoScratchCheck_readAll(JNIEnv *env,jclass cls,jstring path,jbyteArray data,jint off,jint len,jint mode){
+ deny_heap=mode&1;deny_map=mode&2;io_fail=0;
+ const char* name=(*env)->GetStringUTFChars(env,path,NULL);if(!name)return -1;
+ fd_value=open(name,O_RDONLY);(*env)->ReleaseStringUTFChars(env,path,name);assert(fd_value>=0);
+ jint total=0;while(total<len){jint got=readBytes(env,NULL,data,off+total,len-total,NULL);if((*env)->ExceptionCheck(env))break;if(got<0)break;assert(got>0&&got<=BUF_SIZE);total+=got;}
+ close(fd_value);assert(heap_live==0&&map_live==0);return total;
+}
+'''
+bridge+=r'''
+static jfieldID raf_fd,fd_number;static int raf_reads;
+static jint bounded_raf_read(JNIEnv* env,jobject self,jbyteArray bytes,jint off,jint len){
+ jobject fd=(*env)->GetObjectField(env,self,raf_fd);fd_value=(*env)->GetIntField(env,fd,fd_number);(*env)->DeleteLocalRef(env,fd);
+ deny_heap=1;deny_map=1;io_fail=0;++raf_reads;return readBytes(env,self,bytes,off,len,NULL);
+}
+JNIEXPORT void JNICALL Java_IoScratchCheck_installRandomAccessReader(JNIEnv* env,jclass cls){
+ jclass raf=(*env)->FindClass(env,"java/io/RandomAccessFile");jclass fd=(*env)->FindClass(env,"java/io/FileDescriptor");
+ raf_fd=(*env)->GetFieldID(env,raf,"fd","Ljava/io/FileDescriptor;");fd_number=(*env)->GetFieldID(env,fd,"fd","I");
+ JNINativeMethod method={"readBytes0","([BII)I",(void*)&bounded_raf_read};assert((*env)->RegisterNatives(env,raf,&method,1)==0);
+}
+JNIEXPORT jint JNICALL Java_IoScratchCheck_rafReads(JNIEnv* env,jclass cls){return raf_reads;}
+'''
 java=r'''
 import java.nio.file.*;import java.util.*;import java.io.*;
 public class IoScratchCheck {
  static native int transfer(String path,byte[] data,int off,int len,boolean output,int mode);
+ static native int readAll(String path,byte[] data,int off,int len,int mode);
+ static native void installRandomAccessReader();
+ static native int rafReads();
  interface Action {void run()throws Exception;}
  static void expect(Class<? extends Throwable> type,Action a)throws Exception {try{a.run();}catch(Throwable t){if(type.isInstance(t))return;throw t;}throw new AssertionError("Expected "+type);}
  public static void main(String[] args)throws Exception {
   System.load(args[0]);Path f=Path.of(args[1]);byte[] payload=new byte[65537];new Random(42).nextBytes(payload);
-  for(int mode:new int[]{0,1}) {
+  for(int mode:new int[]{0,1,3}) {
    Files.write(f,payload);byte[] out=new byte[payload.length+14];
    int n=transfer(f.toString(),out,7,payload.length,false,mode);
-   if(n!=payload.length||!Arrays.equals(payload,Arrays.copyOfRange(out,7,7+n)))throw new AssertionError("read mismatch");
+   if(n!=8192||!Arrays.equals(Arrays.copyOf(payload,n),Arrays.copyOfRange(out,7,7+n)))throw new AssertionError("read mismatch");
+   Arrays.fill(out,(byte)0);n=readAll(f.toString(),out,7,payload.length,mode);
+   if(n!=payload.length||!Arrays.equals(payload,Arrays.copyOfRange(out,7,7+n))||out[6]!=0||out[7+n]!=0)throw new AssertionError("full short-read loop mismatch");
+   if(mode==3)continue; // Writes retain real allocation failure; tested below.
    Files.write(f,new byte[0]);transfer(f.toString(),out,7,payload.length,true,mode);
    if(!Arrays.equals(payload,Files.readAllBytes(f)))throw new AssertionError("partial write mismatch");
    Files.write(f,new byte[]{1,2,3});if(transfer(f.toString(),out,0,payload.length,false,mode)!=3)throw new AssertionError("short read");
@@ -89,7 +117,7 @@ public class IoScratchCheck {
 }
 '''
 # Boundary calls above 8192 should throw, while <=8192 never allocates.
-java=java.replace('transfer(f.toString(),new byte[size],0,size,output,3);if(size>8192)throw new AssertionError("both backends should fail");','if(size>8192)expect(OutOfMemoryError.class,()->transfer(f.toString(),new byte[size],0,size,output,3));else transfer(f.toString(),new byte[size],0,size,output,3);')
+java=java.replace('transfer(f.toString(),new byte[size],0,size,output,3);if(size>8192)throw new AssertionError("both backends should fail");','if(output&&size>8192)expect(OutOfMemoryError.class,()->transfer(f.toString(),new byte[size],0,size,output,3));else transfer(f.toString(),new byte[size],0,size,output,3);')
 java=java.replace('  }\n }\n}', '''  }
   for(boolean output:new boolean[]{false,true}) {
    expect(NullPointerException.class,()->transfer(f.toString(),null,0,1,output,1));
@@ -98,7 +126,18 @@ java=java.replace('  }\n }\n}', '''  }
    expect(IOException.class,()->transfer(f.toString(),payload,0,payload.length,output,1|8));
    expect(IOException.class,()->transfer(f.toString(),payload,0,payload.length,output,1|4));
   }
-  Files.delete(f);System.out.println("PASS: actual JNI bulk file I/O, libc/mmap, partial writes, short reads/EOF, stack threshold, bounds/null, I/O/OOM cleanup");
+  installRandomAccessReader();Files.write(f,payload);
+  try(var raf=new RandomAccessFile(f.toFile(),"r")){
+   byte[] full=new byte[payload.length];raf.readFully(full);
+   if(!Arrays.equals(payload,full)||raf.getFilePointer()!=payload.length)throw new AssertionError("RAF readFully position/content");
+   expect(EOFException.class,()->raf.readFully(new byte[1]));
+  }
+  Path zip=f.resolveSibling("fixture.zip");
+  try(var out=new java.util.zip.ZipOutputStream(Files.newOutputStream(zip))){out.putNextEntry(new java.util.zip.ZipEntry("payload"));out.write(payload);out.closeEntry();}
+  int before=rafReads();
+  try(var input=new java.util.zip.ZipFile(zip.toFile());var entry=input.getInputStream(input.getEntry("payload"))){if(!Arrays.equals(payload,entry.readAllBytes()))throw new AssertionError("real ZipFile content");}
+  if(rafReads()<=before)throw new AssertionError("ZipFile did not exercise actual capped JNI read");Files.delete(zip);
+  Files.delete(f);System.out.println("PASS: actual JNI bulk file I/O, libc/mmap, partial writes, bounded reads/full continuation/EOF, stack threshold, bounds/null, I/O/OOM cleanup");
  }
 }''')
 (WORK/'bridge.c').write_text(bridge);(WORK/'IoScratchCheck.java').write_text(java)

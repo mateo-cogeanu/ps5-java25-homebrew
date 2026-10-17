@@ -1,0 +1,16 @@
+--- a/src/java.base/share/native/libjava/io_util.c
++++ b/src/java.base/share/native/libjava/io_util.c
+@@ -141,6 +141,13 @@
+         JNU_ThrowByName(env, "java/lang/IndexOutOfBoundsException", NULL);
+         return -1;
+     }
++
++#ifdef __PROSPERO__
++    /* A read may return fewer bytes than requested. Validate the entire caller
++     * slice first, then use the existing stack buffer and one real read call.
++     * Java stream/readFully callers continue from the actual returned count. */
++    if (len > BUF_SIZE) len = BUF_SIZE;
++#endif
+ 
+     if (len == 0) {
+         return 0;
