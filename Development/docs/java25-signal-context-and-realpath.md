@@ -19,3 +19,11 @@ Patch 0059 retains native realpath success and non-EPERM errors. After EPERM onl
 `python3 tools/test_java25_realpath_fallback.py`
 
 The regression registers the actual patched JNI realpath0 in the host JDK, forces native EPERM and mounts/reads a real ZipFS asset. It checks successful native link resolution, missing components, denied paths, conservative link refusal, descriptor cleanup and bounds. Additional actual-helper ASan/UBSan coverage tests trailing slashes and thousands of operations under a descriptor limit. Target java.base-libs rebuild passes. Consumer preflight now canonicalizes the actual asset JAR and mounts/reads its version.json. These host checks do not establish target openat or signal behavior; all console rows remain pending.
+
+## Desktop stack-gap query during signal recovery
+
+Build034 console runs stop in the deliberate null-access preflight. The corrected context reader now reports PC0x206083d8a consistently with raw offset0xe0, while the fault address is0 and no continuation marker is emitted. This validates the register read on the console but does not establish successful signal recovery. The exception report is still a placeholder and no fatal report is available.
+
+Before continuation selection, the inherited FreeBSD branch queries procctl(PROC_STACKGAP_STATUS) and potentially security.bsd.stack_guard_page. Disassembly confirms the linked procctl issues raw syscall544, a desktop ABI assumption. The logs do not pinpoint that call as the terminating instruction. Patch0060 excludes this desktop-specific kernel workaround on PS5 while retaining the normal JVM stack guard/overflow checks and all implicit-exception checks. Other FreeBSD builds retain the adjustment. New checkpoints report entry to stack triage, thread state/interpreter classification and null continuation selection.
+
+`python3 tools/test_java25_signal_triage.py` compiles the actual triage block for both branches under ASan/UBSan with instrumented kernel calls. It confirms actual JVM stack checks and overflow handling still run, desktop adjustment still runs, and PS5 makes no desktop queries. The rebuilt target signal object has no procctl or sysctlbyname dependency. Target HotSpot compilation passes. Build035 requires console validation; this is a portability repair and a narrowed hypothesis, not a confirmed crash fix.

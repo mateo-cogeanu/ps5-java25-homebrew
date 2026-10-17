@@ -1,0 +1,40 @@
+--- a/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
++++ b/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
+@@ -442,7 +442,12 @@
+     // Handle ALL stack overflow variations here
+     if (sig == SIGSEGV || sig == SIGBUS) {
+       address addr = (address) info->si_addr;
+-#ifdef __FreeBSD__
++#ifdef __PROSPERO__
++      ps5_vm_trace("SIGNAL: entering JVM stack guard triage");
++#endif
++#if defined(__FreeBSD__) && !defined(__PROSPERO__)
++      // This workaround queries modern desktop FreeBSD stack-gap controls.
++      // PS5 has its own kernel ABI; retain JVM guard checks without these calls.
+       /*
+        * Determine whether the kernel stack guard pages have been disabled
+        */
+@@ -517,6 +522,9 @@
+     // check is not required on other platforms, because on other
+     // platforms we check for SIGSEGV only or SIGBUS only, where here
+     // we have to check for both SIGSEGV and SIGBUS.
++#ifdef __PROSPERO__
++    ps5_vm_trace_values("SIGNAL: triage state=",(uintptr_t)thread->thread_state()," interpreter=",Interpreter::contains(pc)?1:0," stub=",(uintptr_t)stub);
++#endif
+     if (thread->thread_state() == _thread_in_Java && stub == nullptr) {
+       // Java thread running in Java code => find exception handler if any
+       // a fault inside compiled code, the interpreter, or a stub
+@@ -610,7 +618,13 @@
+       } else if ((sig == SIGSEGV || sig == SIGBUS) &&
+                  MacroAssembler::uses_implicit_null_check(info->si_addr)) {
+           // Determination of interpreter/vtable stub/compiled code null exception
++#ifdef __PROSPERO__
++          ps5_vm_trace("SIGNAL: selecting implicit null continuation");
++#endif
+           stub = SharedRuntime::continuation_for_implicit_exception(thread, pc, SharedRuntime::IMPLICIT_NULL);
++#ifdef __PROSPERO__
++          ps5_vm_trace_hex("SIGNAL: selected null continuation=",(uintptr_t)stub);
++#endif
+       }
+     } else if ((thread->thread_state() == _thread_in_vm ||
+                 thread->thread_state() == _thread_in_native) &&

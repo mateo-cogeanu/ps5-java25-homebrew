@@ -1689,3 +1689,5 @@ Patch 0056 expands the relative/absolute condition reserves to 4096/2048 and add
 ## Signal recovery and canonical paths
 
 [Patches 0058/0059 and their regressions](../docs/java25-signal-context-and-realpath.md) correct the PS5 machine-context offset used for register reads and signal continuation writes, and verify every non-link path component through descriptors after native realpath EPERM. Host replay, actual JNI/ZipFS checks and target rebuilds pass. PS5 recovery and consumer readiness/save/stop remain pending.
+
+Patch0060 excludes desktop FreeBSD stack-gap kernel queries from PS5 signal recovery while keeping JVM stack guards. The actual triage regression covers both platform branches, and the target signal object no longer references those queries. Build034 confirms corrected PC reads but still crashes during null preflight; live continuation recovery remains pending. See the linked signal-context notes.
