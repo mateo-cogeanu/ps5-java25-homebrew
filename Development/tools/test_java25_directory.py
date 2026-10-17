@@ -31,6 +31,7 @@ int sceKernelGetdents(int fd,void*bytes,int capacity){
  }
  int error=errno;closedir(stream);errno=error;return used;
 }
+int sceKernelGetdirentries(int fd,void*data,int cap,long*position){(void)position;return sceKernelGetdents(fd,data,cap);}
 static void throwUnixException(JNIEnv*env,int error){jclass c=(*env)->FindClass(env,"sun/nio/fs/UnixException");jmethodID m=(*env)->GetMethodID(env,c,"<init>","(I)V");jobject e=(*env)->NewObject(env,c,m,error);(*env)->Throw(env,(jthrowable)e);}
 #define jlong_to_ptr(n) ((void*)(intptr_t)(n))
 #define ptr_to_jlong(n) ((jlong)(intptr_t)(n))
@@ -71,9 +72,10 @@ p=w/'parser.c';p.write_text(r'''
 #include <assert.h>
 #include <stdio.h>
 #include "ps5Directory.h"
-static int mode=0,calls=0;
+static int mode=0,calls=0,alternates=0;
 int sceKernelGetdents(int fd,void*out,int cap){
  ++calls;unsigned char*p=out;memset(p,0,cap);
+ if(mode==9||mode==11||(mode==10&&calls>1))return (int)0x80020016u;
  if(mode==1)return (int)0x8002000du;
  if(mode==2&&calls==1)return (int)0x80020004u;
  if(mode==3)return cap+1;
@@ -85,11 +87,19 @@ int sceKernelGetdents(int fd,void*out,int cap){
  if(calls>1+(mode==2))return 0;
  p[0]=1;p[4]=12;p[7]=3;memcpy(p+8,"abc",4);return 12;
 }
+int sceKernelGetdirentries(int fd,void*out,int cap,long*position){
+ ++alternates;(void)fd;(void)cap;(void)position;
+ if(mode==11)return (int)0x8002004eu;
+ unsigned char*p=out;memset(p,0,12);p[0]=1;p[4]=12;p[7]=3;memcpy(p+8,"alt",4);return 12;
+}
 int main(){
- for(mode=0;mode<=8;mode++){
-  Ps5Directory*d=ps5_directory_open("/tmp");assert(d);calls=0;
+ for(mode=0;mode<=11;mode++){
+  Ps5Directory*d=ps5_directory_open("/tmp");assert(d);calls=alternates=0;
   const char*n=ps5_directory_read(d);
-  if(mode==0||mode==2){assert(n&&strcmp(n,"abc")==0);assert(ps5_directory_read(d)==NULL&&errno==0);}
+  if(mode==9){assert(n&&strcmp(n,"alt")==0&&alternates==1&&d->alternate==1);}
+  else if(mode==10){assert(n&&strcmp(n,"abc")==0);assert(ps5_directory_read(d)==NULL&&errno==EINVAL&&alternates==0);}
+  else if(mode==11){assert(n==NULL&&errno==78&&alternates==1);}
+  else if(mode==0||mode==2){assert(n&&strcmp(n,"abc")==0);assert(ps5_directory_read(d)==NULL&&errno==0);}
   else {int e=mode==1?13:EIO;assert(n==NULL&&errno==e);int before=calls;assert(ps5_directory_read(d)==NULL&&errno==e&&calls==before);}
   assert(ps5_directory_close(d)==0);
  }

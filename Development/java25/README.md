@@ -1697,3 +1697,5 @@ Build035 confirms live Java null continuation and progress through40 JAR checks.
 ## Resident directory streams and access
 
 [Patches0062/0063 and regressions](../docs/java25-directory-access.md) enumerate real directories through libkernel with bounded native record parsing, and check denied read/write access queries through actual non-creating descriptor operations. Execute permissions are not inferred. Consumer036 now reports Java failures without a whole-app crash; build037 console filesystem/server validation remains pending.
+
+Build037 confirms actual readable asset access and later datapack loading. Patch0064 adds a conservative initial directory-ABI fallback and native stream/zlib allocation ownership with libc-first mapped fallback. Full JNI/real ZipFS and sanitizer regressions pass; build038 PS5 validation and separate service-discovery DNS diagnosis remain pending. See directory/access notes.

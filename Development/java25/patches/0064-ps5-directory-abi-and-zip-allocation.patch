@@ -1,0 +1,137 @@
+--- a/src/java.base/unix/native/libnio/fs/ps5Directory.h
++++ b/src/java.base/unix/native/libnio/fs/ps5Directory.h
+@@ -10,8 +10,10 @@
+ #include <sys/mman.h>
+ /* libkernel export, not the SDK's desktop syscall wrapper. */
+ extern int sceKernelGetdents(int,void*,int);
++extern int sceKernelGetdirentries(int,void*,int,long*);
+ typedef struct {
+-    int fd, failure;
++    int fd, failure, alternate, delivered;
++    long position;
+     size_t cursor, used;
+     unsigned char data[32768];
+     char name[256];
+@@ -26,14 +28,24 @@
+     if(fd<0)return NULL;
+     Ps5Directory*d=mmap(NULL,sizeof(*d),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+     if(d==MAP_FAILED){int error=errno;close(fd);errno=error;return NULL;}
+-    d->fd=fd;d->failure=0;d->cursor=d->used=0;return d;
++    d->fd=fd;d->failure=0;d->alternate=d->delivered=0;d->position=0;d->cursor=d->used=0;return d;
+ }
+ static const char* ps5_directory_read(Ps5Directory*d) {
+     if(d->failure){errno=d->failure;return NULL;}
+     for(;;){
+         if(d->cursor==d->used){
+             int count;
+-            do{errno=0;count=sceKernelGetdents(d->fd,d->data,sizeof(d->data));}
++            do{errno=0;count=d->alternate?sceKernelGetdirentries(d->fd,d->data,sizeof(d->data),&d->position):sceKernelGetdents(d->fd,d->data,sizeof(d->data));
++                // Only before any record is delivered: retry the alternate
++                // resident ABI after unsupported getdents, without duplicates.
++                if(count<0&&!d->alternate&&!d->delivered){
++                    int error=ps5_directory_errno(count);
++                    if((error==EINVAL||error==ENOSYS)&&lseek(d->fd,0,SEEK_SET)>=0){
++                        d->alternate=1;d->position=0;errno=0;
++                        count=sceKernelGetdirentries(d->fd,d->data,sizeof(d->data),&d->position);
++                    }
++                }
++            }
+             while(count<0&&ps5_directory_errno(count)==EINTR);
+             if(count<0){d->failure=ps5_directory_errno(count);errno=d->failure;return NULL;}
+             if(count==0){errno=0;return NULL;}
+@@ -48,7 +60,7 @@
+         d->cursor+=record;
+         uint32_t inode;memcpy(&inode,p,4);if(inode==0)continue;
+         if(length==0||length+8>=record||p[8+length]!=0||memchr(p+8,0,length))break;
+-        memcpy(d->name,p+8,length);d->name[length]=0;errno=0;return d->name;
++        memcpy(d->name,p+8,length);d->name[length]=0;d->delivered=1;errno=0;return d->name;
+     }
+     d->failure=EIO;errno=EIO;return NULL;
+ }
+--- /dev/null
++++ b/src/java.base/share/native/libzip/ps5ZipAlloc.h
+@@ -0,0 +1,36 @@
++/* SPDX-License-Identifier: GPL-2.0-only WITH Classpath-exception-2.0 */
++#ifndef PS5_ZIP_ALLOC_H
++#define PS5_ZIP_ALLOC_H
++#include <stdint.h>
++#include <stddef.h>
++#include <stdlib.h>
++#include <string.h>
++#include <errno.h>
++#include <sys/mman.h>
++/* One ownership prefix for the stream and zlib's private allocations. */
++typedef union {max_align_t alignment;struct{size_t mapped;}owner;} Ps5ZipAllocation;
++static void* ps5_zip_calloc(size_t count,size_t size) {
++    int saved=errno;
++    if(size&&count>SIZE_MAX/size){errno=ENOMEM;return NULL;}
++    size_t bytes=count*size;
++    if(bytes>SIZE_MAX-sizeof(Ps5ZipAllocation)){errno=ENOMEM;return NULL;}
++    size_t total=bytes+sizeof(Ps5ZipAllocation);
++    Ps5ZipAllocation*base=malloc(total);size_t mapped=0;
++    if(base==NULL){
++        const size_t page=16384;
++        if(total>SIZE_MAX-(page-1)){errno=ENOMEM;return NULL;}
++        mapped=(total+page-1)&~(page-1);
++        base=mmap(NULL,mapped,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
++        if(base==MAP_FAILED)return NULL;
++    }
++    base->owner.mapped=mapped;void*result=base+1;memset(result,0,bytes);errno=saved;return result;
++}
++static void ps5_zip_free(void*value) {
++    if(!value)return;
++    int saved=errno;Ps5ZipAllocation*base=(Ps5ZipAllocation*)value-1;
++    if(base->owner.mapped)munmap(base,base->owner.mapped);else free(base);
++    errno=saved;
++}
++static voidpf ps5_zip_zalloc(voidpf opaque,uInt count,uInt size){(void)opaque;return ps5_zip_calloc(count,size);}
++static void ps5_zip_zfree(voidpf opaque,voidpf value){(void)opaque;ps5_zip_free(value);}
++#endif
+--- a/src/java.base/share/native/libzip/Inflater.c
++++ b/src/java.base/share/native/libzip/Inflater.c
+@@ -37,6 +37,11 @@
+ #include "jvm.h"
+ #include "jni_util.h"
+ #include <zlib.h>
++#ifdef __PROSPERO__
++#include "ps5ZipAlloc.h"
++#define calloc ps5_zip_calloc
++#define free ps5_zip_free
++#endif
+ #include "java_util_zip_Inflater.h"
+ 
+ #define ThrowDataFormatException(env, msg) \
+@@ -63,6 +68,9 @@
+         JNU_ThrowOutOfMemoryError(env, 0);
+         return jlong_zero;
+     } else {
++#ifdef __PROSPERO__
++        strm->zalloc=ps5_zip_zalloc;strm->zfree=ps5_zip_zfree;
++#endif
+         const char *msg;
+         int ret = inflateInit2(strm, nowrap ? -MAX_WBITS : MAX_WBITS);
+         switch (ret) {
+--- a/src/java.base/share/native/libzip/Deflater.c
++++ b/src/java.base/share/native/libzip/Deflater.c
+@@ -33,6 +33,11 @@
+ #include "jni.h"
+ #include "jni_util.h"
+ #include <zlib.h>
++#ifdef __PROSPERO__
++#include "ps5ZipAlloc.h"
++#define calloc ps5_zip_calloc
++#define free ps5_zip_free
++#endif
+ 
+ #include "java_util_zip_Deflater.h"
+ 
+@@ -48,6 +53,9 @@
+         JNU_ThrowOutOfMemoryError(env, 0);
+         return jlong_zero;
+     } else {
++#ifdef __PROSPERO__
++        strm->zalloc=ps5_zip_zalloc;strm->zfree=ps5_zip_zfree;
++#endif
+         const char *msg;
+         int ret = deflateInit2(strm, level, Z_DEFLATED,
+                                nowrap ? -MAX_WBITS : MAX_WBITS,
