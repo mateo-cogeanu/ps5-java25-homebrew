@@ -1,0 +1,72 @@
+--- a/src/java.base/share/native/libjava/ClassLoader.c
++++ b/src/java.base/share/native/libjava/ClassLoader.c
+@@ -144,6 +144,10 @@
+                                         jstring source)
+ {
+     jbyte *body;
++#ifdef __PROSPERO__
++    /* Bounded per-call storage; JNI still copies and validates the class bytes. */
++    jbyte localBody[4096];
++#endif
+     char *utfName;
+     jclass result = 0;
+     char buf[128];
+@@ -165,7 +169,10 @@
+ 
+     // On AIX malloc(0) returns NULL which looks like an out-of-memory
+     // condition; so adjust it to malloc(1)
+-    #ifdef _AIX
++    #if defined(__PROSPERO__)
++        body = length <= (jint)sizeof(localBody) ? localBody :
++            (jbyte *)classloader_scratch_allocate(length);
++    #elif defined(_AIX)
+         body = (jbyte *)classloader_scratch_allocate(length == 0 ? 1 : length);
+     #else
+         body = (jbyte *)classloader_scratch_allocate(length);
+@@ -220,7 +227,10 @@
+         classloader_scratch_release(utfName);
+ 
+  free_body:
+-    classloader_scratch_release(body);
++#ifdef __PROSPERO__
++    if (body != localBody)
++#endif
++        classloader_scratch_release(body);
+     return result;
+ }
+ 
+@@ -307,6 +317,10 @@
+                                         jobject classData)
+ {
+     jbyte *body;
++#ifdef __PROSPERO__
++    /* Bounded per-call storage; JNI still copies and validates the class bytes. */
++    jbyte localBody[4096];
++#endif
+     char *utfName;
+     jclass result = 0;
+     char buf[128];
+@@ -326,7 +340,10 @@
+ 
+     // On AIX malloc(0) returns NULL which looks like an out-of-memory
+     // condition; so adjust it to malloc(1)
+-    #ifdef _AIX
++    #if defined(__PROSPERO__)
++        body = length <= (jint)sizeof(localBody) ? localBody :
++            (jbyte *)classloader_scratch_allocate(length);
++    #elif defined(_AIX)
+         body = (jbyte *)classloader_scratch_allocate(length == 0 ? 1 : length);
+     #else
+         body = (jbyte *)classloader_scratch_allocate(length);
+@@ -368,7 +385,10 @@
+         classloader_scratch_release(utfName);
+ 
+  free_body:
+-    classloader_scratch_release(body);
++#ifdef __PROSPERO__
++    if (body != localBody)
++#endif
++        classloader_scratch_release(body);
+     return result;
+ }
+ 
