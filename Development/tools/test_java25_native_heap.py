@@ -26,13 +26,14 @@ cpp=r'''
 #include <sys/mman.h>
 #include <unistd.h>
 static std::atomic<bool> deny_heap{false},deny_maps{false},deny_resize{false},parallel{false};
+static std::atomic<size_t> map_limit{SIZE_MAX};
 static std::atomic<long> heap_live{0},map_live{0},map_total{0},notes{0};
 static void* test_malloc(size_t n){if(deny_heap)return nullptr;void* p=std::malloc(n);if(p)++heap_live;return p;}
 static void* test_realloc(void* p,size_t n){if(deny_heap||deny_resize)return nullptr;return std::realloc(p,n);}
 static void test_free(void* p){if(p)--heap_live;std::free(p);}
 static void test_note();
 static void* test_mmap(void* p,size_t n,int prot,int flags,int fd,off_t off){
- if(deny_maps){errno=ENOMEM;return MAP_FAILED;}
+ if(deny_maps||n>map_limit){errno=ENOMEM;return MAP_FAILED;}
  void* memory=::mmap(p,n,prot,flags,fd,off);if(memory!=MAP_FAILED){++map_live;++map_total;}return memory;
 }
 static int test_munmap(void* p,size_t n){int result=::munmap(p,n);if(!result)--map_live;return result;}
@@ -56,6 +57,15 @@ int main(){
  assert(!heap::allocate(128));assert(!heap::allocate(SIZE_MAX));check(p,8192,0x79);deny_maps=false;
  void* shrink=heap::reallocate(p,32);assert(shrink==p);check(p,32,0x79);heap::release(p);assert(map_live==0);
  p=heap::allocate(0);assert(p);p=heap::reallocate(p,0);assert(p);heap::release(p);heap::release(nullptr);
+ // A refused full slab retries a real minimal page, with matching cleanup.
+ map_limit=16384;
+ for(size_t n:{24u,48u,4096u}) {
+  void* q=heap::allocate(n);assert(q);std::memset(q,0x59,n);check(q,n,0x59);
+  assert(((heap::Header*)q-1)->block.slab->mapped<=16384);
+  heap::release(q);assert(map_live==0);
+ }
+ map_limit=1;assert(!heap::allocate(24)&&errno==ENOMEM&&map_live==0);
+ map_limit=SIZE_MAX;
  // All size classes and direct mappings, with concurrent ownership and reuse.
  long before=map_total;
  std::vector<void*> blocks;

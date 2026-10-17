@@ -1,0 +1,47 @@
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -2957,6 +2957,13 @@
+ // Get the kern.corefile setting, or otherwise the default path to the core file
+ // Returns the length of the string
+ int os::get_core_path(char* buffer, size_t bufferSize) {
++#ifdef __PROSPERO__
++  // PS5 has no supported desktop core-file naming/query interface. In
++  // particular getprogname can fault while reporting a genuine native OOM.
++  // No core path is available; let the ordinary fatal report continue.
++  if (bufferSize > 0) buffer[0] = '\0';
++  return 0;
++#else
+   int n = 0;
+ #ifdef __APPLE__
+   char coreinfo[MAX_PATH];
+@@ -3001,6 +3008,7 @@
+   n = MIN2(n, (int)bufferSize);
+ 
+   return n;
++#endif // __PROSPERO__
+ }
+ 
+ bool os::supports_map_sync() {
+--- a/src/hotspot/share/runtime/ps5NativeHeap.hpp
++++ b/src/hotspot/share/runtime/ps5NativeHeap.hpp
+@@ -78,8 +78,18 @@
+     if (!slab) {
+       if (rounded(65536, &mapped)) {
+         void* memory = map_pages(mapped);
+-        if (memory == MAP_FAILED) error = errno;
+-        else {
++        if (memory == MAP_FAILED) {
++          error = errno;
++          // Under pressure a full slab can be refused even when a single
++          // page remains available. Retry once, still with real OS storage.
++          size_t minimal;
++          if (rounded(sizeof(Slab) + stride, &minimal) && minimal < mapped) {
++            mapped = minimal;
++            memory = map_pages(mapped);
++            error = memory == MAP_FAILED ? errno : 0;
++          }
++        }
++        if (memory != MAP_FAILED) {
+           slab = (Slab*)memory;
+           slab->next = classes()[index]; slab->available = nullptr;
+           slab->mapped = mapped; slab->stride = stride; slab->live = 0; slab->index = index;

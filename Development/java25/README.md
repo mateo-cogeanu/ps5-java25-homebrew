@@ -1701,3 +1701,9 @@ Build035 confirms live Java null continuation and progress through40 JAR checks.
 Build037 confirms actual readable asset access and later datapack loading. Patch0064 adds a conservative initial directory-ABI fallback and native stream/zlib allocation ownership with libc-first mapped fallback. Full JNI/real ZipFS and sanitizer regressions pass; build038 PS5 validation and separate service-discovery DNS diagnosis remain pending. See directory/access notes.
 
 Patch0065 moves directory bytes to a dedicated page-aligned64KiB mapping and adds bounded saved-stack/frame evidence for unhandled native signals. Build038 still fails directory enumeration and crashes during consumer startup; buffer layout is a hypothesis, and the external faulting address has no native caller yet. Host/target checks pass; build039 is diagnostic development awaiting PS5 validation.
+
+## Native OOM reporting and small slab retry (0066)
+
+Build039's saved native frame chain resolves to ConcurrentHashTable dictionary insertion, AllocateHeap, native out-of-memory reporting, core-dump prerequisites and os::get_core_path. The signal is therefore in fatal reporting, rather than evidence that the last completed malloc itself jumped to the bad PC. The raw trace records refused64KiB slabs for small allocations. It does not establish the process memory limit.
+
+On PS5 get_core_path now returns unavailable without desktop current-directory/program-name queries. Small mapped native allocations retry one minimal page-rounded slab after a64KiB mapping failure; successful ownership/cleanup is unchanged and both failures still propagate real OOM. The host actual-body core-path test and allocator sanitizer tests include a64KiB refusal with smaller mappings accepted, and complete refusal. These repairs need PS5 validation; they do not claim server readiness or eliminate genuine native memory exhaustion. Heap remains192MiB in the consumer probe.
