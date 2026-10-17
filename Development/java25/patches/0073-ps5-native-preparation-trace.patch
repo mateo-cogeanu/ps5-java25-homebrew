@@ -1,0 +1,79 @@
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5NativeMethodTrace.hpp
+@@ -0,0 +1,32 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHARE_RUNTIME_PS5NATIVEMETHODTRACE_HPP
++#define SHARE_RUNTIME_PS5NATIVEMETHODTRACE_HPP
++#ifdef __PROSPERO__
++#include <stddef.h>
++#include <stdint.h>
++#include "runtime/ps5StartupTrace.hpp"
++// Fixed stack formatting of length-delimited Symbol bytes. No ResourceMark,
++// as_C_string, heap allocation, locks or new TLS initialization.
++inline void ps5_trace_native_part(char* line, size_t* used, const unsigned char* bytes,
++                                 size_t length, size_t cap) {
++  size_t count = length < cap ? length : cap;
++  for (size_t i=0; bytes && i<count; ++i) {
++    unsigned char c=bytes[i]; line[(*used)++]=(c>=32 && c<127)?(char)c:'?';
++  }
++  if (length>cap) line[(*used)++]='~';
++}
++inline void ps5_trace_native_method(const char* stage,
++        const unsigned char* holder, size_t holder_len,
++        const unsigned char* name, size_t name_len,
++        const unsigned char* signature, size_t signature_len, uintptr_t target) {
++  char line[384]; size_t used=0;
++  ps5_trace_native_part(line,&used,(const unsigned char*)stage,stage?::strlen(stage):0,48);
++  line[used++]=' ';
++  ps5_trace_native_part(line,&used,holder,holder_len,80);line[used++]='.';
++  ps5_trace_native_part(line,&used,name,name_len,80);
++  ps5_trace_native_part(line,&used,signature,signature_len,160);line[used]=0;
++  ps5_vm_trace(line);
++  ps5_vm_trace_values("PS5 native prepare target=",target," self=",(uintptr_t)pthread_self()," phase=",0);
++}
++#endif
++#endif
+--- a/src/hotspot/share/interpreter/interpreterRuntime.cpp
++++ b/src/hotspot/share/interpreter/interpreterRuntime.cpp
+@@ -35,6 +35,7 @@
+ #include "interpreter/bytecodeTracer.hpp"
+ #include "interpreter/interpreter.hpp"
+ #include "interpreter/interpreterRuntime.hpp"
++#include "runtime/ps5NativeMethodTrace.hpp"
+ #include "interpreter/linkResolver.hpp"
+ #include "interpreter/templateTable.hpp"
+ #include "jvm_io.h"
+@@ -1440,15 +1441,33 @@
+ address                  SignatureHandlerLibrary::_buffer       = nullptr;
+ 
+ 
++#ifdef __PROSPERO__
++static void ps5_trace_preparing_method(const char* stage, Method* method, uintptr_t target) {
++  Symbol* holder=method->method_holder()->name();
++  Symbol* name=method->name(); Symbol* signature=method->signature();
++  ps5_trace_native_method(stage,holder->bytes(),holder->utf8_length(),name->bytes(),name->utf8_length(),
++                         signature->bytes(),signature->utf8_length(),target);
++}
++#endif
++
+ JRT_ENTRY(void, InterpreterRuntime::prepare_native_call(JavaThread* current, Method* method))
++#ifdef __PROSPERO__
++  ps5_trace_preparing_method("PS5 native prepare begin",method,0);
++#endif
+   methodHandle m(current, method);
+   assert(m->is_native(), "sanity check");
+   // lookup native function entry point if it doesn't exist
+   if (!m->has_native_function()) {
+     NativeLookup::lookup(m, CHECK);
+   }
++#ifdef __PROSPERO__
++  ps5_trace_preparing_method("PS5 native lookup complete",m(),(uintptr_t)m->native_function());
++#endif
+   // make sure signature handler is installed
+   SignatureHandlerLibrary::add(m);
++#ifdef __PROSPERO__
++  ps5_trace_preparing_method("PS5 native signature complete",m(),(uintptr_t)m->native_function());
++#endif
+   // The interpreter entry point checks the signature handler first,
+   // before trying to fetch the native entry point and klass mirror.
+   // We must set the signature handler last, so that multiple processors
