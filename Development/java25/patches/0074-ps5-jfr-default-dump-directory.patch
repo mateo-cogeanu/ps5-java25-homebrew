@@ -1,0 +1,38 @@
+--- a/src/hotspot/share/jfr/recorder/repository/jfrEmergencyDump.cpp
++++ b/src/hotspot/share/jfr/recorder/repository/jfrEmergencyDump.cpp
+@@ -68,11 +68,25 @@
+   return *_path_buffer == '\0';
+ }
+ 
++// PS5 does not provide the desktop current-directory query used by JFR.
++// The application-visible download directory is a real dump destination;
++// normal file-open/write failures are still handled by the existing code.
++static char* get_default_dump_directory(char* buffer, size_t size) {
++#ifdef __PROSPERO__
++  static const char directory[] = "/download0";
++  if (buffer == nullptr || size < sizeof(directory)) return nullptr;
++  memcpy(buffer, directory, sizeof(directory));
++  return buffer;
++#else
++  return os::get_current_directory(buffer, size);
++#endif
++}
++
+ // returns with an appended file separator (if successful)
+ static size_t get_dump_directory() {
+   const char* dump_path = JfrEmergencyDump::get_dump_path();
+   if (*dump_path == '\0') {
+-    if (os::get_current_directory(_path_buffer, sizeof(_path_buffer)) == nullptr) {
++    if (get_default_dump_directory(_path_buffer, sizeof(_path_buffer)) == nullptr) {
+       return 0;
+     }
+   } else {
+@@ -167,7 +181,7 @@
+ 
+ void JfrEmergencyDump::set_dump_path(const char* path) {
+   if (path == nullptr || *path == '\0') {
+-    os::get_current_directory(_dump_path, sizeof(_dump_path));
++    get_default_dump_directory(_dump_path, sizeof(_dump_path));
+   } else {
+     if (strlen(path) < JVM_MAXPATHLEN) {
+       strncpy(_dump_path, path, JVM_MAXPATHLEN);
