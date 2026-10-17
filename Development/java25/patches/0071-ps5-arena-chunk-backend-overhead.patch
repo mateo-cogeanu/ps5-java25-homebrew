@@ -1,0 +1,47 @@
+--- a/src/hotspot/share/memory/arena.hpp
++++ b/src/hotspot/share/memory/arena.hpp
+@@ -71,10 +71,17 @@
+     slack      = 24,            // suspected sizeof(Chunk) + internal malloc headers
+ #endif
+ 
++#ifdef __PROSPERO__
++    // Keep the default32KiB chunk within two16KiB fallback pages, including
++    // Chunk, raw ownership prefix and optional NMT header/footer.
++    large_slack = 128,
++#else
++    large_slack = slack,
++#endif
+     tiny_size  =  256  - slack, // Size of first chunk (tiny)
+     init_size  =  1*K  - slack, // Size of first chunk (normal aka small)
+     medium_size= 10*K  - slack, // Size of medium-sized chunk
+-    size       = 32*K  - slack, // Default size of an Arena chunk (following the first)
++    size       = 32*K  - large_slack, // Default size of an Arena chunk (following the first)
+     max_default_size = size     // Largest default size
+   };
+ 
+--- a/src/hotspot/share/memory/arena.cpp
++++ b/src/hotspot/share/memory/arena.cpp
+@@ -30,6 +30,10 @@
+ #include "memory/resourceArea.hpp"
+ #include "nmt/memTracker.inline.hpp"
+ #include "runtime/os.hpp"
++#ifdef __PROSPERO__
++#include "runtime/ps5NativeHeap.hpp"
++#include "nmt/mallocHeader.hpp"
++#endif
+ #include "runtime/task.hpp"
+ #include "runtime/trimNativeHeap.hpp"
+ #include "utilities/align.hpp"
+@@ -60,6 +64,12 @@
+ STATIC_ASSERT(is_aligned((int)Chunk::init_size, ARENA_AMALLOC_ALIGNMENT));
+ STATIC_ASSERT(is_aligned((int)Chunk::medium_size, ARENA_AMALLOC_ALIGNMENT));
+ STATIC_ASSERT(is_aligned((int)Chunk::size, ARENA_AMALLOC_ALIGNMENT));
++#ifdef __PROSPERO__
++// Check the actual target layouts, including tracking-on overhead. Both the
++// Chunk payload and raw allocation prefix must fit the nominal size class.
++STATIC_ASSERT(ARENA_ALIGN(sizeof(Chunk)) + sizeof(ps5_native_heap::Header) +
++              sizeof(MallocHeader) + sizeof(uint16_t) <= Chunk::large_slack);
++#endif
+ 
+ 
+ const char* Arena::tag_name[] = {

@@ -37,12 +37,15 @@ static void* test_mmap(void* p,size_t n,int prot,int flags,int fd,off_t off){
  void* memory=::mmap(p,n,prot,flags,fd,off);if(memory!=MAP_FAILED){++map_live;++map_total;}return memory;
 }
 static int test_munmap(void* p,size_t n){int result=::munmap(p,n);if(!result)--map_live;return result;}
+static long test_sysconf(int name){assert(name==_SC_PAGESIZE);return 16384;}
 #define __PROSPERO__ 1
+#define sysconf test_sysconf
 #define mmap test_mmap
 #define munmap test_munmap
 #include "runtime/ps5NativeHeap.hpp"
 #undef mmap
 #undef munmap
+#undef sysconf
 static void test_note(){if(!parallel)assert(__atomic_load_n(ps5_native_heap::mutex_word(),__ATOMIC_RELAXED)==0);++notes;}
 namespace heap=ps5_native_heap;
 static void check(void* p,size_t n,unsigned char value){assert(p);assert((uintptr_t)p%alignof(max_align_t)==0);for(size_t i=0;i<n;++i)assert(((unsigned char*)p)[i]==value);}
@@ -160,13 +163,33 @@ functions=os_source[start:end]
 preinit=(ROOT/'.tools/java25/openjdk/src/hotspot/share/nmt/nmtPreInit.cpp').read_text()
 a=preinit.index('static void* raw_malloc(size_t s) { return ps5_native_heap::allocate(s); }');b=preinit.index('#else',a)
 functions=preinit[a:b]+'\n'+functions
+arena=(ROOT/'.tools/java25/openjdk/src/hotspot/share/memory/arena.hpp').read_text()
+a=arena.index('  enum {');b=arena.index('\n  };',a)+5
+arena_enum=arena[a:b]
 checks=r'''
+static constexpr size_t K=1024;
+struct ArenaChunkLayoutContract {void* next;size_t length;uint64_t stamp;
+ARENA_ENUM_PLACEHOLDER
+};
 int main(){
  heap_stress_main();deny_heap=false;deny_maps=false;
  // Raw NMT pre-init block survives transition to ordinary NMT-off os APIs.
  void* early=raw_malloc(90);assert(early);std::memset(early,0x61,90);
  deny_heap=true;early=raw_realloc(early,128);check(early,90,0x61);
  deny_heap=true;early=os::realloc(early,300,mtInternal);check(early,90,0x61);os::free(early);
+ // The default arena request must fit two16KiB pages even with NMT overhead.
+ for(bool nmt:{false,true}) {
+  tracking=nmt;accounted=0;limit=SIZE_MAX;deny_heap=true;map_limit=32768;
+  size_t request=sizeof(ArenaChunkLayoutContract)+ArenaChunkLayoutContract::size;
+  void* arena=os::malloc(request,mtInternal);assert(arena);
+  void* raw=nmt?(void*)((MallocHeader*)arena-1):arena;
+  assert(((heap::Header*)raw-1)->block.mapped==32768);
+  memset(arena,0x47,request);os::free(arena);assert(map_live==0&&accounted==0);
+  // Reproduce the old untracked32752-byte request spilling into48KiB.
+  tracking=false;assert(!os::malloc(32752,mtInternal));assert(map_live==0);
+ }
+ map_limit=SIZE_MAX;
+ std::puts("PASS: exact arena size enum with layout/NMT contracts and16KiB page model fits32KiB; previous32752-byte request is refused at32KiB mapping limit");
  for(bool nmt:{false,true}) {
   tracking=nmt;accounted=0;limit=SIZE_MAX;deny_heap=false;
   void* p=os::malloc(128,mtInternal);assert(p);std::memset(p,0x52,128);
@@ -185,6 +208,7 @@ int main(){
 }
 '''
 cpp=cpp.replace('int main(){','int heap_stress_main(){').replace('complete backend cleanup");','complete backend cleanup");return 0;')
+checks=checks.replace('ARENA_ENUM_PLACEHOLDER',arena_enum)
 cpp+='\n#undef assert\n'+model+'\n'+functions+'\n'+checks
 
 source=WORK/'test.cpp';source.write_text(cpp);exe=WORK/'test-native-heap'
