@@ -1,0 +1,274 @@
+--- a/src/java.base/unix/native/libnet/NetworkInterface.c
++++ b/src/java.base/unix/native/libnet/NetworkInterface.c
+@@ -98,6 +98,18 @@
+ #define NETIF_NOTE(phase,value) ps5_netif_note(phase, (long)(value), (*env)->ExceptionCheck(env))
+ #else
+ #define NETIF_NOTE(phase,value) ((void)0)
++#endif
++
++#ifdef __PROSPERO__
++#define PS5_IFADDRS_NOTE(phase,value) ps5_netif_note(phase, (long)(value), 0)
++#include "ps5Ifaddrs.h"
++#define IFADDRS_STORAGE Ps5Ifaddrs ifaddrs_storage = {0}
++#define GETIFADDRS(list) ps5_getifaddrs(list, &ifaddrs_storage)
++#define FREEIFADDRS(list) ps5_freeifaddrs(list, &ifaddrs_storage)
++#else
++#define IFADDRS_STORAGE
++#define GETIFADDRS(list) getifaddrs(list)
++#define FREEIFADDRS(list) freeifaddrs(list)
+ #endif
+ 
+ #define CHECKED_MALLOC3(_pointer, _type, _size) \
+@@ -1741,10 +1753,11 @@
+  * Enumerates and returns all IPv4 interfaces on BSD.
+  */
+ static netif *enumIPv4Interfaces(JNIEnv *env, int sock, netif *ifs) {
++    IFADDRS_STORAGE;
+     struct ifaddrs *ifa, *origifa;
+ 
+     NETIF_NOTE("IPv4 getifaddrs enter", 0);
+-    if (getifaddrs(&origifa) != 0) {
++    if (GETIFADDRS(&origifa) != 0) {
+         NETIF_NOTE("IPv4 getifaddrs failed", 0);
+         JNU_ThrowByNameWithMessageAndLastError
+             (env, JNU_JAVANETPKG "SocketException", "getifaddrs() failed");
+@@ -1774,14 +1787,14 @@
+         // if an exception occurred then free the list
+         if ((*env)->ExceptionCheck(env)) {
+             NETIF_NOTE("IPv4 addif failed", 0);
+-            freeifaddrs(origifa);
++            FREEIFADDRS(origifa);
+             freeif(ifs);
+             return NULL;
+         }
+     }
+ 
+     // free ifaddrs buffer
+-    freeifaddrs(origifa);
++    FREEIFADDRS(origifa);
+     return ifs;
+ }
+ 
+@@ -1789,10 +1802,11 @@
+  * Enumerates and returns all IPv6 interfaces on BSD.
+  */
+ static netif *enumIPv6Interfaces(JNIEnv *env, int sock, netif *ifs) {
++    IFADDRS_STORAGE;
+     struct ifaddrs *ifa, *origifa;
+ 
+     NETIF_NOTE("IPv6 getifaddrs enter", 0);
+-    if (getifaddrs(&origifa) != 0) {
++    if (GETIFADDRS(&origifa) != 0) {
+         NETIF_NOTE("IPv6 getifaddrs failed", 0);
+         JNU_ThrowByNameWithMessageAndLastError
+             (env, JNU_JAVANETPKG "SocketException", "getifaddrs() failed");
+@@ -1814,14 +1828,14 @@
+         // if an exception occurred then free the list
+         if ((*env)->ExceptionCheck(env)) {
+             NETIF_NOTE("IPv6 addif failed", 0);
+-            freeifaddrs(origifa);
++            FREEIFADDRS(origifa);
+             freeif(ifs);
+             return NULL;
+         }
+     }
+ 
+     // free ifaddrs buffer
+-    freeifaddrs(origifa);
++    FREEIFADDRS(origifa);
+     return ifs;
+ }
+ 
+@@ -1854,12 +1868,13 @@
+   (JNIEnv *env, const char *ifname, const struct in_addr *addr,
+    unsigned char *buf)
+ {
++    IFADDRS_STORAGE;
+     struct ifaddrs *ifa0, *ifa;
+     struct sockaddr *saddr;
+     int i;
+ 
+     // grab the interface list
+-    if (!getifaddrs(&ifa0)) {
++    if (!GETIFADDRS(&ifa0)) {
+         // cycle through the interfaces
+         for (i = 0, ifa = ifa0; ifa != NULL; ifa = ifa->ifa_next, i++) {
+             saddr = ifa->ifa_addr;
+@@ -1870,13 +1885,13 @@
+                     // check the address has the correct length
+                     if (sadl->sdl_alen == ETHER_ADDR_LEN) {
+                         memcpy(buf, (sadl->sdl_data + sadl->sdl_nlen), ETHER_ADDR_LEN);
+-                        freeifaddrs(ifa0);
++                        FREEIFADDRS(ifa0);
+                         return ETHER_ADDR_LEN;
+                     }
+                 }
+             }
+         }
+-        freeifaddrs(ifa0);
++        FREEIFADDRS(ifa0);
+     }
+ 
+     return -1;
+--- /dev/null
++++ b/src/java.base/unix/native/libnet/ps5Ifaddrs.h
+@@ -0,0 +1,159 @@
++/* SPDX-License-Identifier: GPL-2.0-only WITH Classpath-exception-2.0 */
++#ifndef PS5_IFADDRS_H
++#define PS5_IFADDRS_H
++#include <sys/sysctl.h>
++#include <sys/mman.h>
++#include <net/route.h>
++#include <stddef.h>
++#include <stdint.h>
++/* The resident getifaddrs can return ENOMEM after earlier successful calls.
++ * Retry only that error using a fresh NET_RT_IFLIST query and owned mappings.
++ * No cached addresses, synthetic interfaces, libc allocator or global leases.
++ */
++typedef struct {
++    struct ifaddrs address;
++    char name[IFNAMSIZ];
++    struct sockaddr_storage addr, mask, dst;
++} Ps5IfaddrNode;
++typedef struct { void *nodes; size_t bytes; } Ps5Ifaddrs;
++#ifndef PS5_IFADDRS_NOTE
++#define PS5_IFADDRS_NOTE(phase,value) ((void)0)
++#endif
++static int ps5_ifaddrs_addresses(const unsigned char *cursor, size_t length,
++                               unsigned bits, const struct sockaddr **addresses) {
++    for (unsigned i=0; i<RTAX_MAX; i++) {
++        addresses[i]=NULL;
++        if (!(bits & (1u<<i))) continue;
++        if (length<2) return -1;
++        size_t bytes=cursor[0];
++        size_t rounded=bytes ? (bytes+sizeof(long)-1)&~(sizeof(long)-1) : sizeof(long);
++        if (rounded>length || (bytes && bytes<2)) return -1;
++        addresses[i]=(const struct sockaddr *)(const void *)cursor;
++        cursor+=rounded; length-=rounded;
++    }
++    if (bits & ~((1u<<RTAX_MAX)-1)) return -1;
++    return 0;
++}
++static int ps5_ifaddrs_copy(struct sockaddr_storage *to, const struct sockaddr *from) {
++    if (!from) return 0;
++    if (from->sa_len>sizeof(*to)) return -1;
++    memset(to,0,sizeof(*to));
++    if (from->sa_len) memcpy(to,from,from->sa_len);
++    return 0;
++}
++/* Each input message contributes at most one node. Addresses are copied into
++ * zero-padded storage because route netmasks may use shortened sockaddr forms.
++ */
++static int ps5_ifaddrs_parse(const unsigned char *data,size_t size,
++                            Ps5IfaddrNode *nodes,size_t capacity,size_t *count) {
++    size_t used=0,offset=0; unsigned index=0;
++    char name[IFNAMSIZ]={0}; unsigned flags=0;
++    struct ifaddrs *last=NULL;
++    while (offset<size) {
++        const unsigned char *message=data+offset;
++        if (size-offset<4) goto invalid;
++        unsigned short length; memcpy(&length,message,2);
++        if (length<4 || length>size-offset || message[2]!=RTM_VERSION) goto invalid;
++        const struct sockaddr *addresses[RTAX_MAX];
++        struct if_msghdr info;
++        struct ifa_msghdr address;
++        const struct sockaddr *value=NULL,*mask=NULL,*dst=NULL;
++        if (message[3]==RTM_IFINFO) {
++            if (length<sizeof(info)) goto invalid;
++            memcpy(&info,message,sizeof(info));
++            index=0; name[0]=0;
++            if (ps5_ifaddrs_addresses(message+sizeof(info),length-sizeof(info),
++                                     (unsigned)info.ifm_addrs,addresses)) goto invalid;
++            value=addresses[RTAX_IFP];
++            if (!value) {offset+=length;continue;}
++            if (value->sa_family!=AF_LINK || value->sa_len<offsetof(struct sockaddr_dl,sdl_data)) goto invalid;
++            struct sockaddr_dl link; memset(&link,0,sizeof(link));
++            memcpy(&link,value,offsetof(struct sockaddr_dl,sdl_data));
++            size_t namesize=link.sdl_nlen;
++            if (!namesize || namesize>=IFNAMSIZ ||
++                offsetof(struct sockaddr_dl,sdl_data)+namesize+link.sdl_alen+link.sdl_slen>value->sa_len) goto invalid;
++            memcpy(name,(const unsigned char *)value+offsetof(struct sockaddr_dl,sdl_data),namesize);name[namesize]=0;
++            index=info.ifm_index;flags=(unsigned)info.ifm_flags;
++        } else if (message[3]==RTM_NEWADDR) {
++            if (length<sizeof(address)) goto invalid;
++            memcpy(&address,message,sizeof(address));
++            if (!index || index!=address.ifam_index) goto invalid;
++            if (ps5_ifaddrs_addresses(message+sizeof(address),length-sizeof(address),
++                                     (unsigned)address.ifam_addrs,addresses)) goto invalid;
++            value=addresses[RTAX_IFA];mask=addresses[RTAX_NETMASK];dst=addresses[RTAX_BRD];
++            if (!value) {offset+=length;continue;}
++            if ((value->sa_family==AF_INET && value->sa_len<sizeof(struct sockaddr_in)) ||
++                (value->sa_family==AF_INET6 && value->sa_len<sizeof(struct sockaddr_in6))) goto invalid;
++        } else {offset+=length;continue;}
++        if (used>=capacity) goto invalid;
++        Ps5IfaddrNode *node=&nodes[used++];memset(node,0,sizeof(*node));
++        memcpy(node->name,name,sizeof(name));node->address.ifa_name=node->name;
++        node->address.ifa_flags=flags;
++        if (ps5_ifaddrs_copy(&node->addr,value) || ps5_ifaddrs_copy(&node->mask,mask) || ps5_ifaddrs_copy(&node->dst,dst)) goto invalid;
++        node->address.ifa_addr=(struct sockaddr *)&node->addr;
++        if (mask) node->address.ifa_netmask=(struct sockaddr *)&node->mask;
++        if (dst) node->address.ifa_dstaddr=(struct sockaddr *)&node->dst;
++        if (last) last->ifa_next=&node->address;
++        last=&node->address;offset+=length;
++    }
++    *count=used;return 0;
++invalid:
++    errno=EINVAL;return -1;
++}
++static void ps5_freeifaddrs(struct ifaddrs *list,Ps5Ifaddrs *storage) {
++    int saved=errno;
++    if (storage->nodes) {munmap(storage->nodes,storage->bytes);storage->nodes=NULL;storage->bytes=0;}
++    else freeifaddrs(list);
++    errno=saved;
++}
++static int ps5_getifaddrs(struct ifaddrs **result,Ps5Ifaddrs *storage) {
++    int saved=errno;
++    *result=NULL;storage->nodes=NULL;storage->bytes=0;
++    if (getifaddrs(result)==0) return 0;
++    if (errno!=ENOMEM) return -1;
++    *result=NULL;
++    PS5_IFADDRS_NOTE("resident ENOMEM; route fallback",0);
++    int mib[6]={CTL_NET,PF_ROUTE,0,0,NET_RT_IFLIST,0};
++    for (unsigned attempt=0;attempt<5;attempt++) {
++        size_t size=0;
++        if (sysctl(mib,6,NULL,&size,NULL,0)<0) return -1;
++        /* Bound temporary memory and parser work; oversized data is real failure. */
++        if (size>1024*1024) {errno=EOVERFLOW;return -1;}
++        if (!size) {errno=saved;return 0;}
++        unsigned char *raw=mmap(NULL,size,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
++        if (raw==MAP_FAILED) return -1;
++        size_t received=size;
++        if (sysctl(mib,6,raw,&received,NULL,0)<0) {
++            int error=errno;munmap(raw,size);errno=error;
++            if (error==ENOMEM) continue;
++            return -1;
++        }
++        if (received>size) {munmap(raw,size);errno=EINVAL;return -1;}
++        /* Count messages with the same bounded framing before allocating nodes. */
++        size_t offset=0,capacity=0;
++        while (offset<received) {
++            if (received-offset<4) break;
++            unsigned short length;memcpy(&length,raw+offset,2);
++            if (length<4 || length>received-offset) break;
++            capacity++;offset+=length;
++        }
++        if (offset!=received || capacity>SIZE_MAX/sizeof(Ps5IfaddrNode)) {
++            munmap(raw,size);errno=EINVAL;return -1;
++        }
++        size_t bytes=capacity*sizeof(Ps5IfaddrNode);
++        if (bytes>16*1024*1024) {munmap(raw,size);errno=EOVERFLOW;return -1;}
++        if (!bytes) {munmap(raw,size);errno=saved;return 0;}
++        Ps5IfaddrNode *nodes=mmap(NULL,bytes,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
++        if (nodes==MAP_FAILED) {int error=errno;munmap(raw,size);errno=error;return -1;}
++        size_t count=0;
++        int status=ps5_ifaddrs_parse(raw,received,nodes,capacity,&count);
++        int error=errno;munmap(raw,size);
++        if (status<0) {munmap(nodes,bytes);errno=error;return -1;}
++        if (!count) {munmap(nodes,bytes);errno=saved;return 0;}
++        storage->nodes=nodes;storage->bytes=bytes;*result=&nodes[0].address;
++        PS5_IFADDRS_NOTE("route fallback complete",count);
++        errno=saved;return 0;
++    }
++    errno=ENOMEM;return -1;
++}
++#endif

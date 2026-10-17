@@ -1749,3 +1749,12 @@ it also runs the actual getAll body with narrow JNI/enumeration stubs covering
 success, enumeration/array/conversion failures, pending exceptions and cleanup.
 ASan/UBSan and target HotSpot/java.base native builds pass. Console validation
 and the underlying OOM cause remain pending.
+
+## Mapped interface-query fallback (0076)
+
+[Patch0076 and validation details](../docs/java25-interface-query-fallback.md)
+retry resident `getifaddrs()` ENOMEM with a fresh bounded kernel route query
+and mapped storage. Current interface/MAC data and explicit ownership are
+retained; normal resident success and other errors remain unchanged. Actual
+parser/fallback sanitizer checks and target native compilation pass. PS5
+route ABI/permissions and downstream consumer readiness remain unvalidated.
