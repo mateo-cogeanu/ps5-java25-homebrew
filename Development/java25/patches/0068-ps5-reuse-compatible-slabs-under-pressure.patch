@@ -1,0 +1,57 @@
+--- a/src/hotspot/share/runtime/ps5NativeHeap.hpp
++++ b/src/hotspot/share/runtime/ps5NativeHeap.hpp
+@@ -71,7 +71,8 @@
+     unsigned index = 0; size_t capacity = 32;
+     while (capacity < size) { ++index; capacity *= 2; }
+     const size_t stride = sizeof(Header) + capacity;
+-    bool created = false; size_t mapped = 0; int error = 0;
++    bool created = false, borrowed = false; size_t mapped = 0; int error = 0;
++    size_t slab_bytes[8] = {}, slab_live[8] = {}, slab_free[8] = {};
+     lock();
+     Slab* slab = classes()[index];
+     while (slab && !slab->available) slab = slab->next;
+@@ -102,6 +103,26 @@
+         }
+       } else error = ENOMEM;
+     }
++    if (!slab) {
++      // Mapping refusal does not mean that existing compatible storage is full.
++      // A slot in a larger class is safe: its header retains the owning slab,
++      // and release uses that slab's real index and mapping length.
++      for (unsigned other = index + 1; other < 8 && !slab; ++other) {
++        slab = classes()[other];
++        while (slab && !slab->available) slab = slab->next;
++      }
++      borrowed = slab != nullptr;
++      if (!slab) {
++        for (unsigned other = 0; other < 8; ++other) {
++          for (Slab* entry = classes()[other]; entry; entry = entry->next) {
++            slab_bytes[other] += entry->mapped;
++            slab_live[other] += entry->live;
++            slab_free[other] += (entry->mapped - sizeof(Slab)) / entry->stride - entry->live;
++          }
++        }
++      }
++    }
++    size_t borrowed_capacity = slab ? slab->stride - sizeof(Header) : 0;
+     if (slab) {
+       header = slab->available; slab->available = header->next; ++slab->live;
+       header->block = {size, 0, slab};
+@@ -109,7 +130,16 @@
+     unlock();
+     // File IO/diagnostics must never run while holding the allocator lock.
+     if (created || !slab) note("PS5 native heap slab: requested=", size, mapped, error);
+-    if (!slab) { errno = error; return nullptr; }
++    if (borrowed) ps5_vm_trace_values("PS5 native heap borrowed: requested=", size, " capacity=", borrowed_capacity, " mapping_error=", error);
++    if (!slab) {
++      for (unsigned other = 0; other < 8; ++other) {
++        ps5_vm_trace_values("PS5 slab capacity=", (size_t)32 << other,
++                            " mapped_bytes=", slab_bytes[other], " live_slots=", slab_live[other]);
++        ps5_vm_trace_values("PS5 slab capacity=", (size_t)32 << other,
++                            " free_slots=", slab_free[other], " requested=", size);
++      }
++      errno = error; return nullptr;
++    }
+   }
+   errno = saved_errno; return header + 1;
+ }

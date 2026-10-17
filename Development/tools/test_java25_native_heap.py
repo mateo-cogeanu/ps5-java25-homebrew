@@ -66,6 +66,26 @@ int main(){
  }
  map_limit=1;assert(!heap::allocate(24)&&errno==ENOMEM&&map_live==0);
  map_limit=SIZE_MAX;
+ // Mapping refusal must reuse compatible capacity, never smaller slots.
+ for(size_t owner_size:{64u,256u,4096u}) {
+  void* owner=heap::allocate(owner_size);assert(owner);std::memset(owner,0x71,owner_size);
+  auto owner_slab=((heap::Header*)owner-1)->block.slab;
+  size_t slots=(owner_slab->mapped-sizeof(heap::Slab))/owner_slab->stride;
+  deny_maps=true;long mappings=map_total;std::vector<void*> borrowed;
+  for(size_t i=1;i<slots;i++){
+   errno=EDOM;void* q=heap::allocate(16);assert(q&&errno==EDOM);
+   assert(((heap::Header*)q-1)->block.slab==owner_slab);
+   std::memset(q,0x36,16);borrowed.push_back(q);
+  }
+  assert(!heap::allocate(16)&&errno==ENOMEM);assert(map_total==mappings);
+  check(owner,owner_size,0x71);heap::release(owner);assert(map_live==1);
+  for(void* q:borrowed){check(q,16,0x36);heap::release(q);}assert(map_live==0);
+  deny_maps=false;
+ }
+ // An undersized slot cannot satisfy a larger request; failed growth retains data.
+ void* small=heap::allocate(16);std::memset(small,0x25,16);deny_maps=true;
+ assert(!heap::allocate(64));assert(!heap::reallocate(small,64));check(small,16,0x25);
+ heap::release(small);assert(map_live==0);deny_maps=false;
  // All size classes and direct mappings, with concurrent ownership and reuse.
  long before=map_total;
  std::vector<void*> blocks;
