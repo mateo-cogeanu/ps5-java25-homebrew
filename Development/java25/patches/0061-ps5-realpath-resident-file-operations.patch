@@ -1,0 +1,99 @@
+--- a/src/java.base/unix/native/libnio/fs/ps5Realpath.h
++++ b/src/java.base/unix/native/libnio/fs/ps5Realpath.h
+@@ -7,12 +7,16 @@
+ #include <string.h>
+ #include <unistd.h>
+ /* Conservative fallback for realpath EPERM: verify each component through
+- * anchored, non-following native opens. No lexical existence or link bypass.
++ * component-prefix, non-following native opens. No lexical existence bypass.
+  * Paths requiring link resolution remain errors when native realpath fails. */
++#ifndef PS5_REALPATH_NOTE
++#define PS5_REALPATH_NOTE(phase,path) ((void)0)
++#endif
+ static int ps5_descriptor_realpath(const char*path,char*resolved) {
+     if (!path || path[0]!='/') {errno=EINVAL;return -1;}
+     size_t length=strnlen(path,PATH_MAX+1);
+     if(length>PATH_MAX){errno=ENAMETOOLONG;return -1;}
++    PS5_REALPATH_NOTE("root open",path);
+     int fd;
+     do{fd=open("/",O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_NOFOLLOW);}while(fd<0&&errno==EINTR);
+     if(fd<0)return -1;
+@@ -27,8 +31,16 @@
+         int dot=strcmp(component,".")==0,parent=strcmp(component,"..")==0;
+         int flags=O_RDONLY|O_NONBLOCK|O_NOFOLLOW;
+         if(pos<length||dot||parent)flags|=O_DIRECTORY;
++        // Use resident libc open: the SDK openat is a raw desktop syscall.
++        // Check each unelided prefix, including dot/parent, before reducing it.
++        char candidate[PATH_MAX+1];size_t prefix=used;
++        if(prefix+count+(used>1?1:0)>PATH_MAX){int error=ENAMETOOLONG;close(fd);errno=error;return -1;}
++        memcpy(candidate,resolved,used);
++        if(used>1)candidate[prefix++]='/';
++        memcpy(candidate+prefix,component,count);candidate[prefix+count]=0;
+         int next;
+-        do{next=openat(fd,component,flags);}while(next<0&&errno==EINTR);
++        PS5_REALPATH_NOTE("component open",candidate);
++        do{next=open(candidate,flags);}while(next<0&&errno==EINTR);
+         if(next<0){int error=errno;close(fd);errno=error;return -1;}
+         if(close(fd)<0){int error=errno;close(next);errno=error;return -1;}fd=next;
+         if(parent){while(used>1&&resolved[used-1]!='/')--used;if(used>1)--used;resolved[used]=0;}
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -30,6 +30,20 @@
+ #include <fcntl.h>
+ #include <dirent.h>
+ #ifdef __PROSPERO__
++// Descriptor-only diagnostics remain usable without a fresh FILE allocation.
++#include <unistd.h>
++#include <errno.h>
++static void ps5_realpath_note(const char *phase,const char *path) {
++    int saved=errno;
++    int fd=open("/download0/java25-vm-trace.log",O_CREAT|O_WRONLY|O_APPEND,0600);
++    if(fd>=0){const char *parts[]={"REALPATH: ",phase," ",path,"\n"};
++        for(unsigned i=0;i<5;i++){size_t left=strlen(parts[i]);const char *p=parts[i];
++            while(left){ssize_t n=write(fd,p,left);if(n<0&&errno==EINTR)continue;if(n<=0)break;p+=n;left-=n;}}
++        close(fd);
++    }
++    errno=saved;
++}
++#define PS5_REALPATH_NOTE(phase,path) ps5_realpath_note(phase,path)
+ #include "ps5Realpath.h"
+ #endif
+ #include <unistd.h>
+@@ -347,6 +361,7 @@
+     CHECK_NULL_RETURN(entry_dev, 0);
+ 
+     /* system calls that might not be available at run time */
++#ifndef __PROSPERO__
+ 
+     my_unlinkat_func = (unlinkat_func*) dlsym(RTLD_DEFAULT, "unlinkat");
+     my_renameat_func = (renameat_func*) dlsym(RTLD_DEFAULT, "renameat");
+@@ -380,6 +395,8 @@
+     {
+         capabilities |= sun_nio_fs_UnixNativeDispatcher_SUPPORTS_OPENAT;
+     }
++
++#endif // !__PROSPERO__: desktop *at/fdopendir ABI is not a PS5 capability.
+ 
+     /* supports file birthtime */
+ 
+@@ -1188,11 +1205,20 @@
+     const char* path = (const char*)jlong_to_ptr(pathAddress);
+ 
+     /* EINTR not listed as a possible error */
++#ifdef __PROSPERO__
++    PS5_REALPATH_NOTE("native enter",path);
++#endif
+     char *canonical = realpath(path, resolved);
++#ifdef __PROSPERO__
++    PS5_REALPATH_NOTE(canonical==NULL?"native refused":"native complete",path);
++#endif
+ #ifdef __PROSPERO__
+     if (canonical == NULL && errno == EPERM && ps5_descriptor_realpath(path, resolved) == 0) {
+         canonical = resolved;
+     }
++#endif
++#ifdef __PROSPERO__
++    PS5_REALPATH_NOTE(canonical==NULL?"fallback failed":"canonical complete",path);
+ #endif
+     if (canonical == NULL) {
+         throwUnixException(env, errno);
