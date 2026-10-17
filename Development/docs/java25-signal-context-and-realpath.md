@@ -1,0 +1,21 @@
+# Signal context and canonical asset paths
+
+Consumer build 033 reached vanilla asset lookup after world metadata validation. Its complete server log records realpath EPERM on the asset JAR; its native trace records SIGSEGV at address 0xc. The historical startup download stalled and was canceled, so collection is explicitly partial. Raw reports remain local.
+
+## PS5 signal register layout
+
+Patch 0058 uses a PS5-only context view with the machine context at offset 0x40, rather than the SDK outer structure offset 0x10. The captured original bytes put RIP at 0xe0, RSP at 0xf8, RBP at 0x88 and interpreter BCP/r13 at 0xa8. The old RIP accessor at 0xb0 read a stack address. Both reads and continuation writes now use the corrected view; the original pointer supplied by the kernel is preserved. Non-PS5 platforms use their original layout.
+
+The [public PS5 layout description](https://github.com/boykopovar/AnyPS5/discussions/727) independently describes a 16-byte signal mask, 48 reserved bytes and RSP at 0xf8. Compile-time assertions bind the adaptation to the pinned SDK mcontext definition. The host replay uses literal console bytes, confirms the incorrect old result and ensures continuation updates change only true RIP bytes. Target LLVM IR confirms offset 224 and no allocation/TLS/guard dependencies. Target HotSpot rebuild passes.
+
+`python3 tools/test_java25_signal_context.py`
+
+This defect can prevent normal implicit null exceptions from reaching their Java handler. That explanation fits fault address 0xc and the captured interpreter register values, but live signal recovery and the whole-app crash fix still require PS5 validation. A consumer preflight deliberately catches a real Java null access before loading the server, and signal recovery records the chosen continuation.
+
+## Descriptor-verified realpath fallback
+
+Patch 0059 retains native realpath success and non-EPERM errors. After EPERM only, an absolute path is walked from an opened root descriptor with openat and O_NOFOLLOW on every component. Intermediate components must be directories. Each component is verified before removing dot/parent components, so missing or non-directory prefixes cannot be skipped. At most two descriptors are live; cleanup preserves the actual failure. Fixed-size buffers enforce path/name limits. When native realpath cannot resolve a symlink, fallback refuses it instead of bypassing link semantics.
+
+`python3 tools/test_java25_realpath_fallback.py`
+
+The regression registers the actual patched JNI realpath0 in the host JDK, forces native EPERM and mounts/reads a real ZipFS asset. It checks successful native link resolution, missing components, denied paths, conservative link refusal, descriptor cleanup and bounds. Additional actual-helper ASan/UBSan coverage tests trailing slashes and thousands of operations under a descriptor limit. Target java.base-libs rebuild passes. Consumer preflight now canonicalizes the actual asset JAR and mounts/reads its version.json. These host checks do not establish target openat or signal behavior; all console rows remain pending.

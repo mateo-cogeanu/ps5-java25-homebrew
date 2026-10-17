@@ -47,3 +47,5 @@ Host validation: `python3 tools/test_probe_log_share.py` exercises the actual C+
 handler with sanitizers, binary/large streaming, allowlist rejection, method and
 header limits, disconnected clients, service start/stop and the ZIP collector.
 Console download and availability during a JVM failure require actual PS5 testing.
+
+The fixed `/startup-tail.log` endpoint returns the last 512 KiB of startup history (or the complete file when smaller). It can start mid-line and can include earlier runs; use run IDs to distinguish them. `/startup.log` still returns full history. The compact tail avoids downloading historical multi-megabyte logs during crash diagnosis; no arbitrary path or range parameters are accepted.

@@ -1685,3 +1685,7 @@ Patch 0056 expands the relative/absolute condition reserves to 4096/2048 and add
 ## Nofollow metadata
 
 [Patch 0057](../docs/java25-nofollow-metadata.md) adds genuine descriptor metadata after PS5 lstat EPERM, with O_NOFOLLOW leaf protection and real missing-path/error propagation. Final symlinks remain errors when native lstat cannot describe them; no link validation is disabled. Report notes now avoid allocating a new FILE. Console validation remains pending.
+
+## Signal recovery and canonical paths
+
+[Patches 0058/0059 and their regressions](../docs/java25-signal-context-and-realpath.md) correct the PS5 machine-context offset used for register reads and signal continuation writes, and verify every non-link path component through descriptors after native realpath EPERM. Host replay, actual JNI/ZipFS checks and target rebuilds pass. PS5 recovery and consumer readiness/save/stop remain pending.

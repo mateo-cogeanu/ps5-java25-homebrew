@@ -23,8 +23,8 @@ int main(int argc,char **argv){
  int listener=socket(AF_INET,SOCK_STREAM,0);sockaddr_in a{};a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
  if(bind(listener,(sockaddr*)&a,sizeof(a))||listen(listener,8))return 3;
  socklen_t length=sizeof(a);getsockname(listener,(sockaddr*)&a,&length);printf("%u\n",ntohs(a.sin_port));fflush(stdout);
- ps5::log_share::Entry entries[]={{"/startup.log",argv[1]},{"/server.log",argv[1]},{"/build.txt",argv[3]},{"/session.txt",argv[4]},{"/hs-error.log",argv[6]},{"/class-load.log",argv[1]},{"/process-usage.log",argv[7]}};
- for(;;){int client=accept(listener,nullptr,nullptr);if(client<0)break;ps5::log_share::serve(client,entries,7);close(client);}
+ ps5::log_share::Entry entries[]={{"/startup-tail.log",argv[1]},{"/startup.log",argv[1]},{"/server.log",argv[1]},{"/build.txt",argv[3]},{"/session.txt",argv[4]},{"/hs-error.log",argv[6]},{"/class-load.log",argv[1]},{"/process-usage.log",argv[7]}};
+ for(;;){int client=accept(listener,nullptr,nullptr);if(client<0)break;ps5::log_share::serve(client,entries,8);close(client);}
 }
 ''')
     subprocess.run(['clang++','-std=c++17','-pthread','-fsanitize=address,undefined','-I'+str(ROOT/'java25/probe'),str(root/'server.cpp'),'-o',str(root/'server')],check=True)
@@ -60,7 +60,12 @@ int main(int argc,char **argv){
                 return result
         response=request(b'GET /startup.log HTTP/1.1\r\nHost: test\r\n\r\n');headers,body=response.split(b'\r\n\r\n',1)
         assert b'200 OK' in headers and body==payload
-        for target in (b'/../data',b'/%2e%2e/data',b'/startup.log?path=/etc/passwd',b'/etc/passwd'):
+        response=request(b'GET /startup-tail.log HTTP/1.1\r\n\r\n');headers,body=response.split(b'\r\n\r\n',1)
+        assert body==payload[-512*1024:] and b'Content-Length: 524288' in headers
+        (root/'data').write_bytes(b'short log\n')
+        assert request(b'GET /startup-tail.log HTTP/1.1\r\n\r\n').split(b'\r\n\r\n',1)[1]==b'short log\n'
+        (root/'data').write_bytes(payload)
+        for target in (b'/../data',b'/%2e%2e/data',b'/startup.log?path=/etc/passwd',b'/startup-tail.log?path=/etc/passwd',b'/etc/passwd'):
             assert b'404 Not Found' in request(b'GET '+target+b' HTTP/1.1\r\n\r\n')
         assert b'405 Method Not Allowed' in request(b'POST /startup.log HTTP/1.1\r\n\r\n')
         assert b'431 Request Header Fields Too Large' in request(b'GET / HTTP/1.1\r\nX: '+b'a'*4100)

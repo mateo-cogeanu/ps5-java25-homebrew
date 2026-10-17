@@ -1,0 +1,190 @@
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5SignalContext.hpp
+@@ -0,0 +1,21 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHARE_RUNTIME_PS5SIGNALCONTEXT_HPP
++#define SHARE_RUNTIME_PS5SIGNALCONTEXT_HPP
++#include <stddef.h>
++#ifdef __PROSPERO__
++// PS5 signal frames have 48 reserved bytes after the 16-byte signal mask.
++// Use this view only for register members; never replace the kernel's pointer.
++struct Ps5SignalContext {
++ unsigned char mask_and_reserved[0x40];
++ mcontext_t uc_mcontext;
++};
++static_assert(offsetof(ucontext_t,uc_mcontext)==0x10,"Re-audit changed SDK context layout");
++static_assert(offsetof(Ps5SignalContext,uc_mcontext)==0x40,"PS5 machine context offset");
++static_assert(offsetof(Ps5SignalContext,uc_mcontext)+offsetof(mcontext_t,mc_rip)==0xe0,"PS5 RIP offset");
++static_assert(offsetof(Ps5SignalContext,uc_mcontext)+offsetof(mcontext_t,mc_rsp)==0xf8,"PS5 RSP offset");
++inline Ps5SignalContext* ps5_signal_context(ucontext_t*uc){return reinterpret_cast<Ps5SignalContext*>(uc);}
++inline const Ps5SignalContext* ps5_signal_context(const ucontext_t*uc){return reinterpret_cast<const Ps5SignalContext*>(uc);}
++#else
++template<class C> inline C* ps5_signal_context(C*uc){return uc;}
++#endif
++#endif
+--- a/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
++++ b/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
+@@ -87,6 +87,8 @@
+ #if !defined(__APPLE__) && !defined(__NetBSD__)
+ # include <pthread_np.h>
+ #endif
++
++#include "runtime/ps5SignalContext.hpp"
+ 
+ #ifdef AMD64
+ #define SPELL_REG_SP "rsp"
+@@ -298,19 +300,19 @@
+ }
+ 
+ address os::Posix::ucontext_get_pc(const ucontext_t * uc) {
+-  return (address)uc->context_pc;
++  return (address)ps5_signal_context(uc)->context_pc;
+ }
+ 
+ void os::Posix::ucontext_set_pc(ucontext_t * uc, address pc) {
+-  uc->context_pc = (intptr_t)pc ;
++  ps5_signal_context(uc)->context_pc = (intptr_t)pc ;
+ }
+ 
+ intptr_t* os::Bsd::ucontext_get_sp(const ucontext_t * uc) {
+-  return (intptr_t*)uc->context_sp;
++  return (intptr_t*)ps5_signal_context(uc)->context_sp;
+ }
+ 
+ intptr_t* os::Bsd::ucontext_get_fp(const ucontext_t * uc) {
+-  return (intptr_t*)uc->context_fp;
++  return (intptr_t*)ps5_signal_context(uc)->context_fp;
+ }
+ 
+ address os::fetch_frame_from_context(const void* ucVoid,
+@@ -357,7 +359,7 @@
+   assert(ucVoid != nullptr, "invariant");
+   const ucontext_t* uc = (const ucontext_t*)ucVoid;
+   assert(os::Posix::ucontext_is_interpreter(uc), "invariant");
+-  return reinterpret_cast<intptr_t*>(uc->REG_BCP);
++  return reinterpret_cast<intptr_t*>(ps5_signal_context(uc)->REG_BCP);
+ }
+ 
+ // By default, gcc always save frame pointer (%ebp/%rbp) on stack. It may get
+@@ -645,7 +647,7 @@
+   if (UnguardOnExecutionViolation > 0 &&
+       stub == nullptr &&
+       (sig == SIGSEGV || sig == SIGBUS) &&
+-      uc->context_trapno == trap_page_fault) {
++      ps5_signal_context(uc)->context_trapno == trap_page_fault) {
+     size_t page_size = os::vm_page_size();
+     address addr = (address) info->si_addr;
+     address pc = os::Posix::ucontext_get_pc(uc);
+@@ -710,6 +712,9 @@
+     // save all thread context in case we need to restore it
+     if (thread != nullptr) thread->set_saved_exception_pc(pc);
+ 
++#ifdef __PROSPERO__
++    ps5_vm_trace_values("SIGNAL: resuming pc=",(uintptr_t)stub," interrupted=",(uintptr_t)pc," self=",(uintptr_t)pthread_self());
++#endif
+     os::Posix::ucontext_set_pc(uc, stub);
+     return true;
+   }
+@@ -787,36 +792,36 @@
+ 
+   st->print_cr("Registers:");
+ #ifdef AMD64
+-  st->print(  "RAX=" INTPTR_FORMAT, (intptr_t)uc->context_rax);
+-  st->print(", RBX=" INTPTR_FORMAT, (intptr_t)uc->context_rbx);
+-  st->print(", RCX=" INTPTR_FORMAT, (intptr_t)uc->context_rcx);
+-  st->print(", RDX=" INTPTR_FORMAT, (intptr_t)uc->context_rdx);
+-  st->cr();
+-  st->print(  "RSP=" INTPTR_FORMAT, (intptr_t)uc->context_rsp);
+-  st->print(", RBP=" INTPTR_FORMAT, (intptr_t)uc->context_rbp);
+-  st->print(", RSI=" INTPTR_FORMAT, (intptr_t)uc->context_rsi);
+-  st->print(", RDI=" INTPTR_FORMAT, (intptr_t)uc->context_rdi);
+-  st->cr();
+-  st->print(  "R8 =" INTPTR_FORMAT, (intptr_t)uc->context_r8);
+-  st->print(", R9 =" INTPTR_FORMAT, (intptr_t)uc->context_r9);
+-  st->print(", R10=" INTPTR_FORMAT, (intptr_t)uc->context_r10);
+-  st->print(", R11=" INTPTR_FORMAT, (intptr_t)uc->context_r11);
+-  st->cr();
+-  st->print(  "R12=" INTPTR_FORMAT, (intptr_t)uc->context_r12);
+-  st->print(", R13=" INTPTR_FORMAT, (intptr_t)uc->context_r13);
+-  st->print(", R14=" INTPTR_FORMAT, (intptr_t)uc->context_r14);
+-  st->print(", R15=" INTPTR_FORMAT, (intptr_t)uc->context_r15);
+-  st->cr();
+-  st->print(  "RIP=" INTPTR_FORMAT, (intptr_t)uc->context_rip);
+-  st->print(", EFLAGS=" INTPTR_FORMAT, (intptr_t)uc->context_flags);
+-  st->print(", ERR=" INTPTR_FORMAT, (intptr_t)uc->context_err);
+-  st->cr();
+-  st->print("  TRAPNO=" INTPTR_FORMAT, (intptr_t)uc->context_trapno);
++  st->print(  "RAX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rax);
++  st->print(", RBX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rbx);
++  st->print(", RCX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rcx);
++  st->print(", RDX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rdx);
++  st->cr();
++  st->print(  "RSP=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rsp);
++  st->print(", RBP=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rbp);
++  st->print(", RSI=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rsi);
++  st->print(", RDI=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rdi);
++  st->cr();
++  st->print(  "R8 =" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r8);
++  st->print(", R9 =" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r9);
++  st->print(", R10=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r10);
++  st->print(", R11=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r11);
++  st->cr();
++  st->print(  "R12=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r12);
++  st->print(", R13=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r13);
++  st->print(", R14=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r14);
++  st->print(", R15=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r15);
++  st->cr();
++  st->print(  "RIP=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rip);
++  st->print(", EFLAGS=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_flags);
++  st->print(", ERR=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_err);
++  st->cr();
++  st->print("  TRAPNO=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_trapno);
+ #  ifdef __FreeBSD__
+   // Add XMM registers + MXCSR. Note that C2 uses XMM to spill GPR values including pointers.
+   st->cr();
+   st->cr();
+-  struct savefpu *savefpu = (struct savefpu *)uc->uc_mcontext.mc_fpstate;
++  struct savefpu *savefpu = (struct savefpu *)ps5_signal_context(uc)->uc_mcontext.mc_fpstate;
+   for (int i = 0; i < 16; ++i) {
+     const int64_t* xmm_val_addr = (int64_t*)&(savefpu->sv_xmm[i]);
+     st->print_cr("XMM[%d]=" INTPTR_FORMAT " " INTPTR_FORMAT, i, xmm_val_addr[1], xmm_val_addr[0]);
+@@ -824,18 +829,18 @@
+   st->print("  MXCSR=" UINT32_FORMAT_X_0, savefpu->sv_env.en_mxcsr);
+ #  endif
+ #else
+-  st->print(  "EAX=" INTPTR_FORMAT, (intptr_t)uc->context_eax);
+-  st->print(", EBX=" INTPTR_FORMAT, (intptr_t)uc->context_ebx);
+-  st->print(", ECX=" INTPTR_FORMAT, (intptr_t)uc->context_ecx);
+-  st->print(", EDX=" INTPTR_FORMAT, (intptr_t)uc->context_edx);
+-  st->cr();
+-  st->print(  "ESP=" INTPTR_FORMAT, (intptr_t)uc->context_esp);
+-  st->print(", EBP=" INTPTR_FORMAT, (intptr_t)uc->context_ebp);
+-  st->print(", ESI=" INTPTR_FORMAT, (intptr_t)uc->context_esi);
+-  st->print(", EDI=" INTPTR_FORMAT, (intptr_t)uc->context_edi);
+-  st->cr();
+-  st->print(  "EIP=" INTPTR_FORMAT, (intptr_t)uc->context_eip);
+-  st->print(", EFLAGS=" INTPTR_FORMAT, (intptr_t)uc->context_eflags);
++  st->print(  "EAX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_eax);
++  st->print(", EBX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_ebx);
++  st->print(", ECX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_ecx);
++  st->print(", EDX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_edx);
++  st->cr();
++  st->print(  "ESP=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_esp);
++  st->print(", EBP=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_ebp);
++  st->print(", ESI=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_esi);
++  st->print(", EDI=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_edi);
++  st->cr();
++  st->print(  "EIP=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_eip);
++  st->print(", EFLAGS=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_eflags);
+ #endif // AMD64
+   st->cr();
+   st->cr();
+@@ -853,7 +858,7 @@
+   while (n < register_count) {
+     // Update continuation with next index before printing location
+     continuation = n + 1;
+-# define CASE_PRINT_REG(n, str, id) case n: st->print(str); print_location(st, uc->context_##id);
++# define CASE_PRINT_REG(n, str, id) case n: st->print(str); print_location(st, ps5_signal_context(uc)->context_##id);
+   switch (n) {
+ #ifdef AMD64
+     CASE_PRINT_REG( 0, "RAX=", rax); break;

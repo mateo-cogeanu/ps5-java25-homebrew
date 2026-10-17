@@ -21,6 +21,7 @@ inline constexpr Entry files[]={
  {"/previous-exception.txt","/download0/previous-probe-exception.txt"},
  {"/previous-abort.txt","/download0/previous-mc-bootstrap-abort.txt"},
  {"/previous-server.log","/download0/mc-server-start/previous-server-console.log"},
+ {"/startup-tail.log","/download0/java25-startup.log"},
  {"/startup.log","/download0/java25-startup.log"},
  {"/vm-trace.log","/download0/java25-vm-trace.log"},
  {"/server.log","/download0/mc-server-start/server-console.log"},
@@ -110,7 +111,7 @@ inline void serve(int fd,const Entry *available=files,size_t count=sizeof(files)
  if(std::sscanf(request,"%15s %255s %15s",method,url,version)!=3){reply(fd,400,"Bad Request","Bad request\n");return;}
  if(std::strcmp(method,"GET")){reply(fd,405,"Method Not Allowed","GET only\n");return;}
  if(!std::strcmp(url,"/")) {
-  reply(fd,200,"OK","<!doctype html><meta charset=utf-8><title>PS5 probe logs</title><h1>PS5 probe logs</h1><p>Read-only LAN downloads. Keep the probe open. Refresh to collect newer output. Missing files return 404. Build identifies the open app; session identifies the recorded run. Startup log contains historical runs.</p><ul><li><a href=/build.txt>Open app build</a><li><a href=/session.txt>Recorded run status</a><li><a href=/startup.log>Startup log</a><li><a href=/vm-trace.log>Native VM trace</a><li><a href=/server.log>Full Minecraft console</a><li><a href=/abort.txt>Last JVM abort</a><li><a href=/class-load.log>Class loading progress</a><li><a href=/process-usage.log>Native resource samples</a><li><a href=/hs-error.log>JVM fatal error report</a><li><a href=/previous-hs-error.log>Previous JVM fatal error report</a><li><a href=/exception.txt>Current-run probe exception</a><li><a href=/previous-exception.txt>Previous-run exception</a><li><a href=/previous-abort.txt>Previous-run abort</a><li><a href=/previous-server.log>Previous-run server output</a></ul>","text/html; charset=utf-8");return;
+  reply(fd,200,"OK","<!doctype html><meta charset=utf-8><title>PS5 probe logs</title><h1>PS5 probe logs</h1><p>Read-only LAN downloads. Keep the probe open. Refresh to collect newer output. Missing files return 404. Build identifies the open app; session identifies the recorded run. Startup log contains historical runs.</p><ul><li><a href=/build.txt>Open app build</a><li><a href=/session.txt>Recorded run status</a><li><a href=/startup-tail.log>Startup tail (last 512 KiB)</a><li><a href=/startup.log>Full startup history</a><li><a href=/vm-trace.log>Native VM trace</a><li><a href=/server.log>Full Minecraft console</a><li><a href=/abort.txt>Last JVM abort</a><li><a href=/class-load.log>Class loading progress</a><li><a href=/process-usage.log>Native resource samples</a><li><a href=/hs-error.log>JVM fatal error report</a><li><a href=/previous-hs-error.log>Previous JVM fatal error report</a><li><a href=/exception.txt>Current-run probe exception</a><li><a href=/previous-exception.txt>Previous-run exception</a><li><a href=/previous-abort.txt>Previous-run abort</a><li><a href=/previous-server.log>Previous-run server output</a></ul>","text/html; charset=utf-8");return;
  }
  const char *path=nullptr;for(size_t i=0;i<count;++i)if(!std::strcmp(url,available[i].url))path=available[i].path;
  if(!path){reply(fd,404,"Not Found","Unknown log\n");return;}
@@ -119,6 +120,10 @@ inline void serve(int fd,const Entry *available=files,size_t count=sizeof(files)
  if(fstat(file,&info)||!S_ISREG(info.st_mode)||info.st_size<0){close(file);reply(fd,500,"Internal Server Error","Cannot read log\n");return;}
  // Bound this response to its initial size, even when the writer keeps appending.
  off_t left=info.st_size;
+ if(!std::strcmp(url,"/startup-tail.log")&&left>512*1024) {
+  left=512*1024;
+  if(lseek(file,info.st_size-left,SEEK_SET)<0){close(file);reply(fd,500,"Internal Server Error","Cannot seek log tail\n");return;}
+ }
  if(header(fd,200,"OK","text/plain; charset=utf-8",static_cast<long long>(left))) {
   char block[16384];while(left>0){size_t size=left<static_cast<off_t>(sizeof(block))?static_cast<size_t>(left):sizeof(block);ssize_t n=read(file,block,size);if(n<0&&errno==EINTR)continue;if(n<=0||!send_all(fd,block,static_cast<size_t>(n)))break;left-=n;}
  }
