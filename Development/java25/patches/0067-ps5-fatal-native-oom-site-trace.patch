@@ -1,0 +1,26 @@
+--- a/src/hotspot/share/utilities/debug.cpp
++++ b/src/hotspot/share/utilities/debug.cpp
+@@ -41,6 +41,7 @@
+ #include "oops/klass.inline.hpp"
+ #include "oops/oop.inline.hpp"
+ #include "runtime/atomic.hpp"
++#include "runtime/ps5StartupTrace.hpp"
+ #include "runtime/flags/flagSetting.hpp"
+ #include "runtime/frame.inline.hpp"
+ #include "runtime/handles.inline.hpp"
+@@ -236,6 +237,15 @@
+   va_list detail_args;
+   va_start(detail_args, detail_fmt);
+ 
++#ifdef __PROSPERO__
++  // Persist the fatal allocation site before the full reporter needs any
++  // additional native resources. Raw trace uses bounded stack formatting.
++  ps5_vm_trace_values("PS5 native fatal OOM: bytes=", size, " line=", line,
++                      " type=", (unsigned long long)vm_err_type);
++  ps5_vm_trace(file);
++  ps5_vm_trace(detail_fmt);
++#endif
++
+   print_error_for_unit_test(nullptr, detail_fmt, detail_args);
+ 
+   VMError::report_and_die(Thread::current_or_null(), file, line, size, vm_err_type, detail_fmt, detail_args);
