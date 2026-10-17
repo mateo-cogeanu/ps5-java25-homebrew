@@ -107,3 +107,40 @@ parser layout mismatch; host replay does not establish console fallback
 completion, Java interface conversion, TCP readiness or verified save/stop.
 Resident ENOMEM's internal cause, overall native capacity and service DNS
 remain unresolved.
+
+## Build054: route parsing succeeds, list-node malloc fails
+
+Run01.000.054-1792253539-553195562 confirms live route fallback completion
+with eight records and the192-byte header. IPv4 enumeration then fails the
+64-byte `addrP` allocation in `addif`, with a checked native malloc error.
+The full saved server log now includes `OutOfMemoryError: Native heap allocation
+failed`, through Netty channel-ID initialization at listener setup. Three
+signals each resume; no native fatal OOM/VM ABORT marker is captured. The
+fixture returns failure before real readiness/save verification.
+
+Patch0079 adds a PS5-only libc-first allocator for libnet's internal interface
+and address nodes. Every node has an aligned ownership prefix, including
+libc successes. After libc refusal, page-rounded anonymous mappings supply
+real storage; both backend failures still throw the checked OOM. Recursive
+`freeif` uses the matching free/munmap operation, preserving errno. Resident
+getifaddrs pointers and route-snapshot ownership are separate and unchanged.
+This is scoped to nodes built by this native file; no global allocator,
+shared pool, reserved fake interface or Java heap increase is introduced.
+Each failed-libc node uses at least one16KiB page; this trades mapping overhead
+for independence from libc allocation refusal, and does not establish a fix
+for the overall native memory limit.
+
+The patch also frees the first unlinked address if allocating a new parent
+interface fails. Other partial lists remain owned by the existing caller
+cleanup. This narrow cleanup repair applies to the common addif code.
+
+`python3 tools/test_java25_netif_alloc.py` compiles the actual allocator,
+addif and recursive freeif bodies under ASan/UBSan. Narrow JNI OOM and kernel
+flag/index stubs surround real storage/copies. It covers libc, mapped and
+mixed lists; IPv4/IPv6/broadcast copies; virtual parent/child nodes; each
+allocation failure including unlinked cleanup; complete refusal/real OOM;
+zero/64/88/page boundaries, overflow, alignment and errno preservation.
+Target HotSpot/java.base native compilation passes. Console node mapping
+availability, Java interface conversion, listener readiness and verified
+save/stop remain pending. Discovery DNS and total native capacity remain
+unresolved.

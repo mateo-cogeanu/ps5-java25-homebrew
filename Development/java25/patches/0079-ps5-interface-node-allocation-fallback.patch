@@ -1,0 +1,103 @@
+--- a/src/java.base/unix/native/libnet/NetworkInterface.c
++++ b/src/java.base/unix/native/libnet/NetworkInterface.c
+@@ -112,15 +112,28 @@
+ #define FREEIFADDRS(list) freeifaddrs(list)
+ #endif
+ 
+-#define CHECKED_MALLOC3(_pointer, _type, _size) \
++#ifdef __PROSPERO__
++#define PS5_NETIF_ALLOC_NOTE(phase,bytes) ps5_netif_note(phase,(long)(bytes),0)
++#include "ps5NetifAlloc.h"
++#define NETIF_ALLOC(bytes) ps5_netif_allocate(bytes)
++#define NETIF_FREE(value) ps5_netif_release(value)
++#else
++#define NETIF_ALLOC(bytes) malloc(bytes)
++#define NETIF_FREE(value) free(value)
++#endif
++
++#define CHECKED_MALLOC_CLEANUP(_pointer, _type, _size, _cleanup) \
+     do { \
+-        _pointer = (_type)malloc(_size); \
++        _pointer = (_type)NETIF_ALLOC(_size); \
+         if (_pointer == NULL) { \
+             NETIF_NOTE("native malloc " #_pointer, _size); \
++            _cleanup; \
+             JNU_ThrowOutOfMemoryError(env, "Native heap allocation failed"); \
+             return ifs; /* return untouched list */ \
+         } \
+     } while(0)
++
++#define CHECKED_MALLOC3(pointer,type,size) CHECKED_MALLOC_CLEANUP(pointer,type,size,(void)0)
+ 
+ typedef struct _netaddr  {
+     struct sockaddr *addr;
+@@ -967,7 +980,7 @@
+         netaddr *addrP = currif->addr;
+         while (addrP != NULL) {
+             netaddr *next = addrP->next;
+-            free(addrP);
++            NETIF_FREE(addrP);
+             addrP = next;
+         }
+ 
+@@ -977,7 +990,7 @@
+         }
+ 
+         ifs = currif->next;
+-        free(currif);
++        NETIF_FREE(currif);
+         currif = ifs;
+     }
+ }
+@@ -1059,7 +1072,7 @@
+ 
+     // If "new" then create a netif structure and insert it into the list.
+     if (currif == NULL) {
+-         CHECKED_MALLOC3(currif, netif *, sizeof(netif) + IFNAMESIZE);
++         CHECKED_MALLOC_CLEANUP(currif, netif *, sizeof(netif) + IFNAMESIZE, NETIF_FREE(addrP));
+          currif->name = (char *)currif + sizeof(netif);
+          strncpy(currif->name, name, IFNAMESIZE);
+          currif->name[IFNAMESIZE - 1] = '\0';
+--- /dev/null
++++ b/src/java.base/unix/native/libnet/ps5NetifAlloc.h
+@@ -0,0 +1,40 @@
++/* SPDX-License-Identifier: GPL-2.0-only WITH Classpath-exception-2.0 */
++#ifndef PS5_NETIF_ALLOC_H
++#define PS5_NETIF_ALLOC_H
++#include <stddef.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <errno.h>
++#include <sys/mman.h>
++#ifndef PS5_NETIF_ALLOC_NOTE
++#define PS5_NETIF_ALLOC_NOTE(phase,bytes) ((void)0)
++#endif
++/* All interface-list nodes carry the same aligned owner prefix, including
++ * libc successes. No resident getifaddrs pointers use this allocator. */
++typedef union {max_align_t alignment; size_t mapped;} Ps5NetifAllocation;
++static void *ps5_netif_allocate(size_t size) {
++    int saved=errno;
++    const size_t page=16384;
++    if (size>SIZE_MAX-sizeof(Ps5NetifAllocation)-(page-1)) {errno=ENOMEM;return NULL;}
++    size_t bytes=sizeof(Ps5NetifAllocation)+(size?size:1);
++    Ps5NetifAllocation *owner=malloc(bytes);
++    if (owner) owner->mapped=0;
++    else {
++        PS5_NETIF_ALLOC_NOTE("node libc refused",size);
++        size_t mapped=(bytes+page-1)&~(page-1);
++        errno=0;
++        owner=mmap(NULL,mapped,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
++        if (owner==MAP_FAILED) {PS5_NETIF_ALLOC_NOTE("node mapping failed",mapped);return NULL;}
++        owner->mapped=mapped;
++        PS5_NETIF_ALLOC_NOTE("node mapped",mapped);
++    }
++    errno=saved;return owner+1;
++}
++static void ps5_netif_release(void *value) {
++    if (!value) return;
++    int saved=errno;
++    Ps5NetifAllocation *owner=(Ps5NetifAllocation *)value-1;
++    if (owner->mapped) munmap(owner,owner->mapped); else free(owner);
++    errno=saved;
++}
++#endif

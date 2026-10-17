@@ -1771,3 +1771,10 @@ skips the actual opaque statistics and reads only stable prefix fields. Host
 ASan/UBSan replay of the complete local1320-byte capture yields eight real
 records and passes mapped ownership/cleanup. Console fallback completion and
 downstream consumer readiness remain pending. Raw route data stays local.
+
+Patch0079 follows confirmed live route parsing with a scoped interface-node
+allocator: libc first, page-rounded anonymous mapping on refusal, explicit
+ownership and matched recursive cleanup. A captured64-byte addif allocation
+failed on console. Actual allocator/addif/freeif sanitizer regressions and
+target build pass; console availability and downstream startup remain pending.
+The new-parent allocation failure also releases its unlinked address node.
