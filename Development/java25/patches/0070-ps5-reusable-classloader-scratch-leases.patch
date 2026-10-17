@@ -1,0 +1,56 @@
+--- a/src/java.base/share/native/libjava/ClassLoader.c
++++ b/src/java.base/share/native/libjava/ClassLoader.c
+@@ -50,6 +50,28 @@
+     size_t mapped_size;
+     max_align_t alignment;
+ } ClassLoaderScratchHeader;
++/* Four exclusive reusable32KiB buffers. No allocator, TLS, or lazy mutex
++ * initialization is needed to lease them. Recursive/concurrent callers never
++ * share a lease; exhaustion falls through to the original real backends. */
++typedef struct {
++    unsigned leased;
++    ClassLoaderScratchHeader header;
++    unsigned char bytes[32768];
++} ClassLoaderScratchSlot;
++static ClassLoaderScratchSlot classloader_scratch_slots[4];
++static void *classloader_scratch_lease(size_t size)
++{
++    if (size > sizeof(classloader_scratch_slots[0].bytes)) return NULL;
++    for (unsigned i = 0; i < 4; ++i) {
++        unsigned expected = 0;
++        if (__atomic_compare_exchange_n(&classloader_scratch_slots[i].leased,
++                &expected, 1, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
++            classloader_scratch_slots[i].header.mapped_size = SIZE_MAX;
++            return &classloader_scratch_slots[i].header + 1;
++        }
++    }
++    return NULL;
++}
+ #endif
+ 
+ static void *classloader_scratch_allocate(size_t size)
+@@ -66,6 +88,8 @@
+         header->mapped_size = 0;
+     } else {
+         int heap_error = errno;
++        void *leased = classloader_scratch_lease(size);
++        if (leased != NULL) { errno = saved_errno; return leased; }
+         long page = sysconf(_SC_PAGESIZE);
+         if (page <= 0 || bytes > SIZE_MAX - (size_t)page) { errno = ENOMEM; return NULL; }
+         size_t mapped = ((bytes + (size_t)page - 1) / (size_t)page) * (size_t)page;
+@@ -90,7 +114,14 @@
+ #ifdef __PROSPERO__
+     if (buffer != NULL) {
+         ClassLoaderScratchHeader *header = ((ClassLoaderScratchHeader *)buffer) - 1;
+-        if (header->mapped_size != 0) munmap(header, header->mapped_size);
++        if (header->mapped_size == SIZE_MAX) {
++            for (unsigned i = 0; i < 4; ++i) {
++                if (header == &classloader_scratch_slots[i].header) {
++                    __atomic_store_n(&classloader_scratch_slots[i].leased, 0, __ATOMIC_RELEASE);
++                    return;
++                }
++            }
++        } else if (header->mapped_size != 0) munmap(header, header->mapped_size);
+         else free(header);
+     }
+ #else
