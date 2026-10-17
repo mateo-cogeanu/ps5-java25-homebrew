@@ -6,7 +6,7 @@
  int os::get_core_path(char* buffer, size_t bufferSize) {
 +#ifdef __PROSPERO__
 +  // PS5 has no supported desktop core-file naming/query interface. In
-+  // particular getprogname can fault while reporting a genuine native OOM.
++  // particular the current-directory query faulted during native OOM reporting.
 +  // No core path is available; let the ordinary fatal report continue.
 +  if (bufferSize > 0) buffer[0] = '\0';
 +  return 0;
