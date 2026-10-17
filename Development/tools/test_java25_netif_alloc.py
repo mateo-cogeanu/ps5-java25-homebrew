@@ -28,7 +28,7 @@ p.write_text(r'''
 #include <net/if.h>
 #include <netinet/in.h>
 static int deny_heap,deny_maps,fail_map,map_calls,live_maps,live_heap;
-static void *test_malloc(size_t n){if(deny_heap){errno=ENOMEM;return NULL;}void*p=malloc(n);assert(p);live_heap++;return p;}
+static void *test_malloc(size_t n){if(deny_heap){if(deny_heap==1)errno=ENOMEM;return NULL;}void*p=malloc(n);assert(p);live_heap++;return p;}
 static void test_free(void*p){if(p){live_heap--;assert(live_heap>=0);free(p);}}
 static void *test_map(void*p,size_t n,int prot,int flags,int fd,off_t o){map_calls++;if(deny_maps||map_calls==fail_map){errno=ENOMEM;return MAP_FAILED;}assert(n%16384==0);void*v=mmap(p,n,prot,flags,fd,o);assert(v!=MAP_FAILED);live_maps++;return v;}
 static int test_unmap(void*p,size_t n){assert(n%16384==0);int r=munmap(p,n);assert(!r);live_maps--;assert(live_maps>=0);return r;}
@@ -74,6 +74,7 @@ int main(void){
  reset();deny_heap=1;list=one(NULL,"eth0:1");assert(!pending&&list&&list->childs&&list->childs->virtual&&list->childs->addr);assert(!strcmp(list->childs->name,"eth0:1"));freeif(list);
  reset();list=one(NULL,"eth0");netif *original=list;deny_heap=1;fail_map=map_calls+2;list=one(list,"eth1");assert(pending&&list==original&&live_maps==0);verify(list);freeif(list);
  reset();deny_heap=deny_maps=1;assert(!one(NULL,"eth0")&&pending&&!live_maps&&!live_heap);
+ reset();deny_heap=2;errno=EACCES;void *without_errno=ps5_netif_allocate(64);assert(without_errno&&errno==EACCES);ps5_netif_release(without_errno);
  reset();deny_heap=1;
  size_t sizes[]={0,1,64,88,16384,32769};
  for(size_t i=0;i<sizeof sizes/sizeof sizes[0];i++){errno=EDOM;void *v=ps5_netif_allocate(sizes[i]);assert(v&&(uintptr_t)v%_Alignof(max_align_t)==0&&errno==EDOM);memset(v,0x5a,sizes[i]);errno=ERANGE;ps5_netif_release(v);assert(errno==ERANGE&&!live_maps);}

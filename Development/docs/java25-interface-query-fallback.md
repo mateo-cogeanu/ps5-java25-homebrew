@@ -144,3 +144,30 @@ Target HotSpot/java.base native compilation passes. Console node mapping
 availability, Java interface conversion, listener readiness and verified
 save/stop remain pending. Discovery DNS and total native capacity remain
 unresolved.
+
+## Build055: node mappings work, second resident query fails
+
+Run01.000.055-1792254170-750451055 confirms four successful16KiB node
+mappings after libc refusals for64/56-byte IPv4 list nodes. The following
+resident getifaddrs call for IPv6 enumeration returns failure with errno13
+(EACCES), so the ENOMEM-only retry is not entered. The full saved console
+again reports Netty initialization OOM through NetworkInterface.getAll.
+The saved trace has three resumed signals, fixture failure, no captured
+VM ABORT/native fatal OOM, and no real readiness/save verification.
+
+The earlier libc refusal logs also carry errno13 after an ioctl. Build055
+does not clear errno before libc allocation or resident getifaddrs, so the
+trace alone cannot establish whether13 is fresh or stale. Patch0080 clears
+errno before those calls. Resident success restores the caller's prior errno.
+The live route-query fallback now also handles resident EACCES and failure
+with errno0, recording the actual resident error value. Other resident errors
+remain failures; actual kernel query/mapping/parser errors remain failures,
+including EACCES from the kernel query itself. No fabricated error, interface,
+cached list or success result is introduced. Node ownership/layout is unchanged.
+
+The actual fallback regression covers explicit resident EACCES, failure that
+leaves errno untouched after a stale EACCES/EPERM, unchanged EPERM/EIO failures,
+and EACCES/EIO query failure propagation. Native node regression also injects
+libc refusal without errno. Full captured-route replay, prior ownership/bounds/
+diagnostic tests and target compilation pass. Console IPv6 enumeration, Java
+interface conversion, listener readiness and verified save/stop remain pending.

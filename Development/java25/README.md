@@ -1778,3 +1778,9 @@ ownership and matched recursive cleanup. A captured64-byte addif allocation
 failed on console. Actual allocator/addif/freeif sanitizer regressions and
 target build pass; console availability and downstream startup remain pending.
 The new-parent allocation failure also releases its unlinked address node.
+
+Patch0080 extends the real route-query retry to resident EACCES/errno-less
+failure after a console IPv6 enumeration failure; ENOMEM remains covered.
+It clears stale errno before resident queries/node malloc and preserves caller
+errno on success. Actual kernel-query denials and other errors still fail.
+Host regressions and target build pass; console startup remains pending.

@@ -1,0 +1,40 @@
+--- a/src/java.base/unix/native/libnet/ps5Ifaddrs.h
++++ b/src/java.base/unix/native/libnet/ps5Ifaddrs.h
+@@ -7,7 +7,7 @@
+ #include <stddef.h>
+ #include <stdint.h>
+ /* The resident getifaddrs can return ENOMEM after earlier successful calls.
+- * Retry only that error using a fresh NET_RT_IFLIST query and owned mappings.
++ * Retry supported resident failures using a fresh NET_RT_IFLIST query and owned mappings.
+  * No cached addresses, synthetic interfaces, libc allocator or global leases.
+  */
+ /* Captured PS5 NET_RT_IFLIST records place link addresses at byte192,
+@@ -144,10 +144,15 @@
+ static int ps5_getifaddrs(struct ifaddrs **result,Ps5Ifaddrs *storage) {
+     int saved=errno;
+     *result=NULL;storage->nodes=NULL;storage->bytes=0;
+-    if (getifaddrs(result)==0) return 0;
+-    if (errno!=ENOMEM) return -1;
++    /* A failed resident call may leave errno untouched. Clear stale errors
++     * from earlier ioctls; query the kernel independently on the observed
++     * ENOMEM/EACCES failures or an errno-less failure. */
++    errno=0;
++    if (getifaddrs(result)==0) {errno=saved;return 0;}
++    int resident_error=errno;
++    if (resident_error!=ENOMEM && resident_error!=EACCES && resident_error!=0) return -1;
+     *result=NULL;
+-    PS5_IFADDRS_NOTE("resident ENOMEM; route fallback",0);
++    PS5_IFADDRS_NOTE("resident failure; route fallback",resident_error);
+     int mib[6]={CTL_NET,PF_ROUTE,0,0,NET_RT_IFLIST,0};
+     for (unsigned attempt=0;attempt<5;attempt++) {
+         size_t size=0;
+--- a/src/java.base/unix/native/libnet/ps5NetifAlloc.h
++++ b/src/java.base/unix/native/libnet/ps5NetifAlloc.h
+@@ -17,6 +17,7 @@
+     const size_t page=16384;
+     if (size>SIZE_MAX-sizeof(Ps5NetifAllocation)-(page-1)) {errno=ENOMEM;return NULL;}
+     size_t bytes=sizeof(Ps5NetifAllocation)+(size?size:1);
++    errno=0;
+     Ps5NetifAllocation *owner=malloc(bytes);
+     if (owner) owner->mapped=0;
+     else {
