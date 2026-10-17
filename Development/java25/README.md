@@ -1679,3 +1679,5 @@ Run `python3 tools/test_java25_native_heap.py`. It executes the actual backend w
 A console capture now confirms pthread mutex initialization returns ENOMEM. [Patch 0054 and its host regression](../docs/java25-native-synchronization-pools.md) add bounded early pools of real mutexes/conditions with exclusive stable-address leases, exact clock attributes and genuine failure propagation. Console validation remains pending.
 
 Patch 0055 expands the early mutex reserve to 4096 for generated-class workloads and records exact failed native-init pool occupancy, attribute matching and caller; event/parker/monitor checks have distinct labels. The next capture confirms the former pools all initialized, but later ENOMEM persists; pool exhaustion remains an inference until occupancy is captured. Console validation remains pending.
+
+Patch 0056 expands the relative/absolute condition reserves to 4096/2048 and adds failed native-condition occupancy/domain/caller diagnostics and constructor labels. The next console capture reaches later class loading but fails native condition init with ENOMEM; exact pool occupancy and consumer completion remain unvalidated.

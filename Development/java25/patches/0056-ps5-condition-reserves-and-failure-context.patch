@@ -1,0 +1,77 @@
+--- a/src/hotspot/share/runtime/ps5Synchronization.hpp
++++ b/src/hotspot/share/runtime/ps5Synchronization.hpp
+@@ -11,7 +11,7 @@
+  struct Slot {Handle native;bool initialized,busy;};
+  struct Stats {size_t initialized,leased;};
+  Slot slots[Count];unsigned lock_word,ready;
+- Stats stats(){Stats result{};lock();for(auto&s:slots){result.initialized+=s.initialized;result.leased+=s.busy;}unlock();return result;}
++ Stats stats(){Stats result{};if(!__atomic_load_n(&ready,__ATOMIC_ACQUIRE))return result;lock();for(auto&s:slots){result.initialized+=s.initialized;result.leased+=s.busy;}unlock();return result;}
+  void lock(){while(__atomic_exchange_n(&lock_word,1u,__ATOMIC_ACQUIRE)){
+   while(__atomic_load_n(&lock_word,__ATOMIC_RELAXED)){
+ #if defined(__x86_64__)
+@@ -35,10 +35,10 @@
+  }
+  bool release(Handle*p){bool found=false;lock();for(auto&s:slots)if(&s.native==p){found=s.initialized&&s.busy;if(found)s.busy=false;break;}unlock();return found;}
+ };
+-enum { mutex_capacity=4096 };
++enum { mutex_capacity=4096, relative_capacity=4096, absolute_capacity=2048 };
+ inline Pool<pthread_mutex_t,mutex_capacity>& mutex_pool(){static Pool<pthread_mutex_t,mutex_capacity> p{};return p;}
+-inline Pool<pthread_cond_t,512>& relative_pool(){static Pool<pthread_cond_t,512> p{};return p;}
+-inline Pool<pthread_cond_t,256>& absolute_pool(){static Pool<pthread_cond_t,256> p{};return p;}
++inline Pool<pthread_cond_t,relative_capacity>& relative_pool(){static Pool<pthread_cond_t,relative_capacity> p{};return p;}
++inline Pool<pthread_cond_t,absolute_capacity>& absolute_pool(){static Pool<pthread_cond_t,absolute_capacity> p{};return p;}
+ struct Configuration {const pthread_mutexattr_t* mutex;const pthread_condattr_t* relative;unsigned state;};
+ inline Configuration& configuration(){static Configuration c{};return c;}
+ struct PrimeResult {size_t mutexes,relative,absolute;};
+@@ -84,11 +84,21 @@
+  CondLease()=default;CondLease(const CondLease&)=delete;CondLease&operator=(const CondLease&)=delete;
+  int init(const pthread_condattr_t*attr){
+   if(active)return EBUSY;int saved=errno;
+-  if(__atomic_load_n(&configuration().state,__ATOMIC_ACQUIRE)==2){
++  unsigned state=__atomic_load_n(&configuration().state,__ATOMIC_ACQUIRE);
++  unsigned domain=!attr?2:(state==2&&attr==configuration().relative?1:0);
++  if(state==2){
+    if(!attr){active=absolute_pool().acquire();if(active)kind=2;}
+    else if(attr==configuration().relative){active=relative_pool().acquire();if(active)kind=1;}
+   }
+   int result=0;if(!active){result=pthread_cond_init(&local,attr);if(!result)active=&local;}
++  if(result){
++   size_t leased=0,initialized=0;
++   if(domain==1){const auto counts=relative_pool().stats();leased=counts.leased;initialized=counts.initialized;}
++   else if(domain==2){const auto counts=absolute_pool().stats();leased=counts.leased;initialized=counts.initialized;}
++   ps5_vm_trace_values("SYNC: cond native init failure status=",(unsigned)result," leased=",leased," initialized=",initialized);
++   // domain: 1 = configured relative clock, 2 = default absolute clock, 0 = custom.
++   ps5_vm_trace_values("SYNC: cond fallback config=",state," domain=",domain," caller=",(uintptr_t)__builtin_return_address(0));
++  }
+   errno=saved;return result;
+  }
+  // Caller must ensure no waiter remains, as required for native cond_destroy.
+--- a/src/hotspot/os/posix/os_posix.cpp
++++ b/src/hotspot/os/posix/os_posix.cpp
+@@ -1630,7 +1630,7 @@
+ 
+ PlatformEvent::PlatformEvent() {
+   int status = ps5_sync::cond_init(_cond, _condAttr);
+-  PS5_PTHREAD_CHECK(status == 0, status, "cond_init");
++  PS5_PTHREAD_CHECK(status == 0, status, "event cond_init");
+   status = ps5_sync::mutex_init(_mutex, _mutexAttr);
+   PS5_PTHREAD_CHECK(status == 0, status, "event mutex_init");
+   _event   = 0;
+@@ -1963,7 +1963,7 @@
+ 
+ PlatformMonitor::Cond::Cond() : _next(nullptr) {
+   int status = ps5_sync::cond_init(&_cond, _condAttr);
+-  PS5_PTHREAD_CHECK(status == 0, status, "cond_init");
++  PS5_PTHREAD_CHECK(status == 0, status, "monitor cond_init");
+ }
+ 
+ PlatformMonitor::Cond::~Cond() {
+@@ -2007,7 +2007,7 @@
+ 
+ PlatformMonitor::PlatformMonitor() {
+   int status = ps5_sync::cond_init(&_cond, _condAttr);
+-  PS5_PTHREAD_CHECK(status == 0, status, "cond_init");
++  PS5_PTHREAD_CHECK(status == 0, status, "monitor cond_init");
+ }
+ 
+ PlatformMonitor::~PlatformMonitor() {

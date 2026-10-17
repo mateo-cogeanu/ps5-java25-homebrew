@@ -36,7 +36,7 @@ int main(){
  pthread_mutexattr_t ma,other;pthread_condattr_t ca;assert(pthread_mutexattr_init(&ma)==0);assert(pthread_mutexattr_settype(&ma,PTHREAD_MUTEX_NORMAL)==0);assert(pthread_mutexattr_init(&other)==0);assert(pthread_condattr_init(&ca)==0);
  // Existing early/local objects remain native-owned, rather than copied.
  MutexLease early;assert(early.init(&ma)==0);auto*early_address=early.get();assert(pthread_mutex_lock(early.get())==0);assert(pthread_mutex_unlock(early.get())==0);
- auto counts=prime(&ma,&ca);assert(counts.mutexes==mutex_capacity&&counts.relative==512&&counts.absolute==256);
+ auto counts=prime(&ma,&ca);assert(counts.mutexes==mutex_capacity&&counts.relative==relative_capacity&&counts.absolute==absolute_capacity);
  assert(early.get()==early_address&&early.destroy()==0);deny=true;
  int before=mutex_calls;MutexLease m;CondLease relative,absolute;errno=EDOM;
  assert(m.init(&ma)==0&&relative.init(&ca)==0&&absolute.init(nullptr)==0&&errno==EDOM&&mutex_calls==before);
@@ -51,6 +51,17 @@ int main(){
  MutexLease extra;auto full=mutex_pool().stats();assert(full.initialized==mutex_capacity&&full.leased==mutex_capacity);assert(extra.init(&ma)==ENOMEM&&extra.destroy()==EINVAL);assert(seen_status==ENOMEM&&seen_leased==mutex_capacity&&seen_initialized==mutex_capacity&&seen_state==2&&seen_match==1&&seen_caller);auto*returned=held.back()->get();assert(held.back()->destroy()==0);held.pop_back();assert(extra.init(&ma)==0&&extra.get()==returned);assert(extra.destroy()==0);for(auto&item:held)assert(item->destroy()==0);held.clear();
  MutexLease custom;assert(custom.init(&other)==ENOMEM);assert(seen_status==ENOMEM&&seen_leased==0&&seen_initialized==mutex_capacity&&seen_state==2&&seen_match==0&&seen_caller); // A different attribute never borrows a configured mutex.
  CondLease custom_cond;pthread_condattr_t different;pthread_condattr_init(&different);assert(custom_cond.init(&different)==ENOMEM);
+ // Exhaust each real condition domain independently; no borrowing wrong clock objects.
+ for(unsigned domain=1;domain<=2;++domain){
+  int capacity=domain==1?relative_capacity:absolute_capacity;const pthread_condattr_t*attr=domain==1?&ca:nullptr;
+  std::vector<std::unique_ptr<CondLease>> conditions;
+  for(int i=0;i<capacity;++i){auto item=std::make_unique<CondLease>();assert(item->init(attr)==0);for(auto&prior:conditions)assert(prior->get()!=item->get());conditions.push_back(std::move(item));}
+  CondLease overflow;errno=EDOM;assert(overflow.init(attr)==ENOMEM&&errno==EDOM);
+  assert(seen_status==ENOMEM&&seen_leased==(unsigned)capacity&&seen_initialized==(unsigned)capacity&&seen_state==2&&seen_match==domain&&seen_caller);
+  auto*returned=conditions.back()->get();assert(conditions.back()->destroy()==0);conditions.pop_back();assert(overflow.init(attr)==0&&overflow.get()==returned);assert(overflow.destroy()==0);
+  for(auto&item:conditions)assert(item->destroy()==0);
+ }
+ assert(custom_cond.init(&different)==ENOMEM);assert(seen_match==0&&seen_leased==0&&seen_initialized==0&&seen_state==2&&seen_caller);
  // Condition-pair syntax retains distinct relative/absolute resources.
  CondPair pair;assert(cond_init_at(pair,0,&ca)==0&&cond_init_at(pair,1,nullptr)==0);assert(&pair[0]!=&pair[1]);assert(cond_destroy_at(pair,0)==0&&cond_destroy_at(pair,1)==0);
  // Actual condition wait/signal exchange after initialization refusal.
@@ -66,7 +77,7 @@ int main(){
  for(auto&s:relative_pool().slots){assert(s.initialized&&!s.busy);assert(pthread_cond_destroy(&s.native)==0);}
  for(auto&s:absolute_pool().slots){assert(s.initialized&&!s.busy);assert(pthread_cond_destroy(&s.native)==0);}
  pthread_condattr_destroy(&different);pthread_condattr_destroy(&ca);pthread_mutexattr_destroy(&ma);pthread_mutexattr_destroy(&other);
- puts("PASS: real pooled mutex/cond objects, late init ENOMEM, no handle copying, lock/busy and wait/signal/timeout behavior, exact attrs,4096-slot exhaustion/reuse,8000 concurrent lease lifetimes and complete native teardown and distinct exhaustion/attribute-mismatch diagnostics");
+ puts("PASS: real pooled mutex/cond objects, late init ENOMEM, no handle copying, lock/busy and wait/signal/timeout behavior, exact attrs,4096 mutex/4096 relative/2048 absolute exhaustion/reuse,8000 concurrent lease lifetimes and complete native teardown and distinct exhaustion/attribute-mismatch diagnostics");
 }
 '''
 p=W/'test.cpp';p.write_text(cpp)

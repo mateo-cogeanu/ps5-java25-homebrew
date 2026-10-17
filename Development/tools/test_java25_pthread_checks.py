@@ -9,6 +9,7 @@ inline void ps5_vm_trace_values(const char* op,unsigned long long status,const c
 ''')
 s=(R/'.tools/java25/openjdk/src/hotspot/os/posix/os_posix.cpp').read_text();a=s.index('PlatformEvent::PlatformEvent()');b=s.index('\nvoid PlatformEvent::park()',a);ctor=s[a:b]
 assert 'PlatformMutex::PlatformMutex() {\n  int status = ps5_sync::mutex_init(&_mutex, _mutexAttr);\n  PS5_PTHREAD_CHECK(status == 0, status, "monitor mutex_init");' in s
+assert 'PlatformMonitor::PlatformMonitor() {\n  int status = ps5_sync::cond_init(&_cond, _condAttr);\n  PS5_PTHREAD_CHECK(status == 0, status, "monitor cond_init");' in s
 p=W/'test.cpp';p.write_text(r'''
 #undef NDEBUG
 #include <cassert>
@@ -31,7 +32,7 @@ int test_mutex_init(pthread_mutex_t*,const pthread_mutexattr_t*){++mutex_calls;r
 '''+ctor+r'''
 int main(){
  PlatformEvent ok;assert(ok._event==0&&ok._nParked==0&&notes==0);
- fail_cond=ENOMEM;int before=mutex_calls;try{PlatformEvent bad;assert(false);}catch(int s){assert(s==ENOMEM&&strcmp(last_op,"cond_init")==0);}assert(mutex_calls==before);
+ fail_cond=ENOMEM;int before=mutex_calls;try{PlatformEvent bad;assert(false);}catch(int s){assert(s==ENOMEM&&strcmp(last_op,"event cond_init")==0);}assert(mutex_calls==before);
  fail_cond=0;fail_mutex=ENOMEM;try{PlatformEvent bad;assert(false);}catch(int s){assert(s==ENOMEM&&strcmp(last_op,"event mutex_init")==0);}
  assert(notes==2);int status=ETIMEDOUT;PS5_PTHREAD_CHECK(status==0||status==ETIMEDOUT,status,"timeout");status=EBUSY;PS5_PTHREAD_CHECK(status==0||status==EBUSY,status,"trylock");assert(notes==2);
  puts("PASS: actual release-check helper and PlatformEvent constructor report ENOMEM before invalid use; successful init and allowed timeout/busy results retained");
