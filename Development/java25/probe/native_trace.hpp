@@ -14,17 +14,28 @@ inline void enable() {owner=pthread_self();verbose.store(true);enabled.store(tru
 inline void quiet() {verbose.store(false);}
 inline void disable() {enabled.store(false);}
 inline bool begin(const char* operation,const void* caller,const void* from,void* to,size_t count) {
- if(!enabled.load()||(verbose.load()&&!pthread_equal(owner,pthread_self()))||ps5_vm_native_trace_busy()||ps5_vm_signal_trace_active()||ps5_vm_trace_io_active()) return false;
- ps5_vm_native_trace_busy()=true;
- ps5_vm_native_call_record() = {operation,(unsigned long long)caller,(unsigned long long)from,(unsigned long long)to,(unsigned long long)count,false};
- if(verbose.load()) {
+ if(!enabled.load())return false;
+ const bool chatty=verbose.load();
+ if(chatty&&!pthread_equal(owner,pthread_self()))return false;
+ // One context lookup per entry/exit, instead of repeating pthread_self and
+ // the static slot search for each guard, record and busy-flag access.
+ auto* context=ps5_vm_thread_context();
+ if(!context||context->busy||context->signal_active||context->io_active)return false;
+ context->busy=true;
+ context->record={operation,(unsigned long long)caller,(unsigned long long)from,(unsigned long long)to,(unsigned long long)count,false};
+ if(chatty) {
   ps5_vm_trace_memory(operation,from,count,0,0);
   ps5_vm_trace_values(operation,(unsigned long long)caller," src=",(unsigned long long)from," dst=",(unsigned long long)to);
  }
- ps5_vm_native_trace_busy()=false;return true;
+ context->busy=false;return true;
 }
 inline void end(bool traced) {
- if(traced) {ps5_vm_native_trace_busy()=true;ps5_vm_native_call_record().completed=true;if(verbose.load())ps5_vm_trace("DONE: Traced native memory/string call");ps5_vm_native_trace_busy()=false;}
+ if(!traced)return;
+ auto* context=ps5_vm_thread_context();
+ if(!context)return;
+ context->busy=true;context->record.completed=true;
+ if(verbose.load())ps5_vm_trace("DONE: Traced native memory/string call");
+ context->busy=false;
 }
 }
 // Native runtime termination can bypass the JNI abort/vfprintf callbacks.

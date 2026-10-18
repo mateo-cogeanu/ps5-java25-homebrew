@@ -35,3 +35,13 @@ Console allocator safety, native headroom and gameplay TPS improvement remain
 pending. Consumer gameplay diagnostics separately record observed TPS, real GC
 counter deltas and read-only hunger fields to distinguish lag from food-state
 issues; they do not change hunger rules or food consumption.
+
+The packaged native memory/string/allocator wrappers also reuse one resolved
+thread context per entry and exit, instead of repeating pthread_self and the
+bounded table search for each guard, busy flag and record field. Quiet capture
+still records every call, including signal-visible active/completed state;
+termination and recursion guards remain enabled. The actual wrapper regression
+counts exactly two thread-context identity lookups for a quiet memcpy and
+checks all sixteen delegated operations, worker isolation, active-call signal
+capture, no quiet-call disk IO, errno, termination and table exhaustion under
+ASan/UBSan. This removes tracing overhead without dropping call evidence.

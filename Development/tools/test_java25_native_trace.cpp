@@ -7,16 +7,21 @@
 #include <fstream>
 #include <string>
 #include <thread>
+#include <atomic>
 #include <signal.h>
 #include <sys/stat.h>
 #include <csetjmp>
 static int test_trace_open(const char*,int flags,int mode) {
  return ::open("build/java25/native-call-test.log",flags,mode);
 }
+static std::atomic<unsigned long> self_calls{0};
+static pthread_t test_pthread_self(){++self_calls;return ::pthread_self();}
+#define pthread_self test_pthread_self
 #define __PROSPERO__ 1
 #define open test_trace_open
 #include "../java25/probe/native_trace.hpp"
 #undef open
+#undef pthread_self
 static bool interrupt_malloc=false;
 static volatile sig_atomic_t saw_active_call=0;
 static void observe_signal(int) {
@@ -78,7 +83,9 @@ int main() {
  __wrap_free(nullptr);
  ps5_native_trace::quiet();
  struct stat before_quiet{};assert(::stat("build/java25/native-call-test.log",&before_quiet)==0);
+ auto calls_before=self_calls.load();
  assert(__wrap_memcpy(output,"quiet",6)==output);
+ assert(self_calls.load()-calls_before==2); // One real context lookup at entry and exit.
  auto quiet_record=ps5_vm_native_call_record();
  assert(quiet_record.completed&&quiet_record.bytes==6&&quiet_record.caller);
  ps5_vm_trace("TEST: main-thread stage");
