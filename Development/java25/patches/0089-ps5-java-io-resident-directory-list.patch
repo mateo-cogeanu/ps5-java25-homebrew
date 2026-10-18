@@ -1,0 +1,105 @@
+--- a/src/java.base/unix/native/libjava/UnixFileSystem_md.c
++++ b/src/java.base/unix/native/libjava/UnixFileSystem_md.c
+@@ -41,6 +41,9 @@
+ #include <errno.h>
+ #include <fcntl.h>
+ #include <dirent.h>
++#ifdef __PROSPERO__
++#include "../libnio/fs/ps5Directory.h"
++#endif
+ 
+ #include "jni.h"
+ #include "jni_util.h"
+@@ -329,8 +332,13 @@
+ JNIEXPORT jobjectArray JNICALL
+ Java_java_io_UnixFileSystem_list0(JNIEnv *env, jobject this, jobject file)
+ {
++#ifdef __PROSPERO__
++    Ps5Directory *dir = NULL;
++    const char *entry;
++#else
+     DIR *dir = NULL;
+     struct dirent *ptr;
++#endif
+     int len, maxlen;
+     jobjectArray rv, old;
+     jclass str_class;
+@@ -339,9 +347,18 @@
+     CHECK_NULL_RETURN(str_class, NULL);
+ 
+     WITH_FIELD_PLATFORM_STRING(env, file, ids.path, path) {
++#ifdef __PROSPERO__
++        dir = ps5_directory_open(path);
++#else
+         dir = opendir(path);
+-    } END_PLATFORM_STRING(env, path);
+-    if (dir == NULL) return NULL;
++#endif
++    } END_PLATFORM_STRING(env, path);
++    if (dir == NULL) {
++#ifdef __PROSPERO__
++        int error=errno;jio_fprintf(stderr,"PS5 java.io list open failed errno=%d\n",error);errno=error;
++#endif
++        return NULL;
++    }
+ 
+     /* Allocate an initial String array */
+     len = 0;
+@@ -350,9 +367,14 @@
+     if (rv == NULL) goto error;
+ 
+     /* Scan the directory */
++#ifdef __PROSPERO__
++    while ((entry = ps5_directory_read(dir)) != NULL) {
++#else
+     while ((ptr = readdir(dir)) != NULL) {
++        const char *entry=ptr->d_name;
++#endif
+         jstring name;
+-        if (!strcmp(ptr->d_name, ".") || !strcmp(ptr->d_name, ".."))
++        if (!strcmp(entry, ".") || !strcmp(entry, ".."))
+             continue;
+         if (len == maxlen) {
+             old = rv;
+@@ -362,15 +384,26 @@
+             (*env)->DeleteLocalRef(env, old);
+         }
+ #ifdef MACOSX
+-        name = newStringPlatform(env, ptr->d_name);
+-#else
+-        name = JNU_NewStringPlatform(env, ptr->d_name);
++        name = newStringPlatform(env, entry);
++#else
++        name = JNU_NewStringPlatform(env, entry);
+ #endif
+         if (name == NULL) goto error;
+         (*env)->SetObjectArrayElement(env, rv, len++, name);
+         (*env)->DeleteLocalRef(env, name);
+     }
++#ifdef __PROSPERO__
++    if (errno!=0) {
++        int error=errno;jio_fprintf(stderr,"PS5 java.io list read failed errno=%d\n",error);errno=error;
++        goto error;
++    }
++    if (ps5_directory_close(dir)!=0) {
++        int error=errno;jio_fprintf(stderr,"PS5 java.io list close failed errno=%d\n",error);errno=error;
++        return NULL;
++    }
++#else
+     closedir(dir);
++#endif
+ 
+     /* Copy the final results into an appropriately-sized array */
+     if (len < maxlen) {
+@@ -386,7 +419,11 @@
+     return rv;
+ 
+  error:
++#ifdef __PROSPERO__
++    {int saved=errno;ps5_directory_close(dir);errno=saved;}
++#else
+     closedir(dir);
++#endif
+     return NULL;
+ }
+ 

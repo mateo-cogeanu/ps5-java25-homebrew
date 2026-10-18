@@ -1844,3 +1844,11 @@ sanitizer regression. Successful ENTER/DONE phase traces now use the configured
 sampling interval while keeping current crash context and unsampled failures.
 See [idle slabs and trace sampling](../docs/java25-native-idle-slabs.md).
 Console gameplay performance remains pending; the consumer still uses `-Xint`.
+
+Patch 0089 extends the established resident directory reader to java.io.File
+listing, fixing the remaining desktop opendir dependency reached by a consumer's
+legacy-player conversion. Empty and real failed listings remain distinct;
+partial failures are rejected and all descriptors/mappings are released.
+See [java.io directory listing](../docs/java25-file-directory-list.md).
+Actual JNI/Java-list host regressions and target compilation pass; the next
+consumer console startup and gameplay result remain pending.
