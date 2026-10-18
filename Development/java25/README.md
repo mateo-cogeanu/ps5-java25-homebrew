@@ -1818,3 +1818,14 @@ resolver-stage diagnostics. This addresses a concrete allocation dependency
 while the exact cause of a consumer DNS failure remains unconfirmed. Native
 network results and failures are retained; console DNS/online operation is
 pending. [Evidence, tests and scope](../docs/java25-dns-result-allocation.md).
+
+
+## java.io metadata for TLS stores (0085)
+
+Patch0085 extends real descriptor metadata/access fallback to java.io after
+PS5 desktop stat/access EPERM. This supports the standard JSSE trust-store
+selection path, which still uses File rather than NIO. Host native/JNI tests
+reproduce zero roots before the adaptation and111 roots after it, using the
+same target cacerts, then complete real consumer HTTPS preflight. Certificate
+verification is unchanged. [Evidence and limits](../docs/java25-file-metadata-trust.md).
+Console TLS and consumer endurance remain pending.

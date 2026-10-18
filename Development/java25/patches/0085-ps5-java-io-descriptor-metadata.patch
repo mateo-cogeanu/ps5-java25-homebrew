@@ -1,0 +1,87 @@
+--- a/src/java.base/unix/native/libjava/UnixFileSystem_md.c
++++ b/src/java.base/unix/native/libjava/UnixFileSystem_md.c
+@@ -98,6 +98,39 @@
+ }
+ 
+ 
++#ifdef __PROSPERO__
++/* File-based trust-store discovery must observe real descriptor metadata when
++ * desktop stat/access are denied. Never infer existence or execute access. */
++static int ps5_file_stat(const char *path, struct stat *observed) {
++    int result; RESTARTABLE(stat(path,observed),result);
++    if (result==0 || errno!=EPERM) return result;
++    int fd; RESTARTABLE(open(path,O_RDONLY|O_NONBLOCK),fd);
++    if (fd<0) return -1;
++    RESTARTABLE(fstat(fd,observed),result);
++    int error=errno;
++    if (close(fd)<0 && result==0) return -1;
++    errno=error;return result;
++}
++static int ps5_file_access(const char *path,int mode) {
++    int result; RESTARTABLE(access(path,mode),result);
++    if (result==0 || errno!=EPERM || (mode&~(R_OK|W_OK))!=0) return result;
++    int flags=O_NONBLOCK|((mode&W_OK)?((mode&R_OK)?O_RDWR:O_WRONLY):O_RDONLY);
++    int fd; RESTARTABLE(open(path,flags),fd);
++    if (fd<0) return -1;
++    struct stat observed;
++    RESTARTABLE(fstat(fd,&observed),result);
++    int error=errno;
++    if (result==0 && !S_ISREG(observed.st_mode) && !S_ISDIR(observed.st_mode)) {result=-1;error=EPERM;}
++    if (close(fd)<0 && result==0) return -1;
++    errno=error;return result;
++}
++#define FILE_STAT ps5_file_stat
++#define FILE_ACCESS ps5_file_access
++#else
++#define FILE_STAT stat
++#define FILE_ACCESS access
++#endif
++
+ /* -- Attribute accessors -- */
+ 
+ 
+@@ -105,7 +138,7 @@
+ statMode(const char *path, int *mode)
+ {
+     struct stat sb;
+-    if (stat(path, &sb) == 0) {
++    if (FILE_STAT(path, &sb) == 0) {
+         *mode = sb.st_mode;
+         return JNI_TRUE;
+     }
+@@ -151,7 +184,7 @@
+     }
+     WITH_FIELD_PLATFORM_STRING(env, file, ids.path, path) {
+         int res;
+-        RESTARTABLE(access(path, mode), res);
++        RESTARTABLE(FILE_ACCESS(path, mode), res);
+         if (res == 0) {
+             rv = JNI_TRUE;
+         }
+@@ -217,7 +250,7 @@
+ 
+     WITH_FIELD_PLATFORM_STRING(env, file, ids.path, path) {
+         struct stat sb;
+-        if (stat(path, &sb) == 0) {
++        if (FILE_STAT(path, &sb) == 0) {
+ #if defined(_AIX)
+             rv =  (jlong)sb.st_mtime * 1000;
+             rv += (jlong)sb.st_mtime_n / 1000000;
+@@ -242,7 +275,7 @@
+ 
+     WITH_FIELD_PLATFORM_STRING(env, file, ids.path, path) {
+         struct stat sb;
+-        if (stat(path, &sb) == 0) {
++        if (FILE_STAT(path, &sb) == 0) {
+             rv = sb.st_size;
+         }
+     } END_PLATFORM_STRING(env, path);
+@@ -398,7 +431,7 @@
+     WITH_FIELD_PLATFORM_STRING(env, file, ids.path, path) {
+         struct stat sb;
+ 
+-        if (stat(path, &sb) == 0) {
++        if (FILE_STAT(path, &sb) == 0) {
+             struct timeval tv[2];
+ 
+             /* Preserve access time */
