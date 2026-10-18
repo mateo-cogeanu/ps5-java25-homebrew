@@ -1795,3 +1795,16 @@ isLoopback0 failure's exact substage remains unresolved. Actual flag/parser
 sanitizer and real JNI error-formatter tests pass; target compilation passes.
 Console flag resolution and consumer readiness remain pending. See the
 [interface-query notes](../docs/java25-interface-query-fallback.md).
+
+
+## PS5 stream paths and mount-query boundary (0082/0083)
+
+A consumer057 run reaches real server readiness, then its native trace ends at
+BsdNativeDispatcher.getfsstat; the linked implementation uses raw syscall395.
+Patch0082 reports ENOSYS on PS5 instead of invoking the unvalidated desktop
+mount ABI. Mount discovery/capacity remain unavailable. Patch0083 resolves
+relative java.io stream opens through File.getAbsolutePath/user.dir, addressing
+captured relative-open errors while preserving actual errors and absolute paths.
+Actual native-body/real-JNI regression with UBSan and -Xcheck:jni plus target
+compilation pass. Console save/stop and handling of unavailable mount queries
+remain pending. [Evidence and limits](../docs/java25-ps5-filesystem-queries.md).

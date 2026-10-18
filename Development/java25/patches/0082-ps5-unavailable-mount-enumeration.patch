@@ -1,0 +1,24 @@
+--- a/src/java.base/bsd/native/libnio/fs/BsdNativeDispatcher.c
++++ b/src/java.base/bsd/native/libnio/fs/BsdNativeDispatcher.c
+@@ -90,6 +90,13 @@
+ JNIEXPORT jlong JNICALL
+ Java_sun_nio_fs_BsdNativeDispatcher_getfsstat(JNIEnv* env, jclass this)
+ {
++#ifdef __PROSPERO__
++    /* The linked desktop getfsstat uses raw syscall395. Mount enumeration
++     * has no validated PS5 ABI; report unsupported rather than invoking it.
++     * Do not invent mounts or filesystem capacity. */
++    throwUnixException(env, ENOSYS);
++    return 0;
++#else
+     int nentries;
+     size_t bufsize;
+     struct fsstat_iter *iter = malloc(sizeof(*iter));
+@@ -138,6 +145,7 @@
+     }
+ 
+     return (jlong)iter;
++#endif
+ }
+ 
+ JNIEXPORT jint JNICALL
