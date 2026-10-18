@@ -1836,3 +1836,11 @@ Real DNS answers/errors and result allocation ownership remain intact. See
 [DNS allocation and resolver lifetime](../docs/java25-dns-result-allocation.md).
 The400-query concurrent allocation-denial regression passes ASan/UBSan;
 consumer062 console DNS/authentication/endurance validation remains pending.
+
+The current native allocator retains at most one idle slab per size class
+(512 KiB total bound) and trims idle storage on mapping pressure. Ten thousand
+4,088-byte allocation/free lifetimes use one real mapping in the actual-header
+sanitizer regression. Successful ENTER/DONE phase traces now use the configured
+sampling interval while keeping current crash context and unsampled failures.
+See [idle slabs and trace sampling](../docs/java25-native-idle-slabs.md).
+Console gameplay performance remains pending; the consumer still uses `-Xint`.

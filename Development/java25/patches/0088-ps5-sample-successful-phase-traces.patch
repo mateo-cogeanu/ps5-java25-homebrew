@@ -1,0 +1,11 @@
+--- a/src/hotspot/share/runtime/ps5StartupTrace.hpp
++++ b/src/hotspot/share/runtime/ps5StartupTrace.hpp
+@@ -98,7 +98,7 @@
+   }
+   unsigned interval=__atomic_load_n(ps5_vm_metadata_interval(),__ATOMIC_ACQUIRE);
+   if (context != nullptr && !ps5_vm_signal_trace_active() && interval > 1 &&
+-      (::strncmp(stage,"ENTER: Metadata ",16)==0 || ::strncmp(stage,"DONE: Metadata ",15)==0) &&
++      (::strncmp(stage,"ENTER: ",7)==0 || ::strncmp(stage,"DONE: ",6)==0) &&
+       ++context->metadata_events % interval != 0) {
+     errno=saved_errno;
+     return; // Last-stage context above remains current even when disk IO is sampled.

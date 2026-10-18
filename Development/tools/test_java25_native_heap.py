@@ -55,17 +55,27 @@ int main(){
  deny_resize=true;void* migrated=heap::reallocate(p,512);check(migrated,128,0x35);p=migrated;deny_resize=false;
  // A pre-NMT raw block and a post-init block have identical storage contracts.
  deny_heap=true;p=heap::reallocate(p,1024);check(p,128,0x35);assert(heap_live==0&&map_live==1);
- p=heap::reallocate(p,8192);check(p,128,0x35);assert(map_live==1);
+ p=heap::reallocate(p,8192);check(p,128,0x35);heap::trim_idle();assert(map_live==1);
  std::memset(p,0x79,8192);deny_maps=true;assert(!heap::reallocate(p,16384));check(p,8192,0x79);
  assert(!heap::allocate(128));assert(!heap::allocate(SIZE_MAX));check(p,8192,0x79);deny_maps=false;
- void* shrink=heap::reallocate(p,32);assert(shrink==p);check(p,32,0x79);heap::release(p);assert(map_live==0);
+ void* shrink=heap::reallocate(p,32);assert(shrink==p);check(p,32,0x79);heap::release(p);heap::trim_idle();assert(map_live==0);
  p=heap::allocate(0);assert(p);p=heap::reallocate(p,0);assert(p);heap::release(p);heap::release(nullptr);
+ // Ten thousand full allocation/free lifetimes use just one warm slab.
+ heap::trim_idle();long warm_before=map_total;
+ for(int i=0;i<10000;i++){errno=EDOM;void* q=heap::allocate(4088);assert(q&&errno==EDOM);memset(q,0x49,4088);heap::release(q);assert(errno==EDOM);}
+ assert(map_total-warm_before==1&&map_live==1);
+ heap::trim_idle();assert(map_live==0);
+ // One retained idle slab/class stays bounded even after multiple live slabs.
+ std::vector<void*> warm_blocks;for(int i=0;i<200;i++)warm_blocks.push_back(heap::allocate(4096));
+ for(void* q:warm_blocks)heap::release(q);assert(map_live==1);
+ // A pressure failure drains idle storage before the large allocation fails.
+ deny_maps=true;assert(!heap::allocate(32768)&&errno==ENOMEM&&map_live==0);deny_maps=false;
  // A refused full slab retries a real minimal page, with matching cleanup.
  map_limit=16384;
  for(size_t n:{24u,48u,4096u}) {
   void* q=heap::allocate(n);assert(q);std::memset(q,0x59,n);check(q,n,0x59);
   assert(((heap::Header*)q-1)->block.slab->mapped<=16384);
-  heap::release(q);assert(map_live==0);
+  heap::release(q);heap::trim_idle();assert(map_live==0);
  }
  map_limit=1;assert(!heap::allocate(24)&&errno==ENOMEM&&map_live==0);
  map_limit=SIZE_MAX;
@@ -82,24 +92,24 @@ int main(){
   }
   assert(!heap::allocate(16)&&errno==ENOMEM);assert(map_total==mappings);
   check(owner,owner_size,0x71);heap::release(owner);assert(map_live==1);
-  for(void* q:borrowed){check(q,16,0x36);heap::release(q);}assert(map_live==0);
+  for(void* q:borrowed){check(q,16,0x36);heap::release(q);}heap::trim_idle();assert(map_live==0);
   deny_maps=false;
  }
  // An undersized slot cannot satisfy a larger request; failed growth retains data.
  void* small=heap::allocate(16);std::memset(small,0x25,16);deny_maps=true;
  assert(!heap::allocate(64));assert(!heap::reallocate(small,64));check(small,16,0x25);
- heap::release(small);assert(map_live==0);deny_maps=false;
+ heap::release(small);heap::trim_idle();assert(map_live==0);deny_maps=false;
  // All size classes and direct mappings, with concurrent ownership and reuse.
  long before=map_total;
  std::vector<void*> blocks;
  for(size_t n:{1u,32u,33u,64u,65u,128u,129u,256u,257u,512u,513u,1024u,1025u,2048u,2049u,4096u,4097u}) {
   void* q=heap::allocate(n);assert(q);std::memset(q,0x41,n);check(q,n,0x41);blocks.push_back(q);
  }
- for(void* q:blocks)heap::release(q);assert(map_live==0);
+ for(void* q:blocks)heap::release(q);heap::trim_idle();assert(map_live==0);
  blocks.clear();before=map_total;
  for(int i=0;i<1000;++i){void* q=heap::allocate(128);assert(q);blocks.push_back(q);}
  assert(map_total-before<10); // Small failed mallocs share real mapped pages.
- for(void* q:blocks)heap::release(q);assert(map_live==0);
+ for(void* q:blocks)heap::release(q);heap::trim_idle();assert(map_live==0);
  parallel=true;std::vector<std::thread> workers;
  for(int t=0;t<8;++t)workers.emplace_back([t]{
   for(int turn=0;turn<2000;++turn){
@@ -107,9 +117,9 @@ int main(){
    size_t next=n+400;void* grown=heap::reallocate(q,next);check(grown,n,t+1);heap::release(grown);
   }
  });
- for(auto &thread:workers)thread.join();assert(map_live==0&&heap_live==0&&notes>0);
+ for(auto &thread:workers)thread.join();assert(map_live<=8);heap::trim_idle();assert(map_live==0&&heap_live==0&&notes>0);
  deny_heap=false;p=heap::allocate(90);assert(p&&heap_live==1);heap::release(p);assert(heap_live==0);
- std::puts("PASS: real mapped storage, eight pooled classes, alignment, normal/mapped realloc migration, failed growth preserves bytes, overflow, concurrency and complete backend cleanup");
+ std::puts("PASS: real mapped storage, bounded idle slab reuse/pressure trimming, eight pooled classes, alignment, normal/mapped realloc migration, failed growth preserves bytes, overflow, concurrency and complete backend cleanup");
 }
 '''
 # Reuse the same actual raw allocator and stress test, then exercise the exact
@@ -184,9 +194,9 @@ int main(){
   void* arena=os::malloc(request,mtInternal);assert(arena);
   void* raw=nmt?(void*)((MallocHeader*)arena-1):arena;
   assert(((heap::Header*)raw-1)->block.mapped==32768);
-  memset(arena,0x47,request);os::free(arena);assert(map_live==0&&accounted==0);
+  memset(arena,0x47,request);os::free(arena);heap::trim_idle();assert(map_live==0&&accounted==0);
   // Reproduce the old untracked32752-byte request spilling into48KiB.
-  tracking=false;assert(!os::malloc(32752,mtInternal));assert(map_live==0);
+  tracking=false;assert(!os::malloc(32752,mtInternal));heap::trim_idle();assert(map_live==0);
  }
  map_limit=SIZE_MAX;
  std::puts("PASS: exact arena size enum with layout/NMT contracts and16KiB page model fits32KiB; previous32752-byte request is refused at32KiB mapping limit");
@@ -202,7 +212,7 @@ int main(){
   if(nmt){limit=accounted;assert(!os::malloc(1,mtInternal));assert(!os::realloc(p,513,mtInternal));limit=SIZE_MAX;}
   p=os::realloc(p,32,mtInternal);check(p,32,0x52);os::free(p);assert(accounted==0);
   assert(!os::malloc(SIZE_MAX,mtInternal));os::free(nullptr);
-  assert(heap_live==0&&map_live==0);
+  heap::trim_idle();assert(heap_live==0&&map_live==0);
  }
  std::puts("PASS: actual os.cpp malloc/realloc/free preserve NMT model accounting/limits, revive headers after failed resize and accept raw pre-init blocks with tracking off");
 }

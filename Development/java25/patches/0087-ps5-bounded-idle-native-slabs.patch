@@ -1,0 +1,55 @@
+--- a/src/hotspot/share/runtime/ps5NativeHeap.hpp
++++ b/src/hotspot/share/runtime/ps5NativeHeap.hpp
+@@ -52,6 +52,21 @@
+ inline void note(const char* label, size_t requested, size_t mapped, int error) {
+   ps5_vm_trace_values(label, requested, " mapped=", mapped, " errno=", (unsigned long long)error);
+ }
++// At most one empty slab per class stays warm (<=8*64KiB). Reclaim it
++// before propagating mapping pressure. Live allocations are never displaced.
++inline void trim_idle_locked() {
++  for (unsigned index=0;index<8;++index) {
++    Slab** link=&classes()[index];
++    while (*link) {
++      Slab* slab=*link;
++      if (slab->live==0) {*link=slab->next;munmap(slab,slab->mapped);}
++      else link=&slab->next;
++    }
++  }
++}
++inline void trim_idle() {
++  int saved=errno;lock();trim_idle_locked();unlock();errno=saved;
++}
+ inline void* allocate(size_t size) {
+   int saved_errno = errno;
+   size = size == 0 ? 1 : size;
+@@ -63,7 +78,9 @@
+   if (size > 4096) {
+     size_t mapped;
+     if (!rounded(sizeof(Header) + size, &mapped)) { errno = ENOMEM; return nullptr; }
+-    void* memory = map_pages(mapped); int error = memory == MAP_FAILED ? errno : 0;
++    void* memory = map_pages(mapped);
++    if (memory==MAP_FAILED) {trim_idle();memory=map_pages(mapped);}
++    int error = memory == MAP_FAILED ? errno : 0;
+     note("PS5 native heap pages: requested=", size, mapped, error);
+     if (memory == MAP_FAILED) { errno = error; return nullptr; }
+     header = (Header*)memory; header->block = {size, mapped, nullptr};
+@@ -81,6 +98,7 @@
+         void* memory = map_pages(mapped);
+         if (memory == MAP_FAILED) {
+           error = errno;
++          trim_idle_locked();
+           // Under pressure a full slab can be refused even when a single
+           // page remains available. Retry once, still with real OS storage.
+           size_t minimal;
+@@ -152,7 +170,10 @@
+     lock();
+     header->next = slab->available; slab->available = header; --slab->live;
+     size_t mapped = 0;
+-    if (!slab->live) {
++    bool other_idle=false;
++    if (!slab->live) for (Slab* other=classes()[slab->index];other;other=other->next)
++      if (other!=slab && other->live==0) {other_idle=true;break;}
++    if (!slab->live && other_idle) {
+       Slab** link = &classes()[slab->index];
+       while (*link != slab) link = &(*link)->next;
+       *link = slab->next; mapped = slab->mapped;

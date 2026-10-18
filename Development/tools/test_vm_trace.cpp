@@ -76,6 +76,14 @@ int main() {
  ps5_vm_trace("THREAD: lifecycle retained");
  assert(open_calls-before_sample==9);
  ps5_vm_set_metadata_interval(0);ps5_vm_trace("DONE: Metadata zeroing");assert(open_calls-before_sample==10);
+ ps5_vm_set_metadata_interval(64);unsigned before_phases=open_calls;
+ for(int i=0;i<400;i++){ps5_vm_trace("DONE: Metachunk commit boundary");assert(errno==EBUSY);}
+ assert(open_calls-before_phases==6);
+ assert(std::string(ps5_vm_last_stage())=="DONE: Metachunk commit boundary");
+ ps5_vm_signal_trace_active()=true;ps5_vm_trace(ps5_vm_last_stage());ps5_vm_signal_trace_active()=false;
+ assert(open_calls-before_phases==7);
+ ps5_vm_trace("FAIL: Metachunk commit boundary");assert(open_calls-before_phases==8);
+ ps5_vm_set_metadata_interval(0);
  unsigned char raw[274]={};for(unsigned i=0;i<sizeof(raw);++i)raw[i]=(unsigned char)i;
  unsigned before_raw=open_calls;
  ps5_vm_trace_raw_context(raw+1,15);assert(open_calls==before_raw);
@@ -86,5 +94,5 @@ int main() {
  std::ifstream raw_file("build/java25/trace-helper-test.log");
  std::string raw_content((std::istreambuf_iterator<char>(raw_file)),{});
  assert(raw_content.find("word0=0x0807060504030201 word1=0x100f0e0d0c0b0a09")!=std::string::npos);
- std::puts("Startup trace helper PASS: EINTR, partial writes, append, denied open, memory fields, fault hex formatting, errno preservation, bounded metadata sampling with current last-stage context, unsampled failure/thread lines");
+ std::puts("Startup trace helper PASS: EINTR, partial writes, append, denied open, memory fields, fault hex formatting, errno preservation, bounded successful-phase sampling with current last-stage context, unsampled failure/thread lines");
 }
