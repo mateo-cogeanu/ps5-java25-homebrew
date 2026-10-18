@@ -17,7 +17,7 @@ This repository contains the **Java runtime port, platform adaptations and accep
 
 > **Current progress:** nine passing milestones on PS5 firmware **13.60**, using interpreter mode. Multi-JAR dependencies, system class-path loading, resident JNI calls, HTTPS and IPv4/IPv6 networking are console-tested.
 
-**Related project:** [ps5-minecraft-java](https://github.com/mateo-cogeanu/ps5-minecraft-java) tracks Minecraft-specific work separately and will use this Java runtime.
+**Related project:** [ps5-minecraft-java](https://github.com/mateo-cogeanu/ps5-minecraft-java) uses this runtime and tracks Minecraft-specific work and console milestones separately.
 
 ## Milestones
 

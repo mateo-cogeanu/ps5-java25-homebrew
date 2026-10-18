@@ -61,3 +61,18 @@ Target HotSpot/java.base native build passes. Console mount-query handling,
 relative stream files, verified saved world/thread exit and all058 rows remain
 pending. Readiness from057 is not a new passing milestone. Discovery DNS and
 overall native memory capacity remain unresolved.
+
+
+## Exact058 console result
+
+On2026-10-18 the human reported ALL PASS for the delivered01.000.058 package.
+The consumer's five rows cover runtime initialization, VM creation, artifact/
+asset preflight, real server readiness, clean stop/thread exit, nonempty saved
+world metadata and VM destruction. The matching runtime pin is
+`aab0d2fa8ad58ba8ceb58561a33a9a5fe50fd583`. Consumer source/package hashes and
+release are frozen in the separate
+[Server_Start validation](https://github.com/mateo-cogeanu/ps5-minecraft-java/tree/main/Server_Start).
+This supersedes the058 pending result above for those rows. It does not turn
+unimplemented mount enumeration/capacity into a supported API or establish DNS,
+reload, player joins, performance or endurance. No runtime binary rebuild was
+made to freeze the human-tested package.
