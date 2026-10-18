@@ -89,9 +89,57 @@ int main(){
  fail_map_n=0;hints.ai_family=AF_INET6;assert(test_getaddrinfo("unit.example",nullptr,&hints,&res)==EAI_FAMILY);
  assert(!ps5_dns_malloc(SIZE_MAX)&&errno==ENOMEM);ps5_dns_free(nullptr);
  std::vector<std::thread> threads;for(int i=0;i<8;i++)threads.emplace_back([]{for(int j=0;j<50;j++)check();});for(auto&t:threads)t.join();assert(!maps&&!heaps&&!pool_live&&!resolver_live);
- puts("PASS: actual SDK lookup/free and scoped adapter; libc/mapped results/canonical names, every partial/total allocation failure, resolver create/query/cleanup failures preserved, unsupported IPv6, errno, overflow and400 concurrent lookups with complete cleanup; ASan/UBSan. Network injected, not console proof.");
+ puts("PASS: actual SDK lookup/free and scoped adapter; libc/mapped results/canonical names, every partial/total allocation failure, resolver create/query/cleanup failures preserved, unsupported IPv6, actual IPv4/IPv6 Java conversion allocation/link/cleanup blocks, errno, overflow and400 concurrent lookups with complete cleanup; ASan/UBSan. Network injected, not console proof.");
 }
 '''
+# Compile the actual JDK conversion-list allocation/link/free blocks as well.
+node_tests = r"""
+inline void* injected_malloc(size_t n){return std::injected_malloc(n);}
+inline void injected_free(void*p){std::injected_free(p);}
+#define malloc injected_malloc
+#define free injected_free
+#define mmap test_mmap
+#define munmap test_munmap
+#include ".tools/java25/openjdk/src/java.base/unix/native/libnet/ps5NetifAlloc.h"
+#undef malloc
+#undef free
+#undef mmap
+#undef munmap
+#define DNS_NODE_ALLOC ps5_netif_allocate
+#define DNS_NODE_FREE ps5_netif_release
+"""
+node_header=(r/'.tools/java25/openjdk/src/java.base/unix/native/libnet/ps5NetifAlloc.h').read_text().replace('owner=malloc(', 'owner=(Ps5NetifAllocation*)malloc(').replace('owner=mmap(', 'owner=(Ps5NetifAllocation*)mmap(')
+node_tests=node_tests.replace('#include ".tools/java25/openjdk/src/java.base/unix/native/libnet/ps5NetifAlloc.h"',node_header)
+for number,filename in enumerate(['Inet4AddressImpl.c','Inet6AddressImpl.c']):
+ text=(r/'.tools/java25/openjdk/src/java.base/unix/native/libnet'/filename).read_text()
+ a=text.index('            if (!skip) {',text.index('lookupAllHostAddr'))
+ b=text.index('            iterator = iterator->ai_next;',a)
+ block=text[a:b]
+ a=text.index('    while (resNew != NULL)',b);b=text.index('    if (res != NULL)',a)
+ cleanup=text[a:b]
+ node_tests+='static int convert'+str(number)+r"""(struct addrinfo *res,bool &oom){
+ int i=0,inetCount=0,inet6Count=0,skip=0;int *env=nullptr;void*ret=(void*)1;
+ struct addrinfo *resNew=nullptr,*last=nullptr,*iterator=res;
+ auto JNU_ThrowOutOfMemoryError=[&](int*,const char*){oom=true;};
+ while(iterator){
+"""+block+r"""
+ iterator=iterator->ai_next;
+ }
+cleanupAndReturn:
+"""+cleanup+' return ret?i:-1; }\n'
+node_tests+=r"""
+void check_conversion(){
+ struct addrinfo entries[3]={};for(int n=0;n<3;n++){entries[n].ai_family=AF_INET;entries[n].ai_next=n<2?&entries[n+1]:nullptr;}
+ for(auto convert:{convert0,convert1}){
+  bool oom=false;deny_heap=false;assert(convert(entries,oom)==3&&!oom);assert(!heaps&&!maps);
+  deny_heap=true;assert(convert(entries,oom)==3&&!oom);assert(!heaps&&!maps);
+  deny_map=true;assert(convert(entries,oom)==-1&&oom);assert(!heaps&&!maps);deny_map=false;
+  oom=false;map_count=0;fail_map_n=2;assert(convert(entries,oom)==-1&&oom);assert(!heaps&&!maps);fail_map_n=0;
+ }
+}
+"""
+source=source.replace('int main(){',node_tests+'\nint main(){\n check_conversion();deny_heap=false;')
+
 cpp=w/'test.cpp';cpp.write_text(source)
 subprocess.run(['clang++','-std=c++20','-O1','-g','-fsanitize=address,undefined','-pthread','-I',str(r),str(cpp),'-o',str(w/'test')],check=True)
 subprocess.run([str(w/'test')],check=True)

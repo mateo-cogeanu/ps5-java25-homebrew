@@ -1,0 +1,72 @@
+--- a/src/java.base/unix/native/libnet/Inet4AddressImpl.c
++++ b/src/java.base/unix/native/libnet/Inet4AddressImpl.c
+@@ -35,6 +35,15 @@
+ 
+ #include "net_util.h"
+ 
++#ifdef __PROSPERO__
++#include "ps5NetifAlloc.h"
++#define DNS_NODE_ALLOC ps5_netif_allocate
++#define DNS_NODE_FREE ps5_netif_release
++#else
++#define DNS_NODE_ALLOC malloc
++#define DNS_NODE_FREE free
++#endif
++
+ #include "java_net_Inet4AddressImpl.h"
+ #include "java_net_spi_InetAddressResolver_LookupPolicy.h"
+ 
+@@ -143,7 +152,7 @@
+ 
+             if (!skip) {
+                 struct addrinfo *next
+-                    = (struct addrinfo *)malloc(sizeof(struct addrinfo));
++                    = (struct addrinfo *)DNS_NODE_ALLOC(sizeof(struct addrinfo));
+                 if (!next) {
+                     JNU_ThrowOutOfMemoryError(env, "Native heap allocation failed");
+                     ret = NULL;
+@@ -192,7 +201,7 @@
+     while (resNew != NULL) {
+         last = resNew;
+         resNew = resNew->ai_next;
+-        free(last);
++        DNS_NODE_FREE(last);
+     }
+     if (res != NULL) {
+         freeaddrinfo(res);
+--- a/src/java.base/unix/native/libnet/Inet6AddressImpl.c
++++ b/src/java.base/unix/native/libnet/Inet6AddressImpl.c
+@@ -38,6 +38,15 @@
+ 
+ #include "net_util.h"
+ 
++#ifdef __PROSPERO__
++#include "ps5NetifAlloc.h"
++#define DNS_NODE_ALLOC ps5_netif_allocate
++#define DNS_NODE_FREE ps5_netif_release
++#else
++#define DNS_NODE_ALLOC malloc
++#define DNS_NODE_FREE free
++#endif
++
+ #include "java_net_InetAddress.h"
+ #include "java_net_Inet4AddressImpl.h"
+ #include "java_net_Inet6AddressImpl.h"
+@@ -290,7 +299,7 @@
+ 
+             if (!skip) {
+                 struct addrinfo *next
+-                    = (struct addrinfo *)malloc(sizeof(struct addrinfo));
++                    = (struct addrinfo *)DNS_NODE_ALLOC(sizeof(struct addrinfo));
+                 if (!next) {
+                     JNU_ThrowOutOfMemoryError(env, "Native heap allocation failed");
+                     ret = NULL;
+@@ -383,7 +392,7 @@
+     while (resNew != NULL) {
+         last = resNew;
+         resNew = resNew->ai_next;
+-        free(last);
++        DNS_NODE_FREE(last);
+     }
+     if (res != NULL) {
+         freeaddrinfo(res);

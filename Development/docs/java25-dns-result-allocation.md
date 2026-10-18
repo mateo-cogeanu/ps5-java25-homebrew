@@ -45,3 +45,14 @@ runtime source publication.
 Target packaging and host tests do not establish online DNS, TLS, authentication
 or player admission on PS5. The separate consumer adds real HTTPS preflight and
 account provisioning; its full two-hour console result remains pending.
+
+
+Patch0084 also covers the separate OpenJDK IPv4/IPv6 address-conversion list:
+its duplicate-filter nodes use the already tested scoped node allocator and
+matching release, while SDK-owned results continue through freeaddrinfo. This
+prevents a successful SDK lookup from immediately encountering the same libc
+allocation dependency during Java conversion. Both-backend failure still
+throws OOM. Host regression compiles the actual allocation/link/cleanup blocks
+for both implementations and checks heap/map success, complete refusal and
+partial-list cleanup under ASan/UBSan; JNI conversion itself is not simulated
+by that block test. Target java.base-libs compilation passes.
