@@ -1871,3 +1871,11 @@ fails with bare OOM during management initialization; raw malloc denial in
 these bodies reproduces that failure on host. Real JNI fault/cleanup controls
 pass, but the precise console allocation site and resolution require retesting.
 Library lookup and JNI load/version validation remain enabled.
+
+### Bound reusable arena retention on PS5
+
+[Patch0091](../docs/java25-arena-pool-bounds.md) limits each arena chunk cache to
+eight unused chunks and reclaims unused pools before retrying an allocation
+refusal. A C1 workload aborted on a real32KiB native mapping failure. Actual
+pool-path ASan/UBSan tests and target rebuild pass; console pressure resolution
+and sustained execution are pending. Live arena storage remains protected.

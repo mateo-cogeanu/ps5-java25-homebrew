@@ -1,0 +1,59 @@
+--- a/src/hotspot/share/memory/arena.cpp
++++ b/src/hotspot/share/memory/arena.cpp
+@@ -93,6 +93,10 @@
+ 
+   Chunk*       _first;
+   const size_t _size;         // (inner payload) size of the chunks this pool serves
++#ifdef __PROSPERO__
++  size_t _cached_count = 0;
++  static constexpr size_t max_cached_chunks = 8;
++#endif
+ 
+   // Returns null if pool is empty.
+   Chunk* take_from_pool() {
+@@ -100,12 +104,20 @@
+     Chunk* c = _first;
+     if (_first != nullptr) {
+       _first = _first->next();
++#ifdef __PROSPERO__
++      --_cached_count;
++#endif
+     }
+     return c;
+   }
+   void return_to_pool(Chunk* chunk) {
+     assert(chunk->length() == _size, "wrong pool for this chunk");
+     ChunkPoolLocker lock;
++#ifdef __PROSPERO__
++    // Do not retain a compilation's whole arena burst until the periodic sweep.
++    if (_cached_count >= max_cached_chunks) { os::free(chunk); return; }
++    ++_cached_count;
++#endif
+     chunk->set_next(_first);
+     _first = chunk;
+   }
+@@ -123,6 +135,9 @@
+       cur = next;
+     }
+     _first = nullptr;
++#ifdef __PROSPERO__
++    _cached_count = 0;
++#endif
+   }
+ 
+   // Given a (inner payload) size, return the pool responsible for it, or null if the size is non-standard
+@@ -192,6 +207,14 @@
+     // Either the pool was empty, or this is a non-standard length. Allocate a new Chunk from C-heap.
+     size_t bytes = ARENA_ALIGN(sizeof(Chunk)) + length;
+     void* p = os::malloc(bytes, mtChunk, CALLER_PC);
++#ifdef __PROSPERO__
++    if (p == nullptr) {
++      // The requesting class can be empty while other size pools retain chunks.
++      // Release only unused chunks, then retry the real allocator once.
++      clean();
++      p = os::malloc(bytes, mtChunk, CALLER_PC);
++    }
++#endif
+     if (p == nullptr && alloc_failmode == AllocFailStrategy::EXIT_OOM) {
+       vm_exit_out_of_memory(bytes, OOM_MALLOC_ERROR, "Chunk::new");
+     }
