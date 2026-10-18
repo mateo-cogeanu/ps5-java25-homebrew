@@ -1,0 +1,28 @@
+--- a/src/java.base/unix/classes/java/io/UnixFileSystem.java
++++ b/src/java.base/unix/classes/java/io/UnixFileSystem.java
+@@ -32,13 +32,16 @@
+     private final char slash;
+     private final char colon;
+     private final String userDir;
++    private final boolean ps5Sandbox;
+ 
+     private String getPathForSysCalls(String path) {
+         return path.isEmpty() ? getCWD().getPath() : path;
+     }
+ 
+     private File getFileForSysCalls(File file) {
+-        return file.getPath().isEmpty() ? getCWD() : file;
++        if (file.getPath().isEmpty()) return getCWD();
++        // Match stream and NIO resolution when the console has no usable cwd.
++        return ps5Sandbox && !isAbsolute(file) ? new File(resolve(file)) : file;
+     }
+ 
+     UnixFileSystem() {
+@@ -46,6 +49,7 @@
+         slash = props.getProperty("file.separator").charAt(0);
+         colon = props.getProperty("path.separator").charAt(0);
+         userDir = StaticProperty.userDir();
++        ps5Sandbox = Boolean.getBoolean("sun.nio.fs.ps5Sandbox");
+     }
+ 
+     /* -- Normalization and construction -- */

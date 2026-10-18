@@ -44,3 +44,15 @@ Target HotSpot/java.base native compilation passes. The separate consumer061
 adds an early default-trust-manager issuer count and file metadata report before
 its online preflight. PS5 root discovery, HTTPS, authenticated admission and
 the7200second run remain pending; passing058 stays frozen.
+
+
+Patch0086 makes relative File objects passed to native filesystem operations
+resolve through existing user.dir policy when sun.nio.fs.ps5Sandbox=true. This
+matches already-adapted stream/NIO resolution and allows relative whitelist
+metadata/load checks to discover the actual preflight-generated file. Empty
+path handling and absolute/public File paths are preserved; desktop policy is
+unchanged when the property is false. The actual patched UnixFileSystem class
+passes host checks with process cwd different from user.dir: relative existence,
+type/readability/length/timestamp, rename/delete and unchanged absolute paths.
+Target java.base Java/native compilation passes. No console whitelist-admission
+claim is made before an actual successful join.
