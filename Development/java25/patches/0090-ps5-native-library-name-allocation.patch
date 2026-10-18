@@ -1,0 +1,96 @@
+--- a/src/java.base/share/native/libjava/NativeLibraries.c
++++ b/src/java.base/share/native/libjava/NativeLibraries.c
+@@ -33,6 +33,54 @@
+ #include "jvm.h"
+ #include "jdk_internal_loader_NativeLibraries.h"
+ 
++
++#ifdef __PROSPERO__
++#include <errno.h>
++#include <stdint.h>
++#include <sys/mman.h>
++#include <unistd.h>
++typedef struct { size_t mapped_size; } NativeLibraryScratch;
++#endif
++
++/* Only temporary library/symbol names use this allocator. */
++static void *native_library_allocate(size_t size) {
++#ifdef __PROSPERO__
++    int saved = errno;
++    if (size > SIZE_MAX - sizeof(NativeLibraryScratch)) { errno = ENOMEM; return NULL; }
++    size_t bytes = size + sizeof(NativeLibraryScratch);
++    NativeLibraryScratch *header = malloc(bytes);
++    if (header != NULL) header->mapped_size = 0;
++    else {
++        int heap_error = errno;
++        long page = sysconf(_SC_PAGESIZE);
++        if (page <= 0 || bytes > SIZE_MAX - (size_t)page) { errno = ENOMEM; return NULL; }
++        size_t mapped = ((bytes + (size_t)page - 1) / (size_t)page) * (size_t)page;
++        void *memory = mmap(NULL, mapped, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
++        int map_error = memory == MAP_FAILED ? errno : 0;
++        jio_fprintf(stderr, "PS5 native library scratch: bytes=%zu malloc_errno=%d mapped_bytes=%zu mmap_errno=%d\n", size, heap_error, memory == MAP_FAILED ? 0 : mapped, map_error);
++        if (memory == MAP_FAILED) { errno = map_error; return NULL; }
++        header = memory; header->mapped_size = mapped;
++    }
++    errno = saved;
++    return header + 1;
++#else
++    return malloc(size);
++#endif
++}
++static void native_library_release(void *memory) {
++#ifdef __PROSPERO__
++    int saved = errno;
++    if (memory != NULL) {
++        NativeLibraryScratch *header = (NativeLibraryScratch *)memory - 1;
++        if (header->mapped_size) munmap(header, header->mapped_size);
++        else free(header);
++    }
++    errno = saved;
++#else
++    free(memory);
++#endif
++}
++
+ typedef jint (JNICALL *JNI_OnLoad_t)(JavaVM *, void *);
+ typedef void (JNICALL *JNI_OnUnload_t)(JavaVM *, void *);
+ 
+@@ -77,7 +125,7 @@
+         FILENAME_MAX) {
+         goto done;
+     }
+-    jniFunctionName = malloc(len);
++    jniFunctionName = native_library_allocate(len);
+     if (jniFunctionName == NULL) {
+         JNU_ThrowOutOfMemoryError(env, NULL);
+         goto done;
+@@ -88,7 +136,7 @@
+         strcat(jniFunctionName, cname);
+     }
+     entryName = JVM_FindLibraryEntry(handle, jniFunctionName);
+-    free(jniFunctionName);
++    native_library_release(jniFunctionName);
+ 
+  done:
+     return entryName;
+@@ -258,7 +306,7 @@
+         JNU_ReleaseStringPlatformChars(env, name, cname);
+         return NULL;
+     }
+-    libName = malloc(len + 1); //+1 for null if prefix+suffix == 0
++    libName = native_library_allocate(len + 1); //+1 for null if prefix+suffix == 0
+     if (libName == NULL) {
+         JNU_ReleaseStringPlatformChars(env, name, cname);
+         JNU_ThrowOutOfMemoryError(env, NULL);
+@@ -276,9 +324,9 @@
+     ret = findJniFunction(env, procHandle, libName, JNI_TRUE);
+     if (ret != NULL) {
+         lib = JNU_NewStringPlatform(env, libName);
+-        free(libName);
++        native_library_release(libName);
+         return lib;
+     }
+-    free(libName);
++    native_library_release(libName);
+     return NULL;
+ }

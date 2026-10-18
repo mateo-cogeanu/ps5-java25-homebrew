@@ -1862,3 +1862,12 @@ missing-log controls reject. Current/previous JIT logs are available through the
 read-only report service. This is a development candidate, not a PS5 JIT pass;
 compiled exceptions, native memory and sustained execution still need console
 validation. Frozen passing interpreter milestones remain preserved.
+
+### Native library name allocation candidate
+
+[Patch0090](../docs/java25-native-library-name-allocation.md) adds a PS5 scoped
+fallback for temporary native-library and JNI symbol names. A C1 consumer run
+fails with bare OOM during management initialization; raw malloc denial in
+these bodies reproduces that failure on host. Real JNI fault/cleanup controls
+pass, but the precise console allocation site and resolution require retesting.
+Library lookup and JNI load/version validation remain enabled.
