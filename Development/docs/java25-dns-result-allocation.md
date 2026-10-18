@@ -56,3 +56,34 @@ throws OOM. Host regression compiles the actual allocation/link/cleanup blocks
 for both implementations and checks heap/map success, complete refusal and
 partial-list cleanup under ASan/UBSan; JNI conversion itself is not simulated
 by that block test. Target java.base-libs compilation passes.
+
+## Retain one bounded resolver pair under native-heap pressure
+
+Consumer061 run `01.000.061-1792334800-999063915` confirms real DNS and
+verified HTTPS preflight,111 default trust roots and real server readiness.
+Minecraft's own discovery thread then receives UnknownHostException. Native
+trace records later SceNetPoolCreate failure `0x8002000c` (ENOMEM), while
+compiler TLS and native allocations also fall back to mapped storage. An
+unrelated earlier local-hostname query returns `0x80410116`; it does not
+establish failure of the successful online preflight. Raw reports stay local.
+
+The scoped netdb adapter now retains the first successful real16KiB SceNet
+pool and resolver until native app exit, across VM runs. Each SDK resolve
+leases the pair from pool-create through pool-destroy. A static atomic flag
+serializes the complete lease without allocating a late mutex or TLS slot;
+waiting callers yield. Both forward and reverse lookup paths in the pinned
+object use that lease. Successful queries continue to ask the real resolver;
+no address/TTL cache or preset service address is introduced. Pool/resolver
+creation failure remains real and permits a later retry; query failures are
+returned unchanged and release the lease. SDK result allocation ownership is
+unchanged. SDK destroy calls release the lease; native destruction is deferred
+to app exit. At most one real pool and one resolver are retained.
+
+The updated actual-adapter/SDK-body ASan/UBSan regression passes400 serialized
+cross-thread fresh queries after all further pool/resolver creation is denied,
+with result allocations using mapping after heap refusal. It checks changing
+answers, real query failure/recovery, partial initialization failure/retry,
+output allocation failures, matching releases and errno. Injected networking
+cannot validate the console's cross-thread handle reuse or authentication.
+Consumer062 packaging and its two-hour console result remain pending until
+recorded separately in the consumer repository.

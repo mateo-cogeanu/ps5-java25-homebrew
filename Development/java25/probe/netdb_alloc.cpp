@@ -4,6 +4,14 @@
 #include "../../.tools/java25/openjdk/src/hotspot/share/runtime/ps5StartupTrace.hpp"
 #include <netdb.h>
 #include <netinet/in.h>
+#include <atomic>
+#include <sched.h>
+// The pinned SDK destroys its pool after every lookup. Keep one real pair for
+// this app lifetime: late pool creation can fail after the VM consumes libc's
+// heap. A lease spans pool-create through pool-destroy, including reverse DNS.
+// Static atomics avoid late pthread mutex/TLS allocation. No answers are cached.
+static std::atomic_flag dns_busy=ATOMIC_FLAG_INIT;
+static int dns_pool=-1,dns_resolver=-1;
 extern "C" {
 int* sceNetErrnoLoc();
 int sceNetPoolCreate(const char*,int,int);
@@ -23,10 +31,30 @@ char* ps5_dns_strdup(const char*s){size_t n=std::strlen(s);if(n==SIZE_MAX){errno
 static void dns_result(const char*stage,int result,int error){
  int saved=errno;ps5_vm_trace(stage);ps5_vm_trace_values("DNS result=",(uint32_t)result," net_errno=",(uint32_t)error," errno=",saved);errno=saved;
 }
-int ps5_dns_pool_create(const char*n,int size,int flags){int r=sceNetPoolCreate(n,size,flags);int e=r<0?*sceNetErrnoLoc():0;dns_result("DNS pool create",r,e);return r;}
-int ps5_dns_pool_destroy(int h){int r=sceNetPoolDestroy(h);int e=r<0?*sceNetErrnoLoc():0;dns_result("DNS pool destroy",r,e);return r;}
-int ps5_dns_resolver_create(const char*n,int pool,int flags){int r=sceNetResolverCreate(n,pool,flags);int e=r<0?*sceNetErrnoLoc():0;dns_result("DNS resolver create",r,e);return r;}
-int ps5_dns_resolver_destroy(int h){int r=sceNetResolverDestroy(h);int e=r<0?*sceNetErrnoLoc():0;dns_result("DNS resolver destroy",r,e);return r;}
+int ps5_dns_pool_create(const char*n,int size,int flags){
+ while(dns_busy.test_and_set(std::memory_order_acquire))sched_yield();
+ int r=dns_pool;
+ if(r<0){r=sceNetPoolCreate(n,size,flags);int e=r<0?*sceNetErrnoLoc():0;dns_result("DNS pool create",r,e);if(r>=0)dns_pool=r;}
+ else dns_result("DNS pool reuse",r,0);
+ if(r<0)dns_busy.clear(std::memory_order_release);
+ return r;
+}
+int ps5_dns_pool_destroy(int h){
+ // Only the pinned SDK calls these adapters, with its matching lease handle.
+ if(h!=dns_pool)return sceNetPoolDestroy(h);
+ dns_result("DNS pool lease release",0,0);dns_busy.clear(std::memory_order_release);return 0;
+}
+int ps5_dns_resolver_create(const char*n,int pool,int flags){
+ if(pool!=dns_pool)return sceNetResolverCreate(n,pool,flags);
+ int r=dns_resolver;
+ if(r<0){r=sceNetResolverCreate(n,pool,flags);int e=r<0?*sceNetErrnoLoc():0;dns_result("DNS resolver create",r,e);if(r>=0)dns_resolver=r;}
+ else dns_result("DNS resolver reuse",r,0);
+ return r;
+}
+int ps5_dns_resolver_destroy(int h){
+ if(h!=dns_resolver)return sceNetResolverDestroy(h);
+ dns_result("DNS resolver lease release",0,0);return 0;
+}
 int ps5_dns_ntoa(int h,const char*n,in_addr_t*a,int timeout,int retry,int flags){int r=sceNetResolverStartNtoa(h,n,a,timeout,retry,flags);int e=r<0?*sceNetErrnoLoc():0;dns_result("DNS resolver query",r,e);return r;}
 int getaddrinfo(const char*n,const char*s,const struct addrinfo*h,struct addrinfo**r){
  int result=ps5_sdk_getaddrinfo(n,s,h,r),saved=errno;

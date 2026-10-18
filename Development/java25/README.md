@@ -1829,3 +1829,10 @@ reproduce zero roots before the adaptation and111 roots after it, using the
 same target cacerts, then complete real consumer HTTPS preflight. Certificate
 verification is unchanged. [Evidence and limits](../docs/java25-file-metadata-trust.md).
 Console TLS and consumer endurance remain pending.
+
+The scoped SDK DNS adapter now retains one serialized16KiB pool/resolver pair
+per app lifetime after consumer061 logs confirm late pool creation ENOMEM.
+Real DNS answers/errors and result allocation ownership remain intact. See
+[DNS allocation and resolver lifetime](../docs/java25-dns-result-allocation.md).
+The400-query concurrent allocation-denial regression passes ASan/UBSan;
+consumer062 console DNS/authentication/endurance validation remains pending.
