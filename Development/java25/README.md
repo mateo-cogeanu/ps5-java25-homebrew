@@ -1808,3 +1808,13 @@ captured relative-open errors while preserving actual errors and absolute paths.
 Actual native-body/real-JNI regression with UBSan and -Xcheck:jni plus target
 compilation pass. Console save/stop and handling of unavailable mount queries
 remain pending. [Evidence and limits](../docs/java25-ps5-filesystem-queries.md).
+
+
+## Scoped SDK DNS results
+
+The runtime packager now adapts only the pinned SDK netdb object's result
+malloc/free/strdup ownership to the existing libc-first/mapped backend and adds
+resolver-stage diagnostics. This addresses a concrete allocation dependency
+while the exact cause of a consumer DNS failure remains unconfirmed. Native
+network results and failures are retained; console DNS/online operation is
+pending. [Evidence, tests and scope](../docs/java25-dns-result-allocation.md).

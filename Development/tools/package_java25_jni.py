@@ -28,6 +28,9 @@ external=json.loads(args.probe_spec.read_text()) if args.probe_spec else None
 if external:
     for key in ("source","param","asset_dir"):
         if not Path(external[key]).exists():parser.error("External probe input missing: "+key)
+    compile_classpath=external.get("java_compile_classpath",[])
+    if not isinstance(compile_classpath,list) or not all(isinstance(p,str) and Path(p).is_file() for p in compile_classpath):
+        parser.error("External java_compile_classpath must list existing JARs")
 if args.lan:
     import ipaddress
     try:
@@ -130,6 +133,24 @@ if args.startup:
     backend=emutls_dir/"backend.o"
     subprocess.run([str(llvm/"clang++"),"-target","x86_64-sie-ps5","-fvisibility-nodllstorageclass=default","-isysroot",str(SDK),"-isystem",str(SDK/"target/include/c++/v1"),"-isystem",str(SDK/"target/include"),"-std=c++20","-O2","-Wall","-Wextra","-Werror","-fno-exceptions","-fno-rtti","-fno-stack-protector","-femulated-tls","-c",str(ROOT/"java25/probe/emutls_alloc.cpp"),"-o",str(backend)],check=True)
     emutls_backend=[backend]
+# Keep SDK resolver result ownership coherent when its small libc allocations
+# fail. Rebind only the pinned netdb object, including its matching free/strdup.
+if args.startup:
+    netdb_dir=WORK/"netdb-adapter";netdb_dir.mkdir(exist_ok=True)
+    subprocess.run([str(llvm/"llvm-ar"),"x",str(native_libc),"netdb.o"],cwd=netdb_dir,check=True)
+    netdb_obj=netdb_dir/"netdb.o"
+    if hashlib.sha256(netdb_obj.read_bytes()).hexdigest()!="ccf0c18495f3e1329570d4f0dac5157a00c5ab9625f2102b197e2575944197f4":
+        raise SystemExit("Unsupported SDK netdb object")
+    rebound={"malloc":"ps5_dns_malloc","free":"ps5_dns_free","strdup":"ps5_dns_strdup","getaddrinfo":"ps5_sdk_getaddrinfo","sceNetPoolCreate":"ps5_dns_pool_create","sceNetPoolDestroy":"ps5_dns_pool_destroy","sceNetResolverCreate":"ps5_dns_resolver_create","sceNetResolverDestroy":"ps5_dns_resolver_destroy","sceNetResolverStartNtoa":"ps5_dns_ntoa"}
+    subprocess.run([str(llvm/"llvm-objcopy"),*["--redefine-sym="+a+"="+b for a,b in rebound.items()],str(netdb_obj)],check=True)
+    text=subprocess.check_output([str(llvm/"llvm-nm"),str(netdb_obj)],text=True)
+    for a,b in rebound.items():
+        if not re.search(r"\b"+b+r"$",text,re.M) or re.search(r"\b"+a+r"$",text,re.M):
+            raise SystemExit("Incomplete scoped DNS adaptation: "+a)
+    subprocess.run([str(llvm/"llvm-ar"),"r",str(native_libc),str(netdb_obj)],check=True)
+    backend=netdb_dir/"backend.o"
+    subprocess.run([str(llvm/"clang++"),"-target","x86_64-sie-ps5","-fvisibility-nodllstorageclass=default","-isysroot",str(SDK),"-isystem",str(SDK/"target/include/c++/v1"),"-isystem",str(SDK/"target/include"),"-std=c++20","-O2","-Wall","-Wextra","-Werror","-fno-exceptions","-fno-rtti","-fno-stack-protector","-femulated-tls","-c",str(ROOT/"java25/probe/netdb_alloc.cpp"),"-o",str(backend)],check=True)
+    emutls_backend.append(backend)
 extra_objects=[]
 extra_args=[]
 app_source="java25/probe/jni.cpp"
@@ -174,7 +195,7 @@ if args.startup:
         (assets/"probe.properties").write_text("lan.host="+args.lan_host+"\nlan.port="+str(args.lan_port)+"\n")
     if external:
         shutil.copytree(Path(external['asset_dir'])/'java25',assets,dirs_exist_ok=True)
-        subprocess.run(["/opt/homebrew/opt/openjdk@25/bin/javac","--release","25","-d",str(assets/"classes"),*external['java_sources']],check=True)
+        subprocess.run(["/opt/homebrew/opt/openjdk@25/bin/javac","--release","25","-d",str(assets/"classes"),*(["-classpath",os.pathsep.join(compile_classpath)] if compile_classpath else []),*external['java_sources']],check=True)
     if args.dependencies:
         subprocess.run(["/opt/homebrew/opt/openjdk@25/bin/javac","--release","25","-d",str(assets/"classes"),*[str(ROOT/"java25/tests"/(name+".java")) for name in ("MultiJar25","SystemClasspath25","NativeDeps25")]],check=True)
         subprocess.run(["python3",str(ROOT/"tools/java25_dependency_fixture.py"),"--output",str(assets/"jars")],check=True)
