@@ -1852,3 +1852,13 @@ partial failures are rejected and all descriptors/mappings are released.
 See [java.io directory listing](../docs/java25-file-directory-list.md).
 Actual JNI/Java-list host regressions and target compilation pass; the next
 consumer console startup and gameplay result remain pending.
+
+### Guarded C1 candidate (console validation pending)
+
+The reusable [C1 warmup gate](../docs/java25-c1-warmup.md) requires actual current-run
+level-1 kernel compilation and checks deterministic results before consumers
+start heavy work. An 8 MiB code-cache host run passes; interpreter, stale and
+missing-log controls reject. Current/previous JIT logs are available through the
+read-only report service. This is a development candidate, not a PS5 JIT pass;
+compiled exceptions, native memory and sustained execution still need console
+validation. Frozen passing interpreter milestones remain preserved.

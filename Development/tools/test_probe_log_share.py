@@ -23,8 +23,8 @@ int main(int argc,char **argv){
  int listener=socket(AF_INET,SOCK_STREAM,0);sockaddr_in a{};a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
  if(bind(listener,(sockaddr*)&a,sizeof(a))||listen(listener,8))return 3;
  socklen_t length=sizeof(a);getsockname(listener,(sockaddr*)&a,&length);printf("%u\n",ntohs(a.sin_port));fflush(stdout);
- ps5::log_share::Entry entries[]={{"/verification-exception.txt",argv[8]},{"/server-exception.txt",argv[9]},{"/startup-tail.log",argv[1]},{"/startup.log",argv[1]},{"/server.log",argv[1]},{"/build.txt",argv[3]},{"/session.txt",argv[4]},{"/hs-error.log",argv[6]},{"/class-load.log",argv[1]},{"/process-usage.log",argv[7]}};
- for(;;){int client=accept(listener,nullptr,nullptr);if(client<0)break;ps5::log_share::serve(client,entries,10);close(client);}
+ ps5::log_share::Entry entries[]={{"/verification-exception.txt",argv[8]},{"/server-exception.txt",argv[9]},{"/startup-tail.log",argv[1]},{"/startup.log",argv[1]},{"/server.log",argv[1]},{"/build.txt",argv[3]},{"/session.txt",argv[4]},{"/hs-error.log",argv[6]},{"/class-load.log",argv[1]},{"/process-usage.log",argv[7]},{"/jit.log",argv[1]}};
+ for(;;){int client=accept(listener,nullptr,nullptr);if(client<0)break;ps5::log_share::serve(client,entries,11);close(client);}
 }
 ''')
     subprocess.run(['clang++','-std=c++17','-pthread','-fsanitize=address,undefined','-I'+str(ROOT/'java25/probe'),str(root/'server.cpp'),'-o',str(root/'server')],check=True)
@@ -33,7 +33,7 @@ int main(int argc,char **argv){
     (root/'probe-build.txt').write_text('test-build')
     (root/'hs_err_java25.log').write_text('previous real fatal report')
     (root/'fatal-test.log').write_text('current real fatal report')
-    for name in ['java25-class-load.log','process-usage.log']:(root/name).write_text('prior diagnostic: '+name)
+    for name in ['java25-class-load.log','process-usage.log','java25-jit.log']:(root/name).write_text('prior diagnostic: '+name)
     failed=root/'failed-archive';failed.mkdir();(failed/'previous-probe-exception.txt').mkdir();(failed/'probe-exception.txt').write_text('preserve me')
     (root/'verification-current').write_text('verification failure')
     (root/'server-current').write_text('server failure')
@@ -48,7 +48,7 @@ int main(int argc,char **argv){
             assert 'test-run' in (root/name).read_text() and 'No ' in (root/name).read_text()
         assert (root/'previous-hs_err_java25.log').read_text()=='previous real fatal report'
         assert not (root/'hs_err_java25.log').exists()
-        for name in ['java25-class-load.log','process-usage.log']:assert (root/('previous-'+name)).read_text()=='prior diagnostic: '+name
+        for name in ['java25-class-load.log','process-usage.log','java25-jit.log']:assert (root/('previous-'+name)).read_text()=='prior diagnostic: '+name
         assert not (root/'java25-class-load.log').exists()
         assert 'elapsed_s=17 getrusage=0 maxrss_raw=' in (root/'process-usage.log').read_text()
         assert 'test-build' in (root/'probe-session.txt').read_text()
@@ -83,6 +83,7 @@ int main(int argc,char **argv){
             assert archive.read('server.log')==payload
             assert archive.read('hs-error.log')==b'current real fatal report'
             assert archive.read('class-load.log')==payload
+            assert archive.read('jit.log')==payload
             assert b'elapsed_s=17 getrusage=0' in archive.read('process-usage.log')
             manifest=json.loads(archive.read('manifest.json'))
             assert manifest['files']['vm-trace.log']['status']=='unavailable'
