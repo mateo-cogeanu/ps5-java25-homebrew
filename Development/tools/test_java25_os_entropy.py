@@ -12,10 +12,15 @@ subprocess.run([str(j/'bin/javac'),'--patch-module','java.base='+str(w/'src'),'-
 #include <stdint.h>
 #include <stdlib.h>
 #include <assert.h>
-static int calls,fail_after=-1;
-int sceRandomGetRandomNumber(uint8_t*p,size_t n){assert(n>0&&n<=64);if(fail_after>=0&&calls>=fail_after)return -1;arc4random_buf(p,n);calls++;return 0;}
+#include <string.h>
+#include <unistd.h>
+static int calls,fail_after=-1,loads;
+int sceRandomGetRandomNumber(uint8_t*p,size_t n){assert(n>0&&n<=64);if(fail_after>=0&&calls>=fail_after)return -1;arc4random_buf(p,n);__atomic_add_fetch(&calls,1,__ATOMIC_RELAXED);return 0;}
+int sceKernelLoadStartModule(const char*p,size_t n,const void*a,unsigned int flags,void*options,int*started){__atomic_add_fetch(&loads,1,__ATOMIC_RELAXED);usleep(20000);assert(!strcmp(p,"/system/common/lib/libSceRandom.sprx"));assert(!n&&!a&&!flags&&!options);*started=0;return getenv("PS5_SEED_LOAD_FAIL")?-1:71;}
+int sceKernelDlsym(int handle,const char*name,void**symbol){assert(handle==71&&!strcmp(name,"PI7jIZj4pcE"));if(getenv("PS5_SEED_LOOKUP_FAIL"))return -1;if(getenv("PS5_SEED_NULL_SYMBOL")){*symbol=0;return 0;}*symbol=(void*)sceRandomGetRandomNumber;return 0;}
 extern void Java_sun_security_provider_NativeSeedGenerator_getPS5SeedBytes(JNIEnv*,jclass,jbyteArray);
 JNIEXPORT void JNICALL Java_EntropyCheck_mode(JNIEnv*e,jclass c,jint n){fail_after=n;calls=0;}
+JNIEXPORT jint JNICALL Java_EntropyCheck_loads(JNIEnv*e,jclass c){return loads;}
 JNIEXPORT jint JNICALL Java_EntropyCheck_calls(JNIEnv*e,jclass c){return calls;}
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*vm,void*x){JNIEnv*e;if((*vm)->GetEnv(vm,(void**)&e,JNI_VERSION_1_8))return JNI_ERR;jclass c=(*e)->FindClass(e,"sun/security/provider/NativeSeedGenerator");JNINativeMethod m={"getPS5SeedBytes","([B)V",(void*)Java_sun_security_provider_NativeSeedGenerator_getPS5SeedBytes};if((*e)->RegisterNatives(e,c,&m,1))return JNI_ERR;return JNI_VERSION_1_8;}
 ''')
@@ -23,15 +28,23 @@ subprocess.run(['clang','-shared','-fPIC','-g','-fsanitize=undefined','-D__PROSP
 (w/'EntropyCheck.java').write_text(r'''
 import java.security.*;import java.lang.reflect.*;
 public class EntropyCheck {
- static native void mode(int failure);static native int calls();
+ static native void mode(int failure);static native int calls();static native int loads();
  public static void main(String[]args)throws Exception{
-  if(args.length>1) {
+  if(args.length>1 && args[1].equals("desktop")) {
    var rng=SecureRandom.getInstance("DRBG");rng.nextBytes(new byte[64]);
    System.out.println("PASS: other Unix platforms retain URL seed source");return;
   }
   System.setProperty("os.name","PS5");System.load(args[0]);
   Class<?> c=Class.forName("sun.security.provider.NativeSeedGenerator");var cons=c.getDeclaredConstructor(String.class);cons.setAccessible(true);
   Object generator=cons.newInstance("file:/definitely-missing-ps5-entropy-device");var fill=c.getDeclaredMethod("getSeedBytes",byte[].class);fill.setAccessible(true);
+  if(args.length>1 && args[1].equals("resolve-failure")) {
+   try{fill.invoke(generator,(Object)new byte[32]);throw new AssertionError("resolver failure accepted");}catch(InvocationTargetException e){if(!(e.getCause() instanceof ProviderException))throw e;}
+   if(calls()!=0)throw new AssertionError("called unavailable OS source");System.out.println("PASS: resolver failure propagates without calling a null source");return;
+  }
+  var error=new java.util.concurrent.atomic.AtomicReference<Throwable>();Thread[]threads=new Thread[8];
+  for(int i=0;i<threads.length;i++){threads[i]=new Thread(()->{try{fill.invoke(generator,(Object)new byte[129]);}catch(Throwable t){error.set(t);}});threads[i].start();}
+  for(Thread t:threads)t.join();if(error.get()!=null)throw new AssertionError(error.get());
+  if(loads()!=1)throw new AssertionError("module resolution raced");
   for(int n:new int[]{0,1,32,64,65,129,4097}){mode(-1);byte[]b=new byte[n];fill.invoke(generator,(Object)b);if(calls()!=(n+63)/64)throw new AssertionError("batch count");}
   for(int failure:new int[]{0,1}){mode(failure);try{fill.invoke(generator,(Object)new byte[129]);throw new AssertionError("failure swallowed");}catch(InvocationTargetException e){if(!(e.getCause() instanceof ProviderException))throw e;}}
   mode(-1);var rng=SecureRandom.getInstance("DRBG");byte[]a=new byte[64];rng.nextBytes(a);rng.generateSeed(129);if(calls()<3)throw new AssertionError("actual DRBG did not use OS source");
@@ -44,3 +57,6 @@ subprocess.run([str(j/'bin/javac'),'-d',str(w),str(w/'EntropyCheck.java')],check
 subprocess.run([str(j/'bin/java'),'--enable-native-access=ALL-UNNAMED','-Xcheck:jni','--patch-module','java.base='+str(w/'patch'),'--add-opens','java.base/sun.security.provider=ALL-UNNAMED','-cp',str(w),'EntropyCheck',str(w/'entropy.dylib')],check=True,timeout=30,env={**os.environ,"UBSAN_OPTIONS":"handle_segv=0:handle_sigbus=0:handle_sigfpe=0"})
 
 subprocess.run([str(j/"bin/java"),"--patch-module","java.base="+str(w/"patch"),"-cp",str(w),"EntropyCheck",str(w/"entropy.dylib"),"desktop"],check=True,timeout=30,env={**os.environ,"UBSAN_OPTIONS":"handle_segv=0:handle_sigbus=0:handle_sigfpe=0"})
+
+for failure in ["PS5_SEED_LOAD_FAIL","PS5_SEED_LOOKUP_FAIL","PS5_SEED_NULL_SYMBOL"]:
+ subprocess.run([str(j/"bin/java"),"--enable-native-access=ALL-UNNAMED","-Xcheck:jni","--patch-module","java.base="+str(w/"patch"),"--add-opens","java.base/sun.security.provider=ALL-UNNAMED","-cp",str(w),"EntropyCheck",str(w/"entropy.dylib"),"resolve-failure"],check=True,timeout=30,env={**os.environ,failure:"1","UBSAN_OPTIONS":"handle_segv=0:handle_sigbus=0:handle_sigfpe=0"})

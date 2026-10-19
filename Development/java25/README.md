@@ -1903,3 +1903,12 @@ to the actual PS5 system random service instead of the unavailable device-file
 path and expensive threaded fallback. Host actual-Java/JNI/DRBG/failure tests
 pass; PS5 service/ABI/TLS startup and the original process-crash cause remain
 unvalidated. This does not alter consumer game classes or TLS verification.
+
+
+### Development: checked OS entropy service resolution
+
+[Patch0096](../docs/java25-checked-entropy-resolution.md) fixes a captured null
+service-import call by explicitly loading/resolving the fixed system RNG service
+and checking every result. Concurrent initialization and load/lookup/null/OS
+failure controls pass on host; target native rebuild passes. Actual PS5 module
+loading, TLS and earlier071crash resolution remain pending.
