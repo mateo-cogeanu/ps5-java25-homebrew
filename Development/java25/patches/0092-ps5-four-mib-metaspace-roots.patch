@@ -1,0 +1,86 @@
+--- a/src/hotspot/share/memory/metaspace/chunklevel.hpp
++++ b/src/hotspot/share/memory/metaspace/chunklevel.hpp
+@@ -34,7 +34,8 @@
+ 
+ namespace metaspace {
+ 
+-// Chunks are managed by a binary buddy allocator.
++// Chunks are managed by a binary buddy allocator. PS5 uses a 4MiB root
++// and thirteen levels down to the same 1KiB leaf; other platforms use 16MiB.
+ 
+ // Chunk sizes range from 1K to 4MB (64bit).
+ //
+@@ -61,8 +62,15 @@
+ 
+ namespace chunklevel {
+ 
++#ifdef __PROSPERO__
++// Keep metadata growth possible when a full 16MiB root reservation is refused.
++// Preserve the 1KiB leaf size and all named sizes supported by this root.
++static const size_t   MAX_CHUNK_BYTE_SIZE    = 4 * M;
++static const int      NUM_CHUNK_LEVELS       = 13;
++#else
+ static const size_t   MAX_CHUNK_BYTE_SIZE    = 16 * M;
+ static const int      NUM_CHUNK_LEVELS       = 15;
++#endif
+ static const size_t   MIN_CHUNK_BYTE_SIZE    = (MAX_CHUNK_BYTE_SIZE >> ((size_t)NUM_CHUNK_LEVELS - 1));
+ 
+ static const size_t   MIN_CHUNK_WORD_SIZE    = MIN_CHUNK_BYTE_SIZE / sizeof(MetaWord);
+@@ -95,24 +103,30 @@
+ chunklevel_t level_fitting_word_size(size_t word_size);
+ 
+ // Shorthands to refer to exact sizes
++#ifndef __PROSPERO__
+ static const chunklevel_t CHUNK_LEVEL_16M =    ROOT_CHUNK_LEVEL;
+ static const chunklevel_t CHUNK_LEVEL_8M =    (ROOT_CHUNK_LEVEL + 1);
+-static const chunklevel_t CHUNK_LEVEL_4M =    (ROOT_CHUNK_LEVEL + 2);
+-static const chunklevel_t CHUNK_LEVEL_2M =    (ROOT_CHUNK_LEVEL + 3);
+-static const chunklevel_t CHUNK_LEVEL_1M =    (ROOT_CHUNK_LEVEL + 4);
+-static const chunklevel_t CHUNK_LEVEL_512K =  (ROOT_CHUNK_LEVEL + 5);
+-static const chunklevel_t CHUNK_LEVEL_256K =  (ROOT_CHUNK_LEVEL + 6);
+-static const chunklevel_t CHUNK_LEVEL_128K =  (ROOT_CHUNK_LEVEL + 7);
+-static const chunklevel_t CHUNK_LEVEL_64K =   (ROOT_CHUNK_LEVEL + 8);
+-static const chunklevel_t CHUNK_LEVEL_32K =   (ROOT_CHUNK_LEVEL + 9);
+-static const chunklevel_t CHUNK_LEVEL_16K =   (ROOT_CHUNK_LEVEL + 10);
+-static const chunklevel_t CHUNK_LEVEL_8K =    (ROOT_CHUNK_LEVEL + 11);
+-static const chunklevel_t CHUNK_LEVEL_4K =    (ROOT_CHUNK_LEVEL + 12);
+-static const chunklevel_t CHUNK_LEVEL_2K =    (ROOT_CHUNK_LEVEL + 13);
+-static const chunklevel_t CHUNK_LEVEL_1K =    (ROOT_CHUNK_LEVEL + 14);
++#endif
++static const chunklevel_t CHUNK_LEVEL_4M =    (HIGHEST_CHUNK_LEVEL - 12);
++static const chunklevel_t CHUNK_LEVEL_2M =    (HIGHEST_CHUNK_LEVEL - 11);
++static const chunklevel_t CHUNK_LEVEL_1M =    (HIGHEST_CHUNK_LEVEL - 10);
++static const chunklevel_t CHUNK_LEVEL_512K =  (HIGHEST_CHUNK_LEVEL - 9);
++static const chunklevel_t CHUNK_LEVEL_256K =  (HIGHEST_CHUNK_LEVEL - 8);
++static const chunklevel_t CHUNK_LEVEL_128K =  (HIGHEST_CHUNK_LEVEL - 7);
++static const chunklevel_t CHUNK_LEVEL_64K =   (HIGHEST_CHUNK_LEVEL - 6);
++static const chunklevel_t CHUNK_LEVEL_32K =   (HIGHEST_CHUNK_LEVEL - 5);
++static const chunklevel_t CHUNK_LEVEL_16K =   (HIGHEST_CHUNK_LEVEL - 4);
++static const chunklevel_t CHUNK_LEVEL_8K =    (HIGHEST_CHUNK_LEVEL - 3);
++static const chunklevel_t CHUNK_LEVEL_4K =    (HIGHEST_CHUNK_LEVEL - 2);
++static const chunklevel_t CHUNK_LEVEL_2K =    (HIGHEST_CHUNK_LEVEL - 1);
++static const chunklevel_t CHUNK_LEVEL_1K =    HIGHEST_CHUNK_LEVEL;
+ 
+ STATIC_ASSERT(CHUNK_LEVEL_1K == HIGHEST_CHUNK_LEVEL);
++#ifdef __PROSPERO__
++STATIC_ASSERT(CHUNK_LEVEL_4M == LOWEST_CHUNK_LEVEL);
++#else
+ STATIC_ASSERT(CHUNK_LEVEL_16M == LOWEST_CHUNK_LEVEL);
++#endif
+ STATIC_ASSERT(ROOT_CHUNK_LEVEL == LOWEST_CHUNK_LEVEL);
+ 
+ /////////////////////////////////////////////////////////
+--- a/test/hotspot/gtest/metaspace/test_chunkManager_stress.cpp
++++ b/test/hotspot/gtest/metaspace/test_chunkManager_stress.cpp
+@@ -184,7 +184,11 @@
+ 
+   // adjust test if we change levels
+   STATIC_ASSERT(HIGHEST_CHUNK_LEVEL == CHUNK_LEVEL_1K);
++#ifdef __PROSPERO__
++  STATIC_ASSERT(LOWEST_CHUNK_LEVEL == CHUNK_LEVEL_4M);
++#else
+   STATIC_ASSERT(LOWEST_CHUNK_LEVEL == CHUNK_LEVEL_16M);
++#endif
+ 
+   void one_test() {
+ 

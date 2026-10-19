@@ -1879,3 +1879,12 @@ eight unused chunks and reclaims unused pools before retrying an allocation
 refusal. A C1 workload aborted on a real32KiB native mapping failure. Actual
 pool-path ASan/UBSan tests and target rebuild pass; console pressure resolution
 and sustained execution are pending. Live arena storage remains protected.
+
+### Four MiB PS5 metadata growth steps
+
+[Patch0092](../docs/java25-metaspace-four-mib-roots.md) uses a PS5-only4MiB root
+and13 buddy levels down to1KiB. A real join path aborts while reserving another
+16MiB non-class metadata node. Actual level-fitting/settings tests and target
+rebuild pass. Single metadata allocations are now bounded by the4MiB root;
+total metadata can grow across nodes. Console growth, join and native budget
+remain pending. Other platforms and frozen passing snapshots are unchanged.
