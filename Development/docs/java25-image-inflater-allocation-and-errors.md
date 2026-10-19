@@ -38,3 +38,18 @@ Target HotSpot and java.base native libraries rebuild. The module set and
 resident compressed-image strategy are retained. PS5 TLS startup, allocation
 behavior and the earlier 071 failure remain pending. No consumer game classes
 are changed by this repair.
+
+## Console follow-up: build 074
+
+Current-run reports confirm default TLS factory creation completed and the
+previously invalid DTLSInputRecord loaded from the image. The subsequent online
+discovery attempt resolved DNS successfully, then the user reported a process
+crash. No final native signal, abort or Java exception was captured. The earlier
+implicit-null signal in preflight was handled and execution continued; it does
+not identify this crash. Last class load: HttpsURLConnection$DefaultHostnameVerifier.
+
+The image fix has console evidence of progress, but server readiness and stability
+are still unproven. Consumer build 075 adds flushed HTTPS setup phase markers and
+Java heap samples without changing runtime options or game bytecode. Its purpose
+is to locate the remaining failure; no root-cause repair is claimed for this
+uncaptured crash. Raw reports stay local.

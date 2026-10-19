@@ -1921,3 +1921,7 @@ existing PS5 zlib storage adapter to native image decoding and propagates decode
 failures into checked resource errors. It also initializes image-reader ownership.
 Actual native inflater and release-mode reader tests pass under ASan/UBSan,
 including DTLS bytes and forced storage refusal. PS5 TLS startup remains pending.
+
+Build074 console follow-up confirms DTLS class loading and default TLS factory
+creation now complete. A later crash after discovery DNS remains unresolved;
+consumer075 adds phase diagnostics. This is progress, not a server stability pass.

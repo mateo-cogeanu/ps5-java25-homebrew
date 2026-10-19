@@ -327,5 +327,6 @@
     "host": "PASS: actual ZIP_InflateFully/PS5 allocation adapter and NDEBUG reader under ASan/UBSan, DTLS/SSL/JFR/desktop byte identity, libc refusal fallback, total refusal/corrupt/truncated/undersized-output errors, untouched caller buffer on failed compressed decode, recovery and matching cleanup; anonymous-image mapping controls. Previous reader test used host libzip, not the actual native inflater.",
     "target": "PASS: HotSpot and java.base native libraries rebuild",
     "console": "pending: actual PS5 TLS/resource loading, memory/headroom and earlier071cause"
-  }
+  },
+  "image_decode_console_followup": "074: DTLSInputRecord and default TLS factory complete; process crash after discovery DNS success, no fatal address/Java exception captured.075consumer diagnostics pending; server stability unresolved."
 }
