@@ -1,0 +1,139 @@
+--- a/src/java.base/share/native/libjimage/imageDecompressor.cpp
++++ b/src/java.base/share/native/libjimage/imageDecompressor.cpp
+@@ -29,6 +29,7 @@
+  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
++#include "imageResourceBuffer.hpp"
+ #include "jni.h"
+ #include "jvm.h"
+ #include "imageDecompressor.hpp"
+@@ -168,7 +169,15 @@
+         has_header = _header._magic == ResourceHeader::resource_header_magic;
+         if (has_header) {
+             // decompressed_resource array contains the result of decompression
+-            decompressed_resource = new u1[(size_t) _header._uncompressed_size];
++            if(_header._uncompressed_size>SIZE_MAX) {
++                if(compressed_resource_base!=compressed)image_buffer_release(compressed_resource_base);
++                return false;
++            }
++            decompressed_resource = image_buffer_allocate((size_t)_header._uncompressed_size);
++            if(!decompressed_resource) {
++                if(compressed_resource_base!=compressed)image_buffer_release(compressed_resource_base);
++                return false;
++            }
+             allocated_size=_header._uncompressed_size;
+             // Retrieve the decompressor name
+             const char* decompressor_name = strings->get(_header._decompressor_name_offset);
+@@ -180,20 +189,22 @@
+             bool success=decompressor && decompressor->decompress_resource(compressed_resource, decompressed_resource,
+                 &_header, strings);
+             if(!success) {
+-                delete[] decompressed_resource;
+-                if(compressed_resource_base!=compressed)delete[] compressed_resource_base;
++                image_buffer_release(decompressed_resource);
++                if(compressed_resource_base!=compressed)image_buffer_release(compressed_resource_base);
+                 return false;
+             }
+             if (compressed_resource_base != compressed) {
+-                delete[] compressed_resource_base;
++                image_buffer_release(compressed_resource_base);
+             }
+             compressed_resource = decompressed_resource;
++            // Terminal resources need no speculative read of another header.
++            if(_header._is_terminal)break;
+         }
+     } while (has_header);
+     if(decompressed_resource==compressed)return false;
+-    if(allocated_size!=uncompressed_size) {delete[] decompressed_resource;return false;}
++    if(allocated_size!=uncompressed_size) {image_buffer_release(decompressed_resource);return false;}
+     memcpy(uncompressed, decompressed_resource, (size_t) uncompressed_size);
+-    delete[] decompressed_resource;
++    image_buffer_release(decompressed_resource);
+     return true;
+ }
+ 
+--- a/src/java.base/share/native/libjimage/imageFile.cpp
++++ b/src/java.base/share/native/libjimage/imageFile.cpp
+@@ -29,6 +29,7 @@
+  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
++#include "imageResourceBuffer.hpp"
+ #include <assert.h>
+ #include <string.h>
+ #include <stdlib.h>
+@@ -571,11 +572,12 @@
+         // If not memory mapped read in bytes.
+         if (!memory_map_image) {
+             // Allocate buffer for compression.
+-            compressed_data = new u1[(size_t)compressed_size];
+-            assert(compressed_data != NULL && "allocation failed");
++            if(compressed_size>SIZE_MAX)return false;
++            compressed_data = image_buffer_allocate((size_t)compressed_size);
++            if(!compressed_data)return false;
+             // Read bytes from offset beyond the image index.
+             bool is_read = read_at(compressed_data, compressed_size, _index_size + offset);
+-            if(!is_read) {delete[] compressed_data;return false;}
++            if(!is_read) {image_buffer_release(compressed_data);return false;}
+         } else {
+             compressed_data = get_data_address() + offset;
+         }
+@@ -586,7 +588,7 @@
+                         &strings, _endian);
+         // If not memory mapped then release temporary buffer.
+         if (!memory_map_image) {
+-                delete[] compressed_data;
++                image_buffer_release(compressed_data);
+         }
+         return success;
+     } else {
+--- /dev/null
++++ b/src/java.base/share/native/libjimage/imageResourceBuffer.hpp
+@@ -0,0 +1,46 @@
++/* SPDX-License-Identifier: GPL-2.0-only WITH Classpath-exception-2.0 */
++#ifndef LIBJIMAGE_IMAGE_RESOURCE_BUFFER_HPP
++#define LIBJIMAGE_IMAGE_RESOURCE_BUFFER_HPP
++#include <stddef.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <errno.h>
++#include <stdio.h>
++#ifdef __PROSPERO__
++#include <sys/mman.h>
++#endif
++#ifndef IMAGE_BUFFER_MALLOC
++#define IMAGE_BUFFER_MALLOC malloc
++#define IMAGE_BUFFER_FREE free
++#define IMAGE_BUFFER_MMAP mmap
++#define IMAGE_BUFFER_MUNMAP munmap
++#endif
++// Ownership is local to each temporary buffer; never replace process allocators.
++union ImageBufferOwner { max_align_t alignment; size_t mapped; };
++static unsigned char* image_buffer_allocate(size_t bytes) {
++    int saved=errno;
++    if(bytes>SIZE_MAX-sizeof(ImageBufferOwner)){errno=ENOMEM;return NULL;}
++    size_t total=bytes+sizeof(ImageBufferOwner),mapped=0;
++    ImageBufferOwner* base=(ImageBufferOwner*)IMAGE_BUFFER_MALLOC(total);
++#ifdef __PROSPERO__
++    if(!base) {
++        const size_t page=16384;
++        if(total>SIZE_MAX-(page-1)){errno=ENOMEM;return NULL;}
++        mapped=(total+page-1)&~(page-1);
++        void* p=IMAGE_BUFFER_MMAP(NULL,mapped,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
++        if(p!=MAP_FAILED)base=(ImageBufferOwner*)p;
++    }
++#endif
++    if(!base){fprintf(stderr,"JIMAGE resource buffer allocation failed bytes=%zu errno=%d\n",bytes,errno);return NULL;}
++    base->mapped=mapped;errno=saved;return (unsigned char*)(base+1);
++}
++static void image_buffer_release(void* buffer) {
++    if(!buffer)return;
++    int saved=errno;ImageBufferOwner* base=(ImageBufferOwner*)buffer-1;
++#ifdef __PROSPERO__
++    if(base->mapped)IMAGE_BUFFER_MUNMAP(base,base->mapped);else
++#endif
++    IMAGE_BUFFER_FREE(base);
++    errno=saved;
++}
++#endif

@@ -40,9 +40,23 @@ int zip_test_maps(void){return maps;}
 (work/'host-jimage-zip.c').write_text(fixture+body[a:b])
 subprocess.run(['/usr/bin/clang','-O1','-g','-fsanitize=address,undefined','-D__PROSPERO__','-I'+str(jdk/'include'),'-I'+str(jdk/'include/darwin'),'-I'+str(zipbase),'-c',str(work/'host-jimage-zip.c'),'-o',str(work/'host-jimage-zip.o')],check=True)
 subprocess.run(base+['-DNDEBUG','-Dmmap=ps5_test_mmap','-c',str(source/'src/java.base/unix/native/libjimage/osSupport_unix.cpp'),'-o',str(work/'host-jimage-os.o')],check=True)
+# Inject failures only into temporary image-resource buffers, independently
+# from the zlib allocator and the resident image mapping.
+(work/'host-image-buffer-test.hpp').write_text(r"""
+#include <stddef.h>
+#include <sys/mman.h>
+extern "C" void* image_test_malloc(size_t);
+extern "C" void image_test_free(void*);
+extern "C" void* image_test_map(void*,size_t,int,int,int,off_t);
+extern "C" int image_test_unmap(void*,size_t);
+#define IMAGE_BUFFER_MALLOC image_test_malloc
+#define IMAGE_BUFFER_FREE image_test_free
+#define IMAGE_BUFFER_MMAP image_test_map
+#define IMAGE_BUFFER_MUNMAP image_test_unmap
+""")
 engine=[]
 for name in ['endian.cpp','imageDecompressor.cpp','imageFile.cpp','jimage.cpp']:
-    obj=work/('host-'+name+'.o');subprocess.run(base+['-DNDEBUG','-c',str(share/name),'-o',str(obj)],check=True);engine.append(str(obj))
+    obj=work/('host-'+name+'.o');subprocess.run(base+['-DNDEBUG','-include',str(work/'host-image-buffer-test.hpp'),'-c',str(share/name),'-o',str(obj)],check=True);engine.append(str(obj))
 subprocess.run(base+[str(ROOT/'tools/test_jimage.cpp'),*engine,str(work/'host-jimage-os.o'),'-L'+str(jdk/'lib/server'),'-Wl,-rpath,'+str(jdk/'lib/server'),'-ljvm',str(work/'host-jimage-zip.o'),'-lz','-o',str(work/'test-jimage')],check=True)
 with tempfile.TemporaryDirectory(prefix='ps5-jimage-identity-') as expected:
     subprocess.run([str(jdk/'bin/jimage'),'extract','--dir',expected,str(work/'boot-image/lib/modules')],check=True)

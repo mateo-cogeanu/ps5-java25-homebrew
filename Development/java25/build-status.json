@@ -328,5 +328,10 @@
     "target": "PASS: HotSpot and java.base native libraries rebuild",
     "console": "pending: actual PS5 TLS/resource loading, memory/headroom and earlier071cause"
   },
-  "image_decode_console_followup": "074: DTLSInputRecord and default TLS factory complete; process crash after discovery DNS success, no fatal address/Java exception captured.075consumer diagnostics pending; server stability unresolved."
+  "image_decode_console_followup": "074: DTLSInputRecord and default TLS factory complete; process crash after discovery DNS success, no fatal address/Java exception captured.075consumer diagnostics pending; server stability unresolved.",
+  "image_resource_buffer_allocation": {
+    "patch": "0098-ps5-image-resource-buffer-allocation.patch",
+    "host": "PASS: ASan/UBSan release reader, independent libc refusal/map fallback/total refusal, caller sentinel/cleanup/recovery, HTTPSclass identity and tinyterminal1/8/28bytes; exact patch application and target build pass",
+    "console": "075stops at HTTPSconnection construction; no fatal location.076pending. Source gap repaired, exact crash cause not proven."
+  }
 }

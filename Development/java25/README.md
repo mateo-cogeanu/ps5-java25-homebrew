@@ -1925,3 +1925,11 @@ including DTLS bytes and forced storage refusal. PS5 TLS startup remains pending
 Build074 console follow-up confirms DTLS class loading and default TLS factory
 creation now complete. A later crash after discovery DNS remains unresolved;
 consumer075 adds phase diagnostics. This is progress, not a server stability pass.
+
+### Development: temporary image-resource allocation
+
+[Patch0098](../docs/java25-image-resource-buffer-allocation.md) extends scoped
+PS5 allocation fallback to image-resource buffers and respects terminal decode
+headers. Actual release reader tests pass ASan/UBSan with independent allocation
+refusal, cleanup/recovery and small terminal resources; target rebuild passes.
+075crash remains unproven;076console HTTPS/server validation is pending.
