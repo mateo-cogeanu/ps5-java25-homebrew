@@ -1894,3 +1894,12 @@ remain pending. Other platforms and frozen passing snapshots are unchanged.
 
 Patches0093–0094 reduce per-allocation overhead and enable ZIP-compressed module
 images using the resident ZIP decoder. See the [implementation and checks](../docs/java25-compact-prefix-and-resident-image.md). Host allocator, reader/resource identity and target builds pass; PS5 memory headroom, decode and sustained stability remain pending.
+
+
+### Development: PS5 OS entropy seeding
+
+[Patch0095](../docs/java25-os-entropy-seeding.md) connects Unix NativeSeedGenerator
+to the actual PS5 system random service instead of the unavailable device-file
+path and expensive threaded fallback. Host actual-Java/JNI/DRBG/failure tests
+pass; PS5 service/ABI/TLS startup and the original process-crash cause remain
+unvalidated. This does not alter consumer game classes or TLS verification.

@@ -1,0 +1,94 @@
+--- a/src/java.base/unix/classes/sun/security/provider/NativeSeedGenerator.java
++++ b/src/java.base/unix/classes/sun/security/provider/NativeSeedGenerator.java
+@@ -28,14 +28,22 @@
+ import java.io.IOException;
+ 
+ /**
+- * Native seed generator for Unix systems. Inherit everything from
+- * URLSeedGenerator.
++ * Native seed generator: OS service on PS5; URL source on other Unix systems.
+  *
+  */
+-class NativeSeedGenerator extends SeedGenerator.URLSeedGenerator {
++class NativeSeedGenerator extends SeedGenerator {
++
++    private final SeedGenerator.URLSeedGenerator source;
++    private static native void getPS5SeedBytes(byte[] result);
+ 
+     NativeSeedGenerator(String seedFile) throws IOException {
+-        super(seedFile);
++        source = "PS5".equals(System.getProperty("os.name"))
++                ? null : new SeedGenerator.URLSeedGenerator(seedFile);
+     }
+ 
++    @Override
++    void getSeedBytes(byte[] result) {
++        if (source != null) source.getSeedBytes(result);
++        else getPS5SeedBytes(result); // Failure throws; never use a substitute seed.
++    }
+ }
+--- /dev/null
++++ b/src/java.base/unix/native/libjava/PS5SeedGenerator.c
+@@ -0,0 +1,40 @@
++/* SPDX-License-Identifier: GPL-2.0-only WITH Classpath-exception-2.0 */
++#ifdef __PROSPERO__
++#include <jni.h>
++#include <stdint.h>
++#include <stddef.h>
++#include <string.h>
++#include <stdio.h>
++// API and64-byte request size used by the pinned SDK hello_sprx sample.
++extern int sceRandomGetRandomNumber(uint8_t *, size_t);
++static void seed_error(JNIEnv *env,const char *name,const char *message) {
++    jclass type=(*env)->FindClass(env,name);
++    if(type!=NULL) { (*env)->ThrowNew(env,type,message); (*env)->DeleteLocalRef(env,type); }
++}
++JNIEXPORT void JNICALL
++Java_sun_security_provider_NativeSeedGenerator_getPS5SeedBytes(JNIEnv *env, jclass type, jbyteArray output) {
++    (void)type;
++    if (output == NULL) {
++        seed_error(env,"java/lang/NullPointerException","seed output");
++        return;
++    }
++    static int announced;
++    jsize length = (*env)->GetArrayLength(env,output);
++    uint8_t bytes[64];
++    for (jsize offset=0; offset<length;) {
++        jsize count=length-offset; if(count>64)count=64;
++        int result=sceRandomGetRandomNumber(bytes,(size_t)count);
++        if(result!=0) {
++            memset(bytes,0,sizeof(bytes));
++            seed_error(env,"java/security/ProviderException","PS5 OS entropy request failed");
++            return;
++        }
++        if(!__atomic_exchange_n(&announced,1,__ATOMIC_RELAXED))
++            fputs("PS5_OS_ENTROPY_OK native service; no threaded seed fallback\n",stderr);
++        (*env)->SetByteArrayRegion(env,output,offset,count,(const jbyte*)bytes);
++        memset(bytes,0,sizeof(bytes));
++        if((*env)->ExceptionCheck(env))return;
++        offset+=count;
++    }
++}
++#endif
+--- a/make/modules/java.base/lib/CoreLibraries.gmk
++++ b/make/modules/java.base/lib/CoreLibraries.gmk
+@@ -50,6 +50,10 @@
+ ifeq ($(call isTargetOs, macosx), true)
+   BUILD_LIBJAVA_java_props_md.c_CFLAGS := -x objective-c
+   BUILD_LIBJAVA_java_props_macosx.c_CFLAGS := -x objective-c
++endif
++
++ifeq ($(PS5_BOOTSTRAP), yes)
++  LIBJAVA_PS5_RANDOM := -lSceRandom
+ endif
+ 
+ $(eval $(call SetupJdkLibrary, BUILD_LIBJAVA, \
+@@ -69,7 +73,7 @@
+         -framework Foundation \
+         -framework SystemConfiguration, \
+     LIBS_windows := advapi32.lib ole32.lib shell32.lib version.lib, \
+-    LIBS_bsd := $(LIBDL), \
++    LIBS_bsd := $(LIBDL) $(LIBJAVA_PS5_RANDOM), \
+ ))
+ 
+ TARGETS += $(BUILD_LIBJAVA)

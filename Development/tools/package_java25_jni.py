@@ -251,7 +251,7 @@ wrapped_calls=["--wrap="+name for name in ("memcpy","memmove","memcmp","strcmp",
 if args.fileio or args.zipjar or args.network or args.lan or args.inbound or args.advanced_network or args.lan_endurance or args.dependencies or bool(external):
     wrapped_calls.append("--wrap=open")
 response(link_response, [*wrapped_calls,*("--defsym=" + name + "=0" for name in absent_callbacks),
-                        "-L" + str(SDK / "target/lib"), merged,*extra_objects,*emutls_backend, native_libc, SDK / "target/lib/libpthread.a",
+                        "-L" + str(SDK / "target/lib"), "-lSceRandom", merged,*extra_objects,*emutls_backend, native_libc, SDK / "target/lib/libpthread.a",
                         SDK / "target/lib/libc++.a", SDK / "target/lib/libc++abi.a",
                         SDK / "target/lib/libunwind.a"])
 subprocess.run(["python3", str(ROOT / "tools/package_native.py"),

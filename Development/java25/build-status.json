@@ -304,5 +304,12 @@
     "compression": "zip-6 default; all requested target modules retained",
     "checks": "PASS: actual PS5 reader and resident ZIP decoder branches compare class/TLS/JFR/desktop resource bytes with jimage extraction; zero file mappings and anonymous-map rejection. Linked target JFR metadata creates238types on host. Target java.base-libs rebuild.",
     "console": "pending: decode/startup and memory/CPU tradeoff"
+  },
+  "ps5_os_entropy": {
+    "patch": "0095-ps5-os-entropy-seeding.patch",
+    "implementation": "NativeSeedGenerator routes PS5 to actual sceRandomGetRandomNumber via libjava JNI; at most64-byte fixed-stack batches, OS failure throws ProviderException; no substitute/threaded fallback. Other Unix URL source preserved. Explicit standalone/embedded libSceRandom dependency.",
+    "host": "PASS: actual Java/JNI source, real DRBG, batched output/empty requests/OS errors/no fallback threads, -Xcheck:jni and UBSan with mocked OS crypto boundary; desktop URL control.",
+    "target": "PASS: java.base classes/native rebuild; package integration checked separately by consumer.",
+    "console": "pending: OS entropy availability/ABI and TLS startup. Prior early TLS crash has no fatal/Java/signal evidence; exact cause unresolved."
   }
 }
