@@ -10,7 +10,8 @@ The earlier071failure remains unproven;072introduced the direct dependency.
 The runtime now obtains entropy from the PS5 kernel kern.rng_pseudo interface
 through sysctlbyname, already used elsewhere in the runtime. Fixed64-byte stack
 storage bounds each request. It validates the return code and actual byte count
-before transferring only the requested bytes to Java. Errors, insufficient
+before transferring only the requested bytes to Java. The kernel API pointer is
+checked too; an unresolved import becomes a Java error instead of a null call. Errors, insufficient
 responses and oversized counts throw ProviderException; there is no substitute
 seed or threaded fallback. Scratch storage is cleared through volatile writes.
 Other Unix platforms retain URL seeding. No optional service import/module load
@@ -22,7 +23,7 @@ Our JNI implementation is independent; no code from that file is incorporated.
 
 The actual Java/JNI host regression covers concurrent requests, batching, DRBG,
 first/later OS errors, kernel-query failure, insufficient responses and oversized
-response counts, plus the desktop URL control. It runs with JNI checking and
+response counts, an injected null kernel API, plus the desktop URL control. It runs with JNI checking and
 UBSan using a mocked kernel boundary backed by host entropy. Target native
 rebuild passes. These do not establish PS5 kernel-query availability or entropy
 quality, successful TLS/server startup, or the earlier071cause. Those remain

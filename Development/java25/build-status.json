@@ -316,7 +316,7 @@
     "patch": "0096-ps5-kernel-entropy-source.patch",
     "evidence": "072SIGSEGV PC0, top saved return address is exactly after direct RNG service call in matching JNI function; ELF GLOB_DAT identifies sceRandomGetRandomNumber. No Java heap failure established. Earlier071cause unresolved.",
     "implementation": "Use checked kern.rng_pseudo sysctlbyname requests with64-byte stack bounds; validate return code and actual length before Java transfer; errors throw ProviderException and volatile-clear scratch. Remove direct RNG dependency; no optional module imports/loads.",
-    "host": "PASS: actual Java/JNI/DRBG, concurrent requests, bounds and OS failure; kernel error, insufficient/oversized response rejection; JNI checking and UBSan with mocked kernel entropy boundary; desktop URL control.",
+    "host": "PASS: actual Java/JNI/DRBG, concurrent requests, bounds and OS failure; kernel error, insufficient/oversized response rejection; JNI checking and UBSan with mocked kernel entropy boundary; desktop URL control. Null kernel API injection also returns ProviderException without a call.",
     "target": "PASS: java.base native rebuild",
     "console": "pending: actual PS5 kernel RNG query, TLS/server startup and original071cause"
   }

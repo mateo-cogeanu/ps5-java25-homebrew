@@ -1,6 +1,6 @@
 --- a/src/java.base/unix/native/libjava/PS5SeedGenerator.c
 +++ b/src/java.base/unix/native/libjava/PS5SeedGenerator.c
-@@ -5,8 +5,13 @@
+@@ -5,8 +5,14 @@
  #include <stddef.h>
  #include <string.h>
  #include <stdio.h>
@@ -10,13 +10,19 @@
 +#include <sys/sysctl.h>
 +// Query the native kernel entropy source. This does not depend on an optional
 +// system module import. Only bytes actually returned by the kernel are used.
++static __typeof__(&sysctlbyname) volatile kernel_entropy=&sysctlbyname;
 +static void clear_seed(void *buffer,size_t size) {
 +    volatile uint8_t *p=buffer;while(size--) *p++=0;
 +}
  static void seed_error(JNIEnv *env,const char *name,const char *message) {
      jclass type=(*env)->FindClass(env,name);
      if(type!=NULL) { (*env)->ThrowNew(env,type,message); (*env)->DeleteLocalRef(env,type); }
-@@ -23,16 +28,17 @@
+@@ -20,19 +26,22 @@
+     }
+     static int announced;
+     jsize length = (*env)->GetArrayLength(env,output);
++    __typeof__(&sysctlbyname) query=kernel_entropy;
++    if(query==NULL) { seed_error(env,"java/security/ProviderException","PS5 kernel entropy API unavailable");return; }
      uint8_t bytes[64];
      for (jsize offset=0; offset<length;) {
          jsize count=length-offset; if(count>64)count=64;
@@ -25,7 +31,7 @@
 -            memset(bytes,0,sizeof(bytes));
 -            seed_error(env,"java/security/ProviderException","PS5 OS entropy request failed");
 +        size_t received=sizeof(bytes);
-+        int result=sysctlbyname("kern.rng_pseudo",bytes,&received,NULL,0);
++        int result=query("kern.rng_pseudo",bytes,&received,NULL,0);
 +        if(result!=0 || received<(size_t)count || received>sizeof(bytes)) {
 +            clear_seed(bytes,sizeof(bytes));
 +            seed_error(env,"java/security/ProviderException","PS5 kernel entropy request failed or returned an invalid length");

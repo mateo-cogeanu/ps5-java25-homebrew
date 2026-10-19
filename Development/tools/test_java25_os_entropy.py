@@ -24,12 +24,13 @@ int sysctlbyname(const char *name,void *output,size_t *length,void *input,size_t
  if(getenv("PS5_SEED_OVERSIZED_RESPONSE"))*length=65;
  __atomic_add_fetch(&calls,1,__ATOMIC_RELAXED);return 0;
 }
+#include "PS5SeedGenerator.c"
 extern void Java_sun_security_provider_NativeSeedGenerator_getPS5SeedBytes(JNIEnv*,jclass,jbyteArray);
 JNIEXPORT void JNICALL Java_EntropyCheck_mode(JNIEnv*e,jclass c,jint n){fail_after=n;calls=0;}
 JNIEXPORT jint JNICALL Java_EntropyCheck_calls(JNIEnv*e,jclass c){return calls;}
-JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*vm,void*x){JNIEnv*e;if((*vm)->GetEnv(vm,(void**)&e,JNI_VERSION_1_8))return JNI_ERR;jclass c=(*e)->FindClass(e,"sun/security/provider/NativeSeedGenerator");JNINativeMethod m={"getPS5SeedBytes","([B)V",(void*)Java_sun_security_provider_NativeSeedGenerator_getPS5SeedBytes};if((*e)->RegisterNatives(e,c,&m,1))return JNI_ERR;return JNI_VERSION_1_8;}
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*vm,void*x){if(getenv("PS5_SEED_IMPORT_NULL"))kernel_entropy=NULL;JNIEnv*e;if((*vm)->GetEnv(vm,(void**)&e,JNI_VERSION_1_8))return JNI_ERR;jclass c=(*e)->FindClass(e,"sun/security/provider/NativeSeedGenerator");JNINativeMethod m={"getPS5SeedBytes","([B)V",(void*)Java_sun_security_provider_NativeSeedGenerator_getPS5SeedBytes};if((*e)->RegisterNatives(e,c,&m,1))return JNI_ERR;return JNI_VERSION_1_8;}
 ''')
-subprocess.run(['clang','-shared','-fPIC','-g','-fsanitize=undefined','-D__PROSPERO__','-I'+str(j/'include'),'-I'+str(j/'include/darwin'),str(src/'unix/native/libjava/PS5SeedGenerator.c'),str(w/'fixture.c'),'-o',str(w/'entropy.dylib')],check=True)
+subprocess.run(['clang','-shared','-fPIC','-g','-fsanitize=undefined','-D__PROSPERO__','-I'+str(j/'include'),'-I'+str(j/'include/darwin'),'-I'+str(src/'unix/native/libjava'),str(w/'fixture.c'),'-o',str(w/'entropy.dylib')],check=True)
 (w/'EntropyCheck.java').write_text(r'''
 import java.security.*;import java.lang.reflect.*;
 public class EntropyCheck {
@@ -62,5 +63,5 @@ subprocess.run([str(j/'bin/java'),'--enable-native-access=ALL-UNNAMED','-Xcheck:
 
 subprocess.run([str(j/"bin/java"),"--patch-module","java.base="+str(w/"patch"),"-cp",str(w),"EntropyCheck",str(w/"entropy.dylib"),"desktop"],check=True,timeout=30,env={**os.environ,"UBSAN_OPTIONS":"handle_segv=0:handle_sigbus=0:handle_sigfpe=0"})
 
-for failure in ["PS5_SEED_KERNEL_FAIL","PS5_SEED_SHORT_RESPONSE","PS5_SEED_OVERSIZED_RESPONSE"]:
+for failure in ["PS5_SEED_KERNEL_FAIL","PS5_SEED_SHORT_RESPONSE","PS5_SEED_OVERSIZED_RESPONSE","PS5_SEED_IMPORT_NULL"]:
  subprocess.run([str(j/"bin/java"),"--enable-native-access=ALL-UNNAMED","-Xcheck:jni","--patch-module","java.base="+str(w/"patch"),"--add-opens","java.base/sun.security.provider=ALL-UNNAMED","-cp",str(w),"EntropyCheck",str(w/"entropy.dylib"),"resolve-failure"],check=True,timeout=30,env={**os.environ,failure:"1","UBSAN_OPTIONS":"handle_segv=0:handle_sigbus=0:handle_sigfpe=0"})
