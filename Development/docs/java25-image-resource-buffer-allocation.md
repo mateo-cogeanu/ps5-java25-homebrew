@@ -37,3 +37,13 @@ reason. Actual PS5 HTTPS/server readiness, memory headroom, gameplay/respawn
 stability and endurance remain pending. Consumer076 retains075phase diagnostics,
 the existing game derivative and world/JIT/heap/security settings. Raw reports
 remain local. No game-JAR transformation is added.
+
+## Console follow-up:076
+
+The user reports much better gameplay. Current076reports now show default TLS
+and verified online preflight completing, real normal-world readiness and an
+authenticated player admitted. This is console progress after0098, not proof
+of the earlier uncaptured crash cause, ALLPASS or full-duration stability.
+Remaining application latency, save warnings and GC tuning are tracked in
+the separate Minecraft consumer repository. Frozen passing snapshots remain
+unchanged.

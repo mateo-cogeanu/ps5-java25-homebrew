@@ -332,6 +332,6 @@
   "image_resource_buffer_allocation": {
     "patch": "0098-ps5-image-resource-buffer-allocation.patch",
     "host": "PASS: ASan/UBSan release reader, independent libc refusal/map fallback/total refusal, caller sentinel/cleanup/recovery, HTTPSclass identity and tinyterminal1/8/28bytes; exact patch application and target build pass",
-    "console": "075stops at HTTPSconnection construction; no fatal location.076pending. Source gap repaired, exact crash cause not proven."
+    "console": "076user reports much better gameplay. Current reports confirm default TLS/online preflight, normal-world Done and authenticated player admission after0098. No ALLPASS or completed2hour validation; previous075crash cause still not proven."
   }
 }
