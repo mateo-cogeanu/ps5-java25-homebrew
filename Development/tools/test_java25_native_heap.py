@@ -74,7 +74,7 @@ int main(){
  map_limit=16384;
  for(size_t n:{24u,48u,4096u}) {
   void* q=heap::allocate(n);assert(q);std::memset(q,0x59,n);check(q,n,0x59);
-  assert(((heap::Header*)q-1)->block.slab->mapped<=16384);
+  assert(heap::owning_slab((heap::Header*)q-1)->mapped<=16384);
   heap::release(q);heap::trim_idle();assert(map_live==0);
  }
  map_limit=1;assert(!heap::allocate(24)&&errno==ENOMEM&&map_live==0);
@@ -82,12 +82,12 @@ int main(){
  // Mapping refusal must reuse compatible capacity, never smaller slots.
  for(size_t owner_size:{64u,256u,4096u}) {
   void* owner=heap::allocate(owner_size);assert(owner);std::memset(owner,0x71,owner_size);
-  auto owner_slab=((heap::Header*)owner-1)->block.slab;
+  auto owner_slab=heap::owning_slab((heap::Header*)owner-1);
   size_t slots=(owner_slab->mapped-sizeof(heap::Slab))/owner_slab->stride;
   deny_maps=true;long mappings=map_total;std::vector<void*> borrowed;
   for(size_t i=1;i<slots;i++){
    errno=EDOM;void* q=heap::allocate(16);assert(q&&errno==EDOM);
-   assert(((heap::Header*)q-1)->block.slab==owner_slab);
+   assert(heap::owning_slab((heap::Header*)q-1)==owner_slab);
    std::memset(q,0x36,16);borrowed.push_back(q);
   }
   assert(!heap::allocate(16)&&errno==ENOMEM);assert(map_total==mappings);
@@ -193,13 +193,13 @@ int main(){
   size_t request=sizeof(ArenaChunkLayoutContract)+ArenaChunkLayoutContract::size;
   void* arena=os::malloc(request,mtInternal);assert(arena);
   void* raw=nmt?(void*)((MallocHeader*)arena-1):arena;
-  assert(((heap::Header*)raw-1)->block.mapped==32768);
+  assert(heap::mapped_bytes((heap::Header*)raw-1)==32768);
   memset(arena,0x47,request);os::free(arena);heap::trim_idle();assert(map_live==0&&accounted==0);
-  // Reproduce the old untracked32752-byte request spilling into48KiB.
-  tracking=false;assert(!os::malloc(32752,mtInternal));heap::trim_idle();assert(map_live==0);
+  // The compact prefix also keeps the old untracked32752-byte request in32KiB.
+  tracking=false;void* old_arena=os::malloc(32752,mtInternal);assert(old_arena);os::free(old_arena);heap::trim_idle();assert(map_live==0);
  }
  map_limit=SIZE_MAX;
- std::puts("PASS: exact arena size enum with layout/NMT contracts and16KiB page model fits32KiB; previous32752-byte request is refused at32KiB mapping limit");
+ std::puts("PASS: exact arena size enum with layout/NMT contracts and16KiB page model fits32KiB; compact prefix also fits32752-byte untracked request at32KiB mapping limit");
  for(bool nmt:{false,true}) {
   tracking=nmt;accounted=0;limit=SIZE_MAX;deny_heap=false;
   void* p=os::malloc(128,mtInternal);assert(p);std::memset(p,0x52,128);

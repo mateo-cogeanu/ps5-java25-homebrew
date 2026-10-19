@@ -18,6 +18,7 @@ import tempfile
 import zipfile
 
 parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--compression',choices=['none','zip-6'],default='zip-6',help='Compress the resident module image without removing modules')
 parser.add_argument('--modules',default='java.base',help='Comma-separated target-built modules to include')
 args=parser.parse_args()
 requested=args.modules.split(',')
@@ -74,7 +75,7 @@ for resource, digest in resource_hashes.items():
             raise SystemExit('Target resource differs in JMOD: '+resource)
 if image.exists(): shutil.rmtree(image)
 subprocess.run([str(JDK/'bin/jlink'),'--module-path',str(jmods),'--add-modules',args.modules,
-                '--output',str(image),'--strip-debug','--no-header-files','--no-man-pages'],check=True)
+                *(['--compress='+args.compression] if args.compression!='none' else []),'--output',str(image),'--strip-debug','--no-header-files','--no-man-pages'],check=True)
 # Runtime data is required by java.time, legacy timezone APIs and TLS.
 # jmod classes/config alone do not include these target-generated data files.
 libs=BUILD/'support/modules_libs/java.base'
@@ -98,6 +99,7 @@ report={'input':'PS5/FreeBSD cross-build target module classes/resources',
         'host_tool_jmod_transport_tag':'linux-amd64; host jlink rejects BSD tags',
         'included_linux_or_host_native_binaries':False,
         'requested_target_modules':requested,
+        'compression':args.compression,
         'included_target_modules':included,
         'target_gendata_targets':gendata,
         'verified_generated_resource_sha256':resource_hashes,

@@ -1,0 +1,95 @@
+--- a/src/hotspot/share/runtime/ps5NativeHeap.hpp
++++ b/src/hotspot/share/runtime/ps5NativeHeap.hpp
+@@ -15,10 +15,11 @@
+ // prefix, so blocks remain compatible across the NMT initialization boundary.
+ namespace ps5_native_heap {
+ struct Slab;
+-union Header {
+-  struct { size_t size, mapped; Slab* slab; } block;
++// Two words preserve maximum alignment while reducing per-object overhead.
++// owner=0: libc; owner low bit=1: aligned Slab pointer; otherwise mapped bytes.
++union alignas(max_align_t) Header {
++  struct { size_t size; uintptr_t owner; } block;
+   Header* next;
+-  max_align_t alignment;
+ };
+ struct alignas(max_align_t) Slab {
+   Slab* next;
+@@ -26,6 +27,12 @@
+   size_t mapped, stride, live;
+   unsigned index;
+ };
++inline Slab* owning_slab(const Header* h) {
++  return (h->block.owner & 1) ? (Slab*)(h->block.owner & ~uintptr_t(1)) : nullptr;
++}
++inline size_t mapped_bytes(const Header* h) {
++  return (h->block.owner & 1) ? 0 : (size_t)h->block.owner;
++}
+ inline Slab** classes() { static Slab* heads[8] = {}; return heads; }
+ inline unsigned* mutex_word() { static unsigned lock = 0; return &lock; }
+ inline void lock() {
+@@ -73,7 +80,7 @@
+   if (size > SIZE_MAX - sizeof(Header)) { errno = ENOMEM; return nullptr; }
+   Header* header = (Header*)permit_forbidden_function::malloc(sizeof(Header) + size);
+   if (header != nullptr) {
+-    header->block = {size, 0, nullptr}; errno = saved_errno; return header + 1;
++    header->block = {size, 0}; errno = saved_errno; return header + 1;
+   }
+   if (size > 4096) {
+     size_t mapped;
+@@ -83,7 +90,7 @@
+     int error = memory == MAP_FAILED ? errno : 0;
+     note("PS5 native heap pages: requested=", size, mapped, error);
+     if (memory == MAP_FAILED) { errno = error; return nullptr; }
+-    header = (Header*)memory; header->block = {size, mapped, nullptr};
++    header = (Header*)memory; header->block = {size, mapped};
+   } else {
+     unsigned index = 0; size_t capacity = 32;
+     while (capacity < size) { ++index; capacity *= 2; }
+@@ -143,7 +150,7 @@
+     size_t borrowed_capacity = slab ? slab->stride - sizeof(Header) : 0;
+     if (slab) {
+       header = slab->available; slab->available = header->next; ++slab->live;
+-      header->block = {size, 0, slab};
++      header->block = {size, (uintptr_t)slab | uintptr_t(1)};
+     }
+     unlock();
+     // File IO/diagnostics must never run while holding the allocator lock.
+@@ -165,7 +172,7 @@
+   if (!memory) return;
+   int saved_errno = errno;
+   Header* header = (Header*)memory - 1;
+-  Slab* slab = header->block.slab;
++  Slab* slab = owning_slab(header);
+   if (slab) {
+     lock();
+     header->next = slab->available; slab->available = header; --slab->live;
+@@ -180,7 +187,7 @@
+     }
+     unlock();
+     if (mapped) munmap(slab, mapped);
+-  } else if (header->block.mapped) munmap(header, header->block.mapped);
++  } else if (mapped_bytes(header)) munmap(header, mapped_bytes(header));
+   else permit_forbidden_function::free(header);
+   errno = saved_errno;
+ }
+@@ -192,15 +199,17 @@
+   const size_t old_size = header->block.size;
+   if (size <= old_size) { header->block.size = size; return memory; }
+   int saved_errno = errno;
+-  if (!header->block.slab && !header->block.mapped) {
++  if (header->block.owner == 0) {
+     Header* resized = (Header*)permit_forbidden_function::realloc(header, sizeof(Header) + size);
+-    if (resized) { resized->block = {size, 0, nullptr}; errno = saved_errno; return resized + 1; }
++    if (resized) { resized->block = {size, 0}; errno = saved_errno; return resized + 1; }
+   }
+   void* replacement = allocate(size);
+   if (!replacement) return nullptr; // Original bytes and ownership are intact.
+   ::memcpy(replacement, memory, old_size);
+   release(memory); errno = saved_errno; return replacement;
+ }
++static_assert(sizeof(Header) == 2 * sizeof(uintptr_t), "compact raw prefix");
++static_assert(alignof(Slab) >= 2, "owner tag requires aligned slab pointers");
+ static_assert(sizeof(Header) % alignof(max_align_t) == 0, "payload alignment");
+ static_assert(sizeof(Slab) % alignof(max_align_t) == 0, "slab payload alignment");
+ }

@@ -1888,3 +1888,9 @@ and13 buddy levels down to1KiB. A real join path aborts while reserving another
 rebuild pass. Single metadata allocations are now bounded by the4MiB root;
 total metadata can grow across nodes. Console growth, join and native budget
 remain pending. Other platforms and frozen passing snapshots are unchanged.
+
+
+### Development: compact allocator prefix and compressed resident image
+
+Patches0093–0094 reduce per-allocation overhead and enable ZIP-compressed module
+images using the resident ZIP decoder. See the [implementation and checks](../docs/java25-compact-prefix-and-resident-image.md). Host allocator, reader/resource identity and target builds pass; PS5 memory headroom, decode and sustained stability remain pending.

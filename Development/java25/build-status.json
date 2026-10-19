@@ -35,7 +35,7 @@
   "startup_breadcrumb_host_tests": "PASS: partial/interrupted writes, denied open, append, memory fields and errno preservation",
   "runtime_path_adaptation": "target builds and package checks PASS; console pending",
   "launcher_option_host_smoke": "PASS: interpreter/SerialGC/heap options run Hello25 on host JDK 25; not PS5 execution",
-  "jimage_host_tests": "PASS: Java 25 Object.class through direct anonymous copy, zero file mappings, clean mapping rejection",
+  "jimage_host_tests": "PASS: actual reader resident ZIP path, resource identity for Object/String/TLS/JFR/desktop, zero file mappings and clean anonymous mapping rejection",
   "memory_binding": "PASS: native packager excludes SDK mman.o and verifies mmap/mprotect dynamic imports",
   "cpu_bootstrap": "target builds and packages PASS; deliberate SIMD fault probe skipped only for PS5 UseAVX=0; console pending",
   "class_space_bootstrap": "PASS: native package built with 32 MiB class-space option; ZIP/metadata/embedded option checks passed; host Hello25 passed with the same class-space and heap budgets; console pending",
@@ -292,5 +292,17 @@
     "checks": "PASS: actual allocator under ASan/UBSan with forced libc/map/realloc failures; all size classes, alignment, pooled sharing, normal/mapped resize migration, failed resize preserving bytes, overflow, eight-thread stress and complete matching cleanup. Actual os.cpp allocation bodies with a narrow NMT contract model preserve limits/accounting/header revival; actual pre-init raw bridges remain compatible with post-init NMT-off APIs. This is not a real host JMM test.",
     "target_checks": "PASS: HotSpot rebuild, single pool-head/lock definitions in app ELF, signed-container integrity, ZIP CRC/version 016, exact rebuilt target libjvm and prepared JAR identity; native fallback labels embedded.",
     "console": "pending: consumer 01.000.016. Addresses confirmed failed allocation; does not yet establish resolution of later native SIGSEGV or successful application startup/save/stop."
+  },
+  "compact_native_prefix": {
+    "patch": "0093-ps5-compact-native-allocation-prefix.patch",
+    "checks": "PASS: actual allocator ASan/UBSan failure/resize/overflow/concurrency/NMT contract tests; 261080-live-block old/new comparison saves2162688bytes at host alignment and4194304bytes with16-byte alignment model. Not console peak or full NMT evidence.",
+    "target": "PASS: HotSpot rebuild",
+    "console": "pending"
+  },
+  "resident_compressed_image": {
+    "patch": "0094-ps5-resident-jimage-zip-decompressor.patch",
+    "compression": "zip-6 default; all requested target modules retained",
+    "checks": "PASS: actual PS5 reader and resident ZIP decoder branches compare class/TLS/JFR/desktop resource bytes with jimage extraction; zero file mappings and anonymous-map rejection. Linked target JFR metadata creates238types on host. Target java.base-libs rebuild.",
+    "console": "pending: decode/startup and memory/CPU tradeoff"
   }
 }

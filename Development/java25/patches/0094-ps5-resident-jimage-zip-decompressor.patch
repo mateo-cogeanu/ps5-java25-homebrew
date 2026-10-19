@@ -1,0 +1,25 @@
+--- a/src/java.base/share/native/libjimage/imageDecompressor.cpp
++++ b/src/java.base/share/native/libjimage/imageDecompressor.cpp
+@@ -42,6 +42,10 @@
+ typedef jboolean (*ZipInflateFully_t)(void *inBuf, jlong inLen,
+                                       void *outBuf, jlong outLen, char **pmsg);
+ static ZipInflateFully_t ZipInflateFully        = NULL;
++#ifdef __PROSPERO__
++// The PS5 payload embeds libzip; its handle is not a desktop dlsym handle.
++extern "C" jboolean ZIP_InflateFully(void*, jlong, void*, jlong, char**);
++#endif
+ 
+ #ifndef WIN32
+     #define JNI_LIB_PREFIX "lib"
+@@ -76,7 +80,11 @@
+ ImageDecompressor** ImageDecompressor::_decompressors = NULL;
+ void ImageDecompressor::image_decompressor_init() {
+     if (_decompressors == NULL) {
++#ifdef __PROSPERO__
++        ZipInflateFully = &ZIP_InflateFully;
++#else
+         ZipInflateFully = (ZipInflateFully_t) findEntry("ZIP_InflateFully");
++#endif
+      assert(ZipInflateFully != NULL && "ZIP decompressor not found.");
+         _decompressors_num = 2;
+         _decompressors = new ImageDecompressor*[_decompressors_num];
