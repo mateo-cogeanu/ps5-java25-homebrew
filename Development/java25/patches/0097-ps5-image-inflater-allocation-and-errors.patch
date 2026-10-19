@@ -1,0 +1,307 @@
+--- a/src/java.base/share/native/libzip/zip_util.c
++++ b/src/java.base/share/native/libzip/zip_util.c
+@@ -45,6 +45,9 @@
+ #include "io_util_md.h"
+ #include "zip_util.h"
+ #include <zlib.h>
++#ifdef __PROSPERO__
++#include "ps5ZipAlloc.h"
++#endif
+ 
+ /* USE_MMAP means mmap the CEN & ENDHDR part of the zip file. */
+ #ifdef USE_MMAP
+@@ -1373,6 +1376,10 @@
+     }
+ 
+     memset(&strm, 0, sizeof(z_stream));
++#ifdef __PROSPERO__
++    strm.zalloc=ps5_zip_zalloc;
++    strm.zfree=ps5_zip_zfree;
++#endif
+     if (inflateInit2(&strm, -MAX_WBITS) != Z_OK) {
+         *msg = strm.msg;
+         return JNI_FALSE;
+@@ -1503,11 +1510,18 @@
+ {
+     z_stream strm;
+     memset(&strm, 0, sizeof(z_stream));
++#ifdef __PROSPERO__
++    strm.zalloc=ps5_zip_zalloc;
++    strm.zfree=ps5_zip_zfree;
++#endif
+ 
+     *pmsg = NULL; /* Reset error message */
+ 
++    if(inLen<=0 || outLen<0 || (jlong)(uInt)inLen!=inLen || (jlong)(uInt)outLen!=outLen) {
++        *pmsg="INFLATER_inflateFully: invalid buffer length";return JNI_FALSE;
++    }
+     if (inflateInit2(&strm, MAX_WBITS) != Z_OK) {
+-        *pmsg = strm.msg;
++        *pmsg = strm.msg ? strm.msg : "INFLATER_inflateFully: initialization failed";
+         return JNI_FALSE;
+     }
+ 
+@@ -1526,7 +1540,8 @@
+                     inflateEnd(&strm);
+                     return JNI_FALSE;
+                 }
+-                break;
++                inflateEnd(&strm);
++                return JNI_TRUE;
+             case Z_DATA_ERROR:
+                 *pmsg = "INFLATER_inflateFully: Compressed data corrupted";
+                 inflateEnd(&strm);
+@@ -1543,7 +1558,8 @@
+     } while (strm.avail_in > 0);
+ 
+     inflateEnd(&strm);
+-    return JNI_TRUE;
++    *pmsg="INFLATER_inflateFully: truncated stream";
++    return JNI_FALSE;
+ }
+ 
+ static voidpf tracking_zlib_alloc(voidpf opaque, uInt items, uInt size) {
+--- a/src/java.base/share/native/libjimage/imageDecompressor.hpp
++++ b/src/java.base/share/native/libjimage/imageDecompressor.hpp
+@@ -105,14 +105,14 @@
+ protected:
+     ImageDecompressor(const char* name) : _name(name) {
+     }
+-    virtual void decompress_resource(u1* data, u1* uncompressed,
++    virtual bool decompress_resource(u1* data, u1* uncompressed,
+         ResourceHeader* header, const ImageStrings* strings) = 0;
+ 
+ public:
+     static void image_decompressor_init();
+     static void image_decompressor_close();
+     static ImageDecompressor* get_decompressor(const char * decompressor_name) ;
+-    static void decompress_resource(u1* compressed, u1* uncompressed,
++    static bool decompress_resource(u1* compressed, u1* uncompressed,
+         u8 uncompressed_size, const ImageStrings* strings, Endian* _endian);
+ };
+ 
+@@ -122,7 +122,7 @@
+ class ZipDecompressor : public ImageDecompressor {
+ public:
+     ZipDecompressor(const char* sym) : ImageDecompressor(sym) { }
+-    void decompress_resource(u1* data, u1* uncompressed, ResourceHeader* header,
++    bool decompress_resource(u1* data, u1* uncompressed, ResourceHeader* header,
+         const ImageStrings* strings);
+     static jboolean decompress(void *in, u8 inSize, void *out, u8 outSize, char **pmsg);
+ };
+@@ -165,7 +165,7 @@
+     static int decompress_int(unsigned char*& value);
+ public:
+     SharedStringDecompressor(const char* sym) : ImageDecompressor(sym){}
+-    void decompress_resource(u1* data, u1* uncompressed, ResourceHeader* header,
++    bool decompress_resource(u1* data, u1* uncompressed, ResourceHeader* header,
+     const ImageStrings* strings);
+ };
+ #endif // LIBJIMAGE_IMAGEDECOMPRESSOR_HPP
+--- a/src/java.base/share/native/libjimage/imageDecompressor.cpp
++++ b/src/java.base/share/native/libjimage/imageDecompressor.cpp
+@@ -33,6 +33,7 @@
+ #include "jvm.h"
+ #include "imageDecompressor.hpp"
+ #include "endian.hpp"
++#include <stdio.h>
+ #ifdef WIN32
+ #include <windows.h>
+ #else
+@@ -141,11 +142,12 @@
+ /*
+  * Decompression entry point. Called from ImageFileReader::get_resource.
+  */
+-void ImageDecompressor::decompress_resource(u1* compressed, u1* uncompressed,
++bool ImageDecompressor::decompress_resource(u1* compressed, u1* uncompressed,
+                 u8 uncompressed_size, const ImageStrings* strings, Endian *endian) {
+     bool has_header = false;
+     u1* decompressed_resource = compressed;
+     u1* compressed_resource = compressed;
++    u8 allocated_size=0;
+     // Resource could have been transformed by a stack of decompressors.
+     // Iterate and decompress resources until there is no more header.
+     do {
+@@ -167,6 +169,7 @@
+         if (has_header) {
+             // decompressed_resource array contains the result of decompression
+             decompressed_resource = new u1[(size_t) _header._uncompressed_size];
++            allocated_size=_header._uncompressed_size;
+             // Retrieve the decompressor name
+             const char* decompressor_name = strings->get(_header._decompressor_name_offset);
+             assert(decompressor_name && "image decompressor not found");
+@@ -174,26 +177,35 @@
+             ImageDecompressor* decompressor = get_decompressor(decompressor_name);
+             assert(decompressor && "image decompressor not found");
+             // Ask the decompressor to decompress the compressed content
+-            decompressor->decompress_resource(compressed_resource, decompressed_resource,
++            bool success=decompressor && decompressor->decompress_resource(compressed_resource, decompressed_resource,
+                 &_header, strings);
++            if(!success) {
++                delete[] decompressed_resource;
++                if(compressed_resource_base!=compressed)delete[] compressed_resource_base;
++                return false;
++            }
+             if (compressed_resource_base != compressed) {
+                 delete[] compressed_resource_base;
+             }
+             compressed_resource = decompressed_resource;
+         }
+     } while (has_header);
++    if(decompressed_resource==compressed)return false;
++    if(allocated_size!=uncompressed_size) {delete[] decompressed_resource;return false;}
+     memcpy(uncompressed, decompressed_resource, (size_t) uncompressed_size);
+     delete[] decompressed_resource;
++    return true;
+ }
+ 
+ // Zip decompressor
+ 
+-void ZipDecompressor::decompress_resource(u1* data, u1* uncompressed,
++bool ZipDecompressor::decompress_resource(u1* data, u1* uncompressed,
+                 ResourceHeader* header, const ImageStrings* strings) {
+     char* msg = NULL;
+     jboolean res = ZipDecompressor::decompress(data, header->_size, uncompressed,
+                     header->_uncompressed_size, &msg);
+-    assert(res && "decompression failed");
++    if(!res)fprintf(stderr,"PS5 JIMAGE ZIP decompression failed: %s\n",msg?msg:"unknown error");
++    return res;
+ }
+ 
+ jboolean ZipDecompressor::decompress(void *in, u8 inSize, void *out, u8 outSize, char **pmsg) {
+@@ -212,7 +224,7 @@
+ /**
+  * Recreate the class by reconstructing the constant pool.
+  */
+-void SharedStringDecompressor::decompress_resource(u1* data,
++bool SharedStringDecompressor::decompress_resource(u1* data,
+                 u1* uncompressed_resource,
+                 ResourceHeader* header, const ImageStrings* strings) {
+     u1* uncompressed_base = uncompressed_resource;
+@@ -344,6 +356,7 @@
+     assert(header->_uncompressed_size == computed &&
+                 "Constant Pool reconstruction failed");
+     memcpy(uncompressed_resource, data, (size_t) remain);
++    return true;
+ }
+ 
+ /*
+--- a/src/java.base/share/native/libjimage/imageFile.hpp
++++ b/src/java.base/share/native/libjimage/imageFile.hpp
+@@ -573,10 +573,10 @@
+     bool verify_location(ImageLocation& location, const char* path) const;
+ 
+     // Return the resource for the supplied location index.
+-    void get_resource(u4 index, u1* uncompressed_data) const;
++    bool get_resource(u4 index, u1* uncompressed_data) const;
+ 
+     // Return the resource for the supplied path.
+-    void get_resource(ImageLocation& location, u1* uncompressed_data) const;
++    bool get_resource(ImageLocation& location, u1* uncompressed_data) const;
+ 
+     // Return the ImageModuleData for this image
+     ImageModuleData * get_image_module_data();
+--- a/src/java.base/share/native/libjimage/imageFile.cpp
++++ b/src/java.base/share/native/libjimage/imageFile.cpp
+@@ -191,7 +191,7 @@
+     int size = (int)location.get_attribute(ImageLocation::ATTRIBUTE_UNCOMPRESSED);
+     u1* content = new u1[size];
+     assert(content != NULL && "allocation failed");
+-    _image_file->get_resource(location, content);
++    if(!_image_file->get_resource(location, content)) {delete[] content;return NULL;}
+     u1* ptr = content;
+     // sequence of sizeof(8) isEmpty|offset. Use the first module that is not empty.
+     u4 offset = 0;
+@@ -354,7 +354,7 @@
+ 
+ // Constructor initializes to a closed state.
+ ImageFileReader::ImageFileReader(const char* name, bool big_endian) :
+-    _module_data(NULL) {
++    _use(0), _module_data(NULL) {
+     // Copy the image file name.
+      int len = (int) strlen(name) + 1;
+     _name = new char[len];
+@@ -550,17 +550,17 @@
+ }
+ 
+ // Return the resource for the supplied location offset.
+-void ImageFileReader::get_resource(u4 offset, u1* uncompressed_data) const {
++bool ImageFileReader::get_resource(u4 offset, u1* uncompressed_data) const {
+         // Get address of first byte of location attribute stream.
+         u1* data = get_location_offset_data(offset);
+         // Expand location attributes.
+         ImageLocation location(data);
+         // Read the data
+-        get_resource(location, uncompressed_data);
++        return get_resource(location, uncompressed_data);
+ }
+ 
+ // Return the resource for the supplied location.
+-void ImageFileReader::get_resource(ImageLocation& location, u1* uncompressed_data) const {
++bool ImageFileReader::get_resource(ImageLocation& location, u1* uncompressed_data) const {
+     // Retrieve the byte offset and size of the resource.
+     u8 offset = location.get_attribute(ImageLocation::ATTRIBUTE_OFFSET);
+     u8 uncompressed_size = location.get_attribute(ImageLocation::ATTRIBUTE_UNCOMPRESSED);
+@@ -575,23 +575,24 @@
+             assert(compressed_data != NULL && "allocation failed");
+             // Read bytes from offset beyond the image index.
+             bool is_read = read_at(compressed_data, compressed_size, _index_size + offset);
+-            assert(is_read && "error reading from image or short read");
++            if(!is_read) {delete[] compressed_data;return false;}
+         } else {
+             compressed_data = get_data_address() + offset;
+         }
+         // Get image string table.
+         const ImageStrings strings = get_strings();
+         // Decompress resource.
+-        ImageDecompressor::decompress_resource(compressed_data, uncompressed_data, uncompressed_size,
++        bool success=ImageDecompressor::decompress_resource(compressed_data, uncompressed_data, uncompressed_size,
+                         &strings, _endian);
+         // If not memory mapped then release temporary buffer.
+         if (!memory_map_image) {
+                 delete[] compressed_data;
+         }
++        return success;
+     } else {
+         // Read bytes from offset beyond the image index.
+         bool is_read = read_at(uncompressed_data, uncompressed_size, _index_size + offset);
+-        assert(is_read && "error reading from image or short read");
++        return is_read;
+     }
+ }
+ 
+--- a/src/java.base/share/native/libjimage/jimage.cpp
++++ b/src/java.base/share/native/libjimage/jimage.cpp
+@@ -167,8 +167,7 @@
+ extern "C" JNIEXPORT jlong
+ JIMAGE_GetResource(JImageFile* image, JImageLocationRef location,
+         char* buffer, jlong size) {
+-    ((ImageFileReader*) image)->get_resource((u4) location, (u1*) buffer);
+-    return size;
++    return ((ImageFileReader*) image)->get_resource((u4) location, (u1*) buffer) ? size : 0;
+ }
+ 
+ /*
+--- a/src/hotspot/share/classfile/classLoader.cpp
++++ b/src/hotspot/share/classfile/classLoader.cpp
+@@ -443,7 +443,10 @@
+       ClassLoader::perf_sys_classfile_bytes_read()->inc(size);
+     }
+     char* data = NEW_RESOURCE_ARRAY(char, size);
+-    (*JImageGetResource)(jimage_non_null(), location, data, size);
++    if((*JImageGetResource)(jimage_non_null(), location, data, size)!=size) {
++      JavaThread* THREAD=current;
++      THROW_MSG_NULL(vmSymbols::java_io_IOException(),err_msg("JIMAGE resource read/decompression failed: %s",name));
++    }
+     // Resource allocated
+     assert(this == (ClassPathImageEntry*)ClassLoader::get_jrt_entry(), "must be");
+     return new ClassFileStream((u1*)data,
+@@ -1398,7 +1401,7 @@
+   if (location == 0)
+     return nullptr;
+   char *val = NEW_C_HEAP_ARRAY(char, size+1, mtClass);
+-  (*JImageGetResource)(jimage, location, val, size);
++  if((*JImageGetResource)(jimage, location, val, size)!=size) {FREE_C_HEAP_ARRAY(char,val);return nullptr;}
+   val[size] = '\0';
+   return val;
+ }

@@ -318,6 +318,14 @@
     "implementation": "Use checked kern.rng_pseudo sysctlbyname requests with64-byte stack bounds; validate return code and actual length before Java transfer; errors throw ProviderException and volatile-clear scratch. Remove direct RNG dependency; no optional module imports/loads.",
     "host": "PASS: actual Java/JNI/DRBG, concurrent requests, bounds and OS failure; kernel error, insufficient/oversized response rejection; JNI checking and UBSan with mocked kernel entropy boundary; desktop URL control. Null kernel API injection also returns ProviderException without a call.",
     "target": "PASS: java.base native rebuild",
-    "console": "pending: actual PS5 kernel RNG query, TLS/server startup and original071cause"
+    "console": "PARTIAL:073 reports MC_TLS_RANDOM_OK, confirming DRBG initialized; TLS factory next fails runtime class-format check. Full TLS/server/endurance still pending."
+  },
+  "ps5_image_inflater_errors": {
+    "patch": "0097-ps5-image-inflater-allocation-and-errors.patch",
+    "evidence": "073 DRBG succeeds; TLS factory fails ClassFormatError DTLSInputRecord magic0x07000f0c. Native inflater status not logged; exact refused allocation not proven. Source native full-inflate lacked PS5 callbacks and image reader ignored decode failure in release.",
+    "implementation": "Existing libc/page-backed matched zlib callbacks in both full-inflate paths; require complete/exact decode; propagate failed image reads via0return/HotSpot IOException, reject failed optional resources, initialize reader reference count.",
+    "host": "PASS: actual ZIP_InflateFully/PS5 allocation adapter and NDEBUG reader under ASan/UBSan, DTLS/SSL/JFR/desktop byte identity, libc refusal fallback, total refusal/corrupt/truncated/undersized-output errors, untouched caller buffer on failed compressed decode, recovery and matching cleanup; anonymous-image mapping controls. Previous reader test used host libzip, not the actual native inflater.",
+    "target": "PASS: HotSpot and java.base native libraries rebuild",
+    "console": "pending: actual PS5 TLS/resource loading, memory/headroom and earlier071cause"
   }
 }

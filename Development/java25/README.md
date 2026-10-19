@@ -1912,3 +1912,12 @@ service-import call using the checked kern.rng_pseudo interface. Actual Java/JNI
 concurrency/batch/DRBG/kernel-error/short/oversized-response and desktop-control
 tests pass; target native rebuild passes. PS5 kernel availability, TLS/server
 startup and earlier071crash resolution remain pending.
+
+
+### Development: native image inflater allocation and errors
+
+[Patch 0097](../docs/java25-image-inflater-allocation-and-errors.md) applies the
+existing PS5 zlib storage adapter to native image decoding and propagates decode
+failures into checked resource errors. It also initializes image-reader ownership.
+Actual native inflater and release-mode reader tests pass under ASan/UBSan,
+including DTLS bytes and forced storage refusal. PS5 TLS startup remains pending.
