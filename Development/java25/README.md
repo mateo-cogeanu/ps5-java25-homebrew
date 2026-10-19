@@ -1905,10 +1905,10 @@ pass; PS5 service/ABI/TLS startup and the original process-crash cause remain
 unvalidated. This does not alter consumer game classes or TLS verification.
 
 
-### Development: checked OS entropy service resolution
+### Development: checked PS5 kernel entropy
 
-[Patch0096](../docs/java25-checked-entropy-resolution.md) fixes a captured null
-service-import call by explicitly loading/resolving the fixed system RNG service
-and checking every result. Concurrent initialization and load/lookup/null/OS
-failure controls pass on host; target native rebuild passes. Actual PS5 module
-loading, TLS and earlier071crash resolution remain pending.
+[Patch0096](../docs/java25-checked-entropy-resolution.md) fixes the captured null
+service-import call using the checked kern.rng_pseudo interface. Actual Java/JNI
+concurrency/batch/DRBG/kernel-error/short/oversized-response and desktop-control
+tests pass; target native rebuild passes. PS5 kernel availability, TLS/server
+startup and earlier071crash resolution remain pending.

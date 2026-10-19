@@ -1,0 +1,64 @@
+--- a/src/java.base/unix/native/libjava/PS5SeedGenerator.c
++++ b/src/java.base/unix/native/libjava/PS5SeedGenerator.c
+@@ -5,8 +5,13 @@
+ #include <stddef.h>
+ #include <string.h>
+ #include <stdio.h>
+-// API and64-byte request size used by the pinned SDK hello_sprx sample.
+-extern int sceRandomGetRandomNumber(uint8_t *, size_t);
++#include <sys/types.h>
++#include <sys/sysctl.h>
++// Query the native kernel entropy source. This does not depend on an optional
++// system module import. Only bytes actually returned by the kernel are used.
++static void clear_seed(void *buffer,size_t size) {
++    volatile uint8_t *p=buffer;while(size--) *p++=0;
++}
+ static void seed_error(JNIEnv *env,const char *name,const char *message) {
+     jclass type=(*env)->FindClass(env,name);
+     if(type!=NULL) { (*env)->ThrowNew(env,type,message); (*env)->DeleteLocalRef(env,type); }
+@@ -23,16 +28,17 @@
+     uint8_t bytes[64];
+     for (jsize offset=0; offset<length;) {
+         jsize count=length-offset; if(count>64)count=64;
+-        int result=sceRandomGetRandomNumber(bytes,(size_t)count);
+-        if(result!=0) {
+-            memset(bytes,0,sizeof(bytes));
+-            seed_error(env,"java/security/ProviderException","PS5 OS entropy request failed");
++        size_t received=sizeof(bytes);
++        int result=sysctlbyname("kern.rng_pseudo",bytes,&received,NULL,0);
++        if(result!=0 || received<(size_t)count || received>sizeof(bytes)) {
++            clear_seed(bytes,sizeof(bytes));
++            seed_error(env,"java/security/ProviderException","PS5 kernel entropy request failed or returned an invalid length");
+             return;
+         }
+         if(!__atomic_exchange_n(&announced,1,__ATOMIC_RELAXED))
+-            fputs("PS5_OS_ENTROPY_OK native service; no threaded seed fallback\n",stderr);
++            fputs("PS5_OS_ENTROPY_OK kernel source; no threaded seed fallback\n",stderr);
+         (*env)->SetByteArrayRegion(env,output,offset,count,(const jbyte*)bytes);
+-        memset(bytes,0,sizeof(bytes));
++        clear_seed(bytes,sizeof(bytes));
+         if((*env)->ExceptionCheck(env))return;
+         offset+=count;
+     }
+--- a/make/modules/java.base/lib/CoreLibraries.gmk
++++ b/make/modules/java.base/lib/CoreLibraries.gmk
+@@ -50,10 +50,6 @@
+ ifeq ($(call isTargetOs, macosx), true)
+   BUILD_LIBJAVA_java_props_md.c_CFLAGS := -x objective-c
+   BUILD_LIBJAVA_java_props_macosx.c_CFLAGS := -x objective-c
+-endif
+-
+-ifeq ($(PS5_BOOTSTRAP), yes)
+-  LIBJAVA_PS5_RANDOM := -lSceRandom
+ endif
+ 
+ $(eval $(call SetupJdkLibrary, BUILD_LIBJAVA, \
+@@ -73,7 +69,7 @@
+         -framework Foundation \
+         -framework SystemConfiguration, \
+     LIBS_windows := advapi32.lib ole32.lib shell32.lib version.lib, \
+-    LIBS_bsd := $(LIBDL) $(LIBJAVA_PS5_RANDOM), \
++    LIBS_bsd := $(LIBDL), \
+ ))
+ 
+ TARGETS += $(BUILD_LIBJAVA)
