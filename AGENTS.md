@@ -78,3 +78,19 @@ reports, then proceed with repairs for concrete issues found within the existing
 Java/Minecraft scope. Build, check and publish the resulting changes under the
 repository ownership rules above. Do not wait for a separate repair request.
 Keep unresolved causes and console validation explicit; raw logs remain local.
+
+## Unmodified Minecraft server JAR direction
+
+The user requires future compatibility fixes and features to live in the Java
+port or the separately maintained Minecraft harness/configuration. Do not add
+or expand server-JAR transformations, bytecode hooks or replacement game classes.
+Keep the official downloaded server JAR intact. Existing local derivative
+transformations are temporary migration debt, not the preferred architecture.
+
+Gradually remove the existing transformations as working replacements are
+implemented and validated. Move runtime compatibility into the Java port; use
+vanilla configuration, ops.json and supported administration mechanisms for
+Minecraft policy where possible. Do not silently remove required workarounds
+or claim an unmodified server while a derivative is still executed. Record
+each remaining transformation and console validation needed for its removal.
+Preserve frozen passing snapshots; migrate development only.
