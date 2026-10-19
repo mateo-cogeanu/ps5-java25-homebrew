@@ -333,5 +333,14 @@
     "patch": "0098-ps5-image-resource-buffer-allocation.patch",
     "host": "PASS: ASan/UBSan release reader, independent libc refusal/map fallback/total refusal, caller sentinel/cleanup/recovery, HTTPSclass identity and tinyterminal1/8/28bytes; exact patch application and target build pass",
     "console": "076user reports much better gameplay. Current reports confirm default TLS/online preflight, normal-world Done and authenticated player admission after0098. No ALLPASS or completed2hour validation; previous075crash cause still not proven."
+  },
+  "index_only_image": {
+    "patch": "0099-ps5-index-only-module-image.patch",
+    "cause": "077fatalC1CompilerThread0 Chunk::new32664bytes, raw32768bytemmap ENOMEM afterprune/retry;97.573s. Not a JavaheapOOM.",
+    "image_bytes": 28085766,
+    "index_bytes": 1000498,
+    "persistent_copy_reduction_bytes": 27082752,
+    "host": "PASS: actualrelease-readerASan/UBSan, indexunder2MiB/nofilemaps, exactresources, short/EINTR/EIO/EOFreads, input/outputrefusal/calleroutput/cleanup/recovery and existingZIPcontrols; exactpatchapplication/targetbuild.",
+    "console": "078pending; nativeallocationfatalbehavior remainsifheadroomexhausted; no compilerbailoutimplemented."
   }
 }

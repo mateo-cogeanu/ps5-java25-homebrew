@@ -39,7 +39,7 @@ int zip_test_maps(void){return maps;}
 """
 (work/'host-jimage-zip.c').write_text(fixture+body[a:b])
 subprocess.run(['/usr/bin/clang','-O1','-g','-fsanitize=address,undefined','-D__PROSPERO__','-I'+str(jdk/'include'),'-I'+str(jdk/'include/darwin'),'-I'+str(zipbase),'-c',str(work/'host-jimage-zip.c'),'-o',str(work/'host-jimage-zip.o')],check=True)
-subprocess.run(base+['-DNDEBUG','-Dmmap=ps5_test_mmap','-c',str(source/'src/java.base/unix/native/libjimage/osSupport_unix.cpp'),'-o',str(work/'host-jimage-os.o')],check=True)
+subprocess.run(base+['-DNDEBUG','-Dmmap=ps5_test_mmap','-Dpread=ps5_test_pread','-c',str(source/'src/java.base/unix/native/libjimage/osSupport_unix.cpp'),'-o',str(work/'host-jimage-os.o')],check=True)
 # Inject failures only into temporary image-resource buffers, independently
 # from the zlib allocator and the resident image mapping.
 (work/'host-image-buffer-test.hpp').write_text(r"""

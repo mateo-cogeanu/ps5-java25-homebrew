@@ -1,0 +1,50 @@
+--- a/src/java.base/share/native/libjimage/imageFile.cpp
++++ b/src/java.base/share/native/libjimage/imageFile.cpp
+@@ -43,7 +43,13 @@
+ #include "../../../../hotspot/share/runtime/ps5StartupTrace.hpp"
+ 
+ // Map the full jimage, only with 64 bit addressing.
++#ifdef __PROSPERO__
++// Keep only the lookup index resident. Resource bytes are read on demand;
++// copying the whole compressed image consumes native compiler headroom.
++bool ImageFileReader::memory_map_image = false;
++#else
+ bool ImageFileReader::memory_map_image = sizeof(void *) == 8;
++#endif
+ 
+ #ifdef WIN32
+ const char FileSeparator = '\\';
+@@ -413,6 +419,10 @@
+     if (_file_size < _index_size) {
+         return false;
+     }
++#ifdef __PROSPERO__
++    ps5_vm_trace_values("JIMAGE index-only resident bytes=",_index_size,
++                        " image bytes=",_file_size," reserved=",0);
++#endif
+     // Memory map image (minimally the index.)
+     ps5_vm_trace("ENTER: JIMAGE memory mapping");
+     _index_data = (u1*)osSupport::map_memory(_fd, _name, 0, (size_t)map_size());
+--- a/src/java.base/unix/native/libjimage/osSupport_unix.cpp
++++ b/src/java.base/unix/native/libjimage/osSupport_unix.cpp
+@@ -80,7 +80,20 @@
+  * Read nBytes at offset into a buffer.
+  */
+ jlong osSupport::read(jint fd, char *buf, jlong nBytes, jlong offset) {
++#ifdef __PROSPERO__
++    if(nBytes<0 || offset<0 || nBytes>LLONG_MAX-offset) {errno=EINVAL;return -1;}
++    jlong completed=0;
++    while(completed<nBytes) {
++        size_t request=(size_t)((nBytes-completed)>1024*1024?1024*1024:nBytes-completed);
++        ssize_t got=::pread(fd,buf+completed,request,offset+completed);
++        if(got>0)completed+=got;
++        else if(got<0 && errno==EINTR)continue;
++        else return got<0?-1:completed;
++    }
++    return completed;
++#else
+     return ::pread(fd, buf, nBytes, offset);
++#endif
+ }
+ 
+ /**

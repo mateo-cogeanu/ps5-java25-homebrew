@@ -1933,3 +1933,12 @@ PS5 allocation fallback to image-resource buffers and respects terminal decode
 headers. Actual release reader tests pass ASan/UBSan with independent allocation
 refusal, cleanup/recovery and small terminal resources; target rebuild passes.
 075crash remains unproven;076console HTTPS/server validation is pending.
+
+### Development: index-only module image
+
+[Patch0099](../docs/java25-index-only-module-image.md) addresses077's captured
+C1nativeallocation abort by retaining only the image index and reading resource
+bytes on demand. It removes25.8MiBof persistent anonymous copy for the current
+image, keeps all modules and checked decompression, and handles short/interrupted
+reads. Native reader ASan/UBSan and target build pass;078PS5latency/headroom/
+stability remain pending. It does not implement a compiler OOM bailout.

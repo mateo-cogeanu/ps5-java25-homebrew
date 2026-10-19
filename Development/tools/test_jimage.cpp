@@ -6,6 +6,7 @@
 #include "imageDecompressor.hpp"
 #include <cstdlib>
 #include <cstdint>
+#include <unistd.h>
 #include <sys/mman.h>
 #include <cerrno>
 #include <cassert>
@@ -29,10 +30,19 @@ extern "C" void* image_test_map(void* p,size_t n,int prot,int flags,int fd,off_t
  p=mmap(p,n,prot,flags,fd,off);if(p!=MAP_FAILED){++image_live;++image_maps;}return p;
 }
 extern "C" int image_test_unmap(void* p,size_t n) {int rc=munmap(p,n);if(!rc)--image_live;return rc;}
+static int read_mode=0,read_interrupt=0;
+static size_t largest_resident_map=0;
+extern "C" ssize_t ps5_test_pread(int fd,void* out,size_t count,off_t offset) {
+ if(read_interrupt){--read_interrupt;errno=EINTR;return -1;}
+ if(read_mode==2){errno=EIO;return -1;}
+ if(read_mode==3)return 0;
+ if(read_mode==1&&count>97)count=97;
+ return pread(fd,out,count,offset);
+}
 static bool reject_file=false,reject_anonymous=false;
 static unsigned file_mappings=0,anonymous_mappings=0;
 extern "C" void *ps5_test_mmap(void *p,size_t size,int protection,int flags,int fd,off_t offset) {
- if(fd>=0) ++file_mappings; else ++anonymous_mappings;
+ if(fd>=0) ++file_mappings; else {++anonymous_mappings;if(size>largest_resident_map)largest_resident_map=size;}
  if((fd>=0 && reject_file)||(fd<0 && reject_anonymous)) {errno=EPERM;return MAP_FAILED;}
  return mmap(p,size,protection,flags,fd,offset);
 }
@@ -40,6 +50,7 @@ void read_object(const char *expected_root) {
  jint error=0;
  auto *image=JIMAGE_Open("build/java25/boot-image/lib/modules",&error);
  assert(image);
+ assert(((ImageFileReader*)image)->map_size()<2*1024*1024);
  jlong size=0;
  auto location=JIMAGE_FindResource(image,"java.base","25","java/lang/Object.class",&size);
  assert(location && size>8);
@@ -91,21 +102,31 @@ int main(int argc,char **argv) {
  std::vector<char> buffer(bytes,0x5a);zip_test_mode(1,0);assert(JIMAGE_GetResource(image,location,buffer.data(),bytes)==0);
  for(char b:buffer)assert(b==0x5a);assert(zip_test_live()==0);
  zip_test_mode(1,-1);assert(JIMAGE_GetResource(image,location,buffer.data(),bytes)==bytes);assert((unsigned char)buffer[0]==0xca);assert(zip_test_live()==0);JIMAGE_Close(image);
- // Resident images need one decoded resource buffer. Its allocation refusal
- // must return0, preserve caller bytes and release all mappings.
+ // Index-only images need compressed-input and decoded-output buffers. Either
+ // allocation refusal must preserve caller bytes and release all mappings.
  image_deny=true;image_budget=-1;read_object(argv[1]);assert(image_maps>0&&image_live==0);
  image=JIMAGE_Open("build/java25/boot-image/lib/modules",&image_error);assert(image);
  location=JIMAGE_FindResource(image,"java.base","25","sun/net/www/protocol/https/DelegateHttpsURLConnection.class",&bytes);assert(location);
- for(int budget: {0}) {
+ for(int budget: {0,1}) {
   buffer.assign(bytes,0x5a);image_budget=budget;assert(JIMAGE_GetResource(image,location,buffer.data(),bytes)==0);
   for(char b:buffer)assert(b==0x5a);assert(image_live==0);
  }
- image_budget=1;assert(JIMAGE_GetResource(image,location,buffer.data(),bytes)==bytes);assert(image_live==0);
- JIMAGE_Close(image);image_deny=false;
+ image_budget=2;assert(JIMAGE_GetResource(image,location,buffer.data(),bytes)==bytes);assert(image_live==0);
+ image_budget=-1;image_deny=false;
+ for(int mode: {2,3}) {
+  read_mode=mode;buffer.assign(bytes,0x5a);assert(JIMAGE_GetResource(image,location,buffer.data(),bytes)==0);
+  for(char b:buffer)assert(b==0x5a);assert(image_live==0);
+ }
+ read_mode=1;read_interrupt=1;assert(JIMAGE_GetResource(image,location,buffer.data(),bytes)==bytes);assert(image_live==0);
+ JIMAGE_Close(image);
  assert(file_mappings==0 && anonymous_mappings==6);
+ // Complete reader open/class reads under short and interrupted real pread.
+ read_mode=1;read_interrupt=1;read_object(argv[1]);read_mode=0;
+ assert(file_mappings==0 && anonymous_mappings==7);
+ assert(largest_resident_map<2*1024*1024);
  reject_anonymous=true;
  jint error=0;
  assert(!JIMAGE_Open("build/java25/boot-image/lib/modules",&error));
- assert(file_mappings==0 && anonymous_mappings==7);
- std::puts("Real JIMAGE reader PASS: direct anonymous copies, zero file mappings, actual ZIP and image-buffer allocation fallback/refusal/cleanup/recovery; truncated/corrupt controls; DTLS/classes/TLS/JFR/desktop identity; failed decode returns0 without publishing bytes; mapping rejection");
+ assert(file_mappings==0 && anonymous_mappings==8);
+ std::puts("Real JIMAGE reader PASS: index-only anonymous copies below2MiB, zero file mappings, short/EINTR/EIO/EOF pread controls, actual ZIP and image-buffer allocation fallback/refusal/cleanup/recovery; truncated/corrupt controls; DTLS/classes/TLS/JFR/desktop identity; failed decode returns0 without publishing bytes; mapping rejection");
 }
