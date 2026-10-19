@@ -23,3 +23,27 @@
       assert(ZipInflateFully != NULL && "ZIP decompressor not found.");
          _decompressors_num = 2;
          _decompressors = new ImageDecompressor*[_decompressors_num];
+--- a/make/modules/java.base/lib/CoreLibraries.gmk
++++ b/make/modules/java.base/lib/CoreLibraries.gmk
+@@ -107,6 +107,12 @@
+ ## Build libjimage
+ ################################################################################
+ 
++# PS5 embeds ZIP in the payload; the standalone library also needs its direct
++# dependency so the target build checks the same symbol contract.
++ifeq ($(PS5_BOOTSTRAP), yes)
++  LIBJIMAGE_ZIP_LIB := libzip
++endif
++
+ $(eval $(call SetupJdkLibrary, BUILD_LIBJIMAGE, \
+     NAME := jimage, \
+     LINK_TYPE := C++, \
+@@ -120,7 +126,7 @@
+     DISABLED_WARNINGS_clang_imageFile.cpp := unused-private-field \
+         unused-variable, \
+     LDFLAGS := $(LDFLAGS_CXX_JDK), \
+-    JDK_LIBS := libjvm, \
++    JDK_LIBS := libjvm $(LIBJIMAGE_ZIP_LIB), \
+     LIBS_unix := $(LIBDL), \
+ ))
+ 
