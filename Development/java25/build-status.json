@@ -342,5 +342,11 @@
     "persistent_copy_reduction_bytes": 27082752,
     "host": "PASS: actualrelease-readerASan/UBSan, indexunder2MiB/nofilemaps, exactresources, short/EINTR/EIO/EOFreads, input/outputrefusal/calleroutput/cleanup/recovery and existingZIPcontrols; exactpatchapplication/targetbuild.",
     "console": "078pending; nativeallocationfatalbehavior remainsifheadroomexhausted; no compilerbailoutimplemented."
+  },
+  "java_native_image_handoff": {
+    "patch": "0100-ps5-java-image-reader-index-mode.patch",
+    "failure": "078all40JARhashespass, then ExceptionInInitializerError inJarFilebytecodecheck. JavaMAP_ALL64bitdefault mismatchesnativeindex-onlymap; nestedconsolecausenotcaptured.",
+    "host": "PASS: actualJava/native/ZIP/JNI integration withUBSan; oldMAP_ALLmode reproducesJarFileinitializererror/Unicodebufferbounds; fixedPS5modewithforcedmapall=true anddesktopcontrolpass, exactObject/Unicode/HTTPS/DTLS/JFRresourceidentity. NativeASan/UBSancontrols retained. TargetJava/native rebuild passes.",
+    "console": "079verifyrow/serverstartup/nativeheadroom/readlatency/endurancepending; no milestonefreeze."
   }
 }

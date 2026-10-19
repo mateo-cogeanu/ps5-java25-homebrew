@@ -1942,3 +1942,11 @@ bytes on demand. It removes25.8MiBof persistent anonymous copy for the current
 image, keeps all modules and checked decompression, and handles short/interrupted
 reads. Native reader ASan/UBSan and target build pass;078PS5latency/headroom/
 stability remain pending. It does not implement a compiler OOM bailout.
+
+### Development: Java/native image-reader agreement
+
+[Patch0100](../docs/java25-java-image-reader-index-mode.md) aligns Java's
+BasicImageReader with PS5's index-only native map. A real Java/native/JNI
+integration test reproduces the old JarFile initializer failure and passes with
+the fix, including Unicode/HTTPS/DTLS/JFR byte identity and desktop control.
+The index-only saving is retained.079console verification/startup remains pending.

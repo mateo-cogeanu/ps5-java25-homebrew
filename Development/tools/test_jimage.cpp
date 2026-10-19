@@ -58,7 +58,7 @@ void read_object(const char *expected_root) {
  assert(JIMAGE_GetResource(image,location,reinterpret_cast<char *>(bytes.data()),size)==size);
  assert(bytes[0]==0xca && bytes[1]==0xfe && bytes[2]==0xba && bytes[3]==0xbe);
  assert(bytes[6]==0 && bytes[7]==69);
- const char *resources[][2]={{"java.base","java/lang/String.class"},{"java.base","java/lang/Object.class"},{"java.base","sun/security/ssl/SSLSocketImpl.class"},{"java.base","sun/security/ssl/DTLSInputRecord.class"},{"java.base","javax/net/ssl/HttpsURLConnection$DefaultHostnameVerifier.class"},{"java.base","sun/net/www/protocol/https/DelegateHttpsURLConnection.class"},{"jdk.jfr","jdk/jfr/internal/types/metadata.bin"},{"java.desktop","java/awt/Color.class"}};
+ const char *resources[][2]={{"java.base","java/lang/String.class"},{"java.base","jdk/internal/icu/impl/data/icudt76b/nfkc.nrm"},{"java.base","java/lang/Object.class"},{"java.base","sun/security/ssl/SSLSocketImpl.class"},{"java.base","sun/security/ssl/DTLSInputRecord.class"},{"java.base","javax/net/ssl/HttpsURLConnection$DefaultHostnameVerifier.class"},{"java.base","sun/net/www/protocol/https/DelegateHttpsURLConnection.class"},{"jdk.jfr","jdk/jfr/internal/types/metadata.bin"},{"java.desktop","java/awt/Color.class"}};
  for(auto &resource:resources){
   auto location=JIMAGE_FindResource(image,resource[0],"25",resource[1],&size);assert(location && size>0);
   std::vector<char> actual(static_cast<size_t>(size));assert(JIMAGE_GetResource(image,location,actual.data(),size)==size);

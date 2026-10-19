@@ -1,0 +1,14 @@
+--- a/src/java.base/share/classes/jdk/internal/jimage/BasicImageReader.java
++++ b/src/java.base/share/classes/jdk/internal/jimage/BasicImageReader.java
+@@ -65,7 +65,10 @@
+             isSystemProperty("sun.arch.data.model", "64", "32");
+     private static final boolean USE_JVM_MAP =
+             isSystemProperty("jdk.image.use.jvm.map", "true", "true");
+-    private static final boolean MAP_ALL =
++    // The PS5 native reader shares only its resident index. Its resource
++    // payloads must use explicit-offset reads even on a 64-bit VM.
++    private static final boolean IS_PS5 = isSystemProperty("os.name", "PS5", "");
++    private static final boolean MAP_ALL = !IS_PS5 &&
+             isSystemProperty("jdk.image.map.all", "true", IS_64_BIT ? "true" : "false");
+ 
+     private final Path imagePath;
