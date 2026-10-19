@@ -1950,3 +1950,11 @@ BasicImageReader with PS5's index-only native map. A real Java/native/JNI
 integration test reproduces the old JarFile initializer failure and passes with
 the fix, including Unicode/HTTPS/DTLS/JFR byte identity and desktop control.
 The index-only saving is retained.079console verification/startup remains pending.
+
+### Development: SerialGC code-cache pause review
+
+079now reaches readiness/join, but code-cache growth requests five full GC
+pauses totaling1.029seconds within the short console capture. The consumer080
+candidate[adjusts an existing threshold](../docs/java25-serial-codecache-pauses.md)
+while preserving aggressive near-full cleanup and memory limits. PS5pause
+frequency/nativeheadroom/endurance still need comparison; no freeze-free claim.

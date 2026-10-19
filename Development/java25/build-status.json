@@ -347,6 +347,6 @@
     "patch": "0100-ps5-java-image-reader-index-mode.patch",
     "failure": "078all40JARhashespass, then ExceptionInInitializerError inJarFilebytecodecheck. JavaMAP_ALL64bitdefault mismatchesnativeindex-onlymap; nestedconsolecausenotcaptured.",
     "host": "PASS: actualJava/native/ZIP/JNI integration withUBSan; oldMAP_ALLmode reproducesJarFileinitializererror/Unicodebufferbounds; fixedPS5modewithforcedmapall=true anddesktopcontrolpass, exactObject/Unicode/HTTPS/DTLS/JFRresourceidentity. NativeASan/UBSancontrols retained. TargetJava/native rebuild passes.",
-    "console": "079verifyrow/serverstartup/nativeheadroom/readlatency/endurancepending; no milestonefreeze."
+    "console": "079now reaches normal-world readiness and authenticated join; user reports shorter/morefrequent freezes. Current49sJVMcapture has5CodeCacheGCThreshold fullpauses177.555-269.367ms. NotALLPASS/endurance."
   }
 }
