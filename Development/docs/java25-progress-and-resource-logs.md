@@ -11,3 +11,21 @@ Build 025 leaves no direct native termination or fatal-signal marker. Raw logs r
 Validation: native HTTP/collector ASan/UBSan checks new report archive/removal, downloads, allowlist and existing behavior; actual host resource sample and write failure preserve errno. Java25 accepts the class logger option and emits class records. Actual verifier allocator under ASan/UBSan performs 1200 forced fallback mappings, emits 9 success records, retains a mapping-failure record, preserves errno and cleans every mapping. Target java.base-libs builds successfully; PS5 telemetry and crash resolution remain pending.
 
 A consumer JNI `vfprintf` hook must honor non-console FILE targets. Redirecting every stream to the startup capture leaves the class-log file empty even though class records appear in startup.log. The Minecraft consumer corrects this routing separately; the runtime logger itself is unchanged.
+
+
+## Bounded thrown-exception diagnostics (consumer087)
+
+The fixed allowlist now also serves `/exceptions.log` and
+`/exceptions-rotated.log`, plus matching previous-run routes. Consumers can use
+HotSpot's standard `-Xlog:exceptions=info` with `filesize=8M,filecount=1` to
+retain the active file and one rotated file (about16MiB total, with possible
+single-record overshoot). Exceptions that applications catch without printing
+may then have VM throw-site/handler evidence. This includes expected exceptions;
+a thrown exception alone is not a failure diagnosis. This diagnostic setting can
+add I/O overhead and is not a performance acceptance configuration.
+
+Session initialization archives both files and clears them only after successful
+copy; reopening the app alone preserves them. The collector includes both current
+files and records missing files in its manifest. The actual HTTP/collector test
+checks exact binary downloads and archival of both files under ASan/UBSan.
+No runtime exception handling or application bytecode is changed.

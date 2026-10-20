@@ -360,6 +360,11 @@
     "patch": "0102-ps5-share-direct-memory-with-zip-image.patch",
     "scope": "Two PS5-only VM C ABI helpers share0101ledger/budget with libzip stream/zlib callbacks and libjimage temporary buffers after anonymous-map ENOMEM; exact per-allocation backend tags and errno/zeroing/decode contracts retained.",
     "host": "PASS: actual ZIP JNI/VM bridge/shared ledger over real aligned kernel-model storage under refused libc/pages; raw/wrapped compression/ZipFS writes+reads, direct partial-init refusal and cleanup. ASan/UBSan allocator1024zlib lifetimes and actual image/ZIP direct input-output/decode buffers, partial budgets/byte preservation/exact Path$1/HTTPS/DTLS bytes; existing I/O/corruption controls. Actual Java/native/JNI PS5/desktop image controls pass. Exact patch application/HotSpot+java.base native build/two exports pass.",
-    "console": "Pending; player/world persistence, native headroom, compression/image pressure and stability unvalidated. No compiler bailout or universal native-allocation fix."
+    "console": "086 joins and runs through120s health at20TPS, then player-save warning on disconnect makes harness fail; prior Deflater/image exceptions absent in capture. Actual player persistence unresolved, not ALL PASS."
+  },
+  "exception_log_sharing": {
+    "scope": "Fixed read-only routes for bounded HotSpot thrown-exception active/rotated files and previous-run archive; collector includes current pair. No exception semantics change.",
+    "host": "PASS: actual native HTTP and collector ASan/UBSan, exact binary pair downloads and archive/clear behavior.",
+    "console": "Consumer087 pending PS5; diagnostic overhead and hidden player-save cause unresolved."
   }
 }

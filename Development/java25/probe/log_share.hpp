@@ -31,6 +31,10 @@ inline constexpr Entry files[]={
  {"/class-load.log","/download0/java25-class-load.log"},
  {"/process-usage.log","/download0/process-usage.log"},
  {"/jit.log","/download0/java25-jit.log"},
+ {"/exceptions.log","/download0/java25-exceptions.log"},
+ {"/exceptions-rotated.log","/download0/java25-exceptions.log.0"},
+ {"/previous-exceptions.log","/download0/previous-java25-exceptions.log"},
+ {"/previous-exceptions-rotated.log","/download0/previous-java25-exceptions.log.0"},
  {"/previous-jit.log","/download0/previous-java25-jit.log"},
  {"/previous-class-load.log","/download0/previous-java25-class-load.log"},
  {"/previous-process-usage.log","/download0/previous-process-usage.log"},
@@ -59,8 +63,8 @@ inline bool archive_report(const char *path,const char *previous) {
 }
 inline bool begin_session(const char *build,const char *run,const char *root="/download0") {
  char path[640],backup[640],note[512];bool ok=true;
- const char *current[]={"probe-exception.txt","mc-bootstrap-abort.txt","mc-server-start/server-console.log","hs_err_java25.log","java25-class-load.log","process-usage.log","probe-verification-exception.txt","probe-server-exception.txt","java25-jit.log"};
- const char *old[]={"previous-probe-exception.txt","previous-mc-bootstrap-abort.txt","mc-server-start/previous-server-console.log","previous-hs_err_java25.log","previous-java25-class-load.log","previous-process-usage.log","previous-probe-verification-exception.txt","previous-probe-server-exception.txt","previous-java25-jit.log"};
+ const char *current[]={"probe-exception.txt","mc-bootstrap-abort.txt","mc-server-start/server-console.log","hs_err_java25.log","java25-class-load.log","process-usage.log","probe-verification-exception.txt","probe-server-exception.txt","java25-jit.log","java25-exceptions.log","java25-exceptions.log.0"};
+ const char *old[]={"previous-probe-exception.txt","previous-mc-bootstrap-abort.txt","mc-server-start/previous-server-console.log","previous-hs_err_java25.log","previous-java25-class-load.log","previous-process-usage.log","previous-probe-verification-exception.txt","previous-probe-server-exception.txt","previous-java25-jit.log","previous-java25-exceptions.log","previous-java25-exceptions.log.0"};
  for(size_t i=0;i<sizeof(current)/sizeof(current[0]);++i){
   std::snprintf(path,sizeof(path),"%s/%s",root,current[i]);std::snprintf(backup,sizeof(backup),"%s/%s",root,old[i]);
   if(!archive_report(path,backup)){ok=false;continue;}
@@ -115,7 +119,7 @@ inline void serve(int fd,const Entry *available=files,size_t count=sizeof(files)
  if(std::sscanf(request,"%15s %255s %15s",method,url,version)!=3){reply(fd,400,"Bad Request","Bad request\n");return;}
  if(std::strcmp(method,"GET")){reply(fd,405,"Method Not Allowed","GET only\n");return;}
  if(!std::strcmp(url,"/")) {
-  reply(fd,200,"OK","<!doctype html><meta charset=utf-8><title>PS5 probe logs</title><h1>PS5 probe logs</h1><p>Read-only LAN downloads. Keep the probe open. Refresh to collect newer output. Missing files return 404. Build identifies the open app; session identifies the recorded run. Startup log contains historical runs.</p><ul><li><a href=/build.txt>Open app build</a><li><a href=/session.txt>Recorded run status</a><li><a href=/startup-tail.log>Startup tail (last 512 KiB)</a><li><a href=/startup.log>Full startup history</a><li><a href=/vm-trace.log>Native VM trace</a><li><a href=/server.log>Full Minecraft console</a><li><a href=/abort.txt>Last JVM abort</a><li><a href=/class-load.log>Class loading progress</a><li><a href=/process-usage.log>Native resource samples</a><li><a href=/jit.log>JIT compilation</a><li><a href=/previous-jit.log>Previous JIT compilation</a><li><a href=/hs-error.log>JVM fatal error report</a><li><a href=/previous-hs-error.log>Previous JVM fatal error report</a><li><a href=/verification-exception.txt>Verification failure</a><li><a href=/server-exception.txt>Server test failure</a><li><a href=/exception.txt>Current-run probe exception</a><li><a href=/previous-exception.txt>Previous-run exception</a><li><a href=/previous-abort.txt>Previous-run abort</a><li><a href=/previous-server.log>Previous-run server output</a></ul>","text/html; charset=utf-8");return;
+  reply(fd,200,"OK","<!doctype html><meta charset=utf-8><title>PS5 probe logs</title><h1>PS5 probe logs</h1><p>Read-only LAN downloads. Keep the probe open. Refresh to collect newer output. Missing files return 404. Build identifies the open app; session identifies the recorded run. Startup log contains historical runs.</p><ul><li><a href=/build.txt>Open app build</a><li><a href=/session.txt>Recorded run status</a><li><a href=/startup-tail.log>Startup tail (last 512 KiB)</a><li><a href=/startup.log>Full startup history</a><li><a href=/vm-trace.log>Native VM trace</a><li><a href=/server.log>Full Minecraft console</a><li><a href=/abort.txt>Last JVM abort</a><li><a href=/class-load.log>Class loading progress</a><li><a href=/process-usage.log>Native resource samples</a><li><a href=/exceptions.log>Java thrown exceptions</a><li><a href=/exceptions-rotated.log>Java thrown exceptions (rotated)</a><li><a href=/previous-exceptions.log>Previous Java thrown exceptions</a><li><a href=/previous-exceptions-rotated.log>Previous Java thrown exceptions (rotated)</a><li><a href=/jit.log>JIT compilation</a><li><a href=/previous-jit.log>Previous JIT compilation</a><li><a href=/hs-error.log>JVM fatal error report</a><li><a href=/previous-hs-error.log>Previous JVM fatal error report</a><li><a href=/verification-exception.txt>Verification failure</a><li><a href=/server-exception.txt>Server test failure</a><li><a href=/exception.txt>Current-run probe exception</a><li><a href=/previous-exception.txt>Previous-run exception</a><li><a href=/previous-abort.txt>Previous-run abort</a><li><a href=/previous-server.log>Previous-run server output</a></ul>","text/html; charset=utf-8");return;
  }
  const char *path=nullptr;for(size_t i=0;i<count;++i)if(!std::strcmp(url,available[i].url))path=available[i].path;
  if(!path){reply(fd,404,"Not Found","Unknown log\n");return;}
