@@ -354,6 +354,12 @@
     "patch": "0101-ps5-native-direct-memory-fallback.patch",
     "scope": "Raw native allocator only: libc -> anonymous pages -> bounded direct-memory fallback on ENOMEM; no Java heap/metaspace/codecache mapping change.2048slots/128MiB held budget; CPU RW/no fixed mapping.",
     "host": "PASS: actual allocator/direct ledger ASan/UBSan with real aligned storage and simulated kernel success/refusal/rollback/unmap/release failure/budget/slot limits/4000concurrent lifetimes. Existing os.cpp NMT/preinit regression with unavailable direct backend passes. Exact clean patch application and targetHotSpot build pass.",
-    "console": "Pending; direct kernel behavior/cache/headroom/stability unvalidated. No compiler OOM bailout; all-backend failure retains fatal contract. Other allocators remain unchanged."
+    "console": "PS5consumer085 confirms2064mappings/2000releases,3309568lastheld/10059776peak observed held bytes and0reported direct failures; then native ZIP Deflater.init OOM and image decode errors stop server. Not universal stability/headroom proof."
+  },
+  "zip_image_direct_fallback": {
+    "patch": "0102-ps5-share-direct-memory-with-zip-image.patch",
+    "scope": "Two PS5-only VM C ABI helpers share0101ledger/budget with libzip stream/zlib callbacks and libjimage temporary buffers after anonymous-map ENOMEM; exact per-allocation backend tags and errno/zeroing/decode contracts retained.",
+    "host": "PASS: actual ZIP JNI/VM bridge/shared ledger over real aligned kernel-model storage under refused libc/pages; raw/wrapped compression/ZipFS writes+reads, direct partial-init refusal and cleanup. ASan/UBSan allocator1024zlib lifetimes and actual image/ZIP direct input-output/decode buffers, partial budgets/byte preservation/exact Path$1/HTTPS/DTLS bytes; existing I/O/corruption controls. Actual Java/native/JNI PS5/desktop image controls pass. Exact patch application/HotSpot+java.base native build/two exports pass.",
+    "console": "Pending; player/world persistence, native headroom, compression/image pressure and stability unvalidated. No compiler bailout or universal native-allocation fix."
   }
 }

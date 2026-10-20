@@ -2,6 +2,7 @@
 """Actual Java image reader + actual index-only native reader/JNI on host JDK25."""
 from pathlib import Path
 import subprocess,os
+from java25_direct_memory_fixture import build as build_direct
 r=Path(__file__).resolve().parents[1];src=r/'.tools/java25/openjdk';w=r/'build/java25/image-handoff';w.mkdir(parents=True,exist_ok=True)
 j=Path(os.environ.get('JAVA25_BOOT_JDK','/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home'))
 share=src/'src/java.base/share/native/libjimage';zipbase=src/'src/java.base/share/native/libzip'
@@ -27,7 +28,8 @@ for name in ['endian.cpp','imageDecompressor.cpp','imageFile.cpp','jimage.cpp','
 for path in [src/'src/java.base/unix/native/libjimage/osSupport_unix.cpp',w/'prepare.cpp']:
  obj=w/(path.stem+'.o');subprocess.run(['/usr/bin/clang++','-std=c++14',*base,'-c',str(path),'-o',str(obj)],check=True);objects.append(str(obj))
 lib=w/'libimagehandoff.dylib'
-subprocess.run(['/usr/bin/clang++','-dynamiclib','-fsanitize=undefined',*objects,str(w/'zip.o'),'-L'+str(j/'lib/server'),'-Wl,-rpath,'+str(j/'lib/server'),'-ljvm','-lz','-o',str(lib)],check=True)
+direct_object=build_direct(r,w,j,['-fsanitize=undefined'])
+subprocess.run(['/usr/bin/clang++','-dynamiclib','-fsanitize=undefined',direct_object,*objects,str(w/'zip.o'),'-L'+str(j/'lib/server'),'-Wl,-rpath,'+str(j/'lib/server'),'-ljvm','-lz','-o',str(lib)],check=True)
 actual=src/'src/java.base/share/classes/jdk/internal/jimage/BasicImageReader.java'
 native='''package jdk.internal.jimage;
 import java.nio.ByteBuffer;

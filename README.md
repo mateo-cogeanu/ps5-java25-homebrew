@@ -19,7 +19,7 @@ This repository contains the **Java runtime port, platform adaptations and accep
 
 **Related project:** [ps5-minecraft-java](https://github.com/mateo-cogeanu/ps5-minecraft-java) uses this runtime and tracks Minecraft-specific work and console milestones separately.
 
-Development is testing a [bounded native direct-memory fallback](Development/docs/java25-native-direct-fallback.md) after a consumer C1 allocation failure. Host allocator checks and the target build pass; PS5 validation is pending.
+Development is testing a [shared native direct-memory fallback](Development/docs/java25-zip-image-direct-memory.md) for raw allocations, ZIP compression and image buffers. Raw mapping/release is observed on PS5; the ZIP/image extension passes host checks and target builds, with console validation pending.
 
 ## Milestones
 

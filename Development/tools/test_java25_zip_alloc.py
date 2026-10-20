@@ -2,7 +2,9 @@
 """Run actual Inflater/Deflater JNI with forced libc failure and bounded mmap fallback."""
 from pathlib import Path
 import subprocess,re
+from java25_direct_memory_fixture import build as build_direct
 r=Path(__file__).resolve().parents[1];w=r/'build/java25/zip-alloc-test';w.mkdir(parents=True,exist_ok=True);base=r/'.tools/java25/openjdk/src/java.base/share/native/libzip';headers=r/'.tools/java25/openjdk/build/ps5-bootstrap/support/headers/java.base';jdk=Path('/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home')
+direct_object=build_direct(r,w,jdk)
 prefix=r'''
 #include <jni.h>
 #include <stdint.h>
@@ -45,19 +47,22 @@ bridge=r'''
 #include <stdlib.h>
 #include "java_util_zip_Inflater.h"
 #include "java_util_zip_Deflater.h"
+extern int ps5_test_direct_live(void);extern int ps5_test_direct_maps(void);extern void ps5_test_direct_mode(int);
 int zip_deny=0,zip_budget=-1,zip_live=0;
+JNIEXPORT void JNICALL Java_ZipAllocTest_directMode(JNIEnv*env,jclass c,jint n){ps5_test_direct_mode(n);}
+JNIEXPORT jint JNICALL Java_ZipAllocTest_directMaps(JNIEnv*env,jclass c){return ps5_test_direct_maps();}
 JNIEXPORT void JNICALL Java_ZipAllocTest_mode(JNIEnv*env,jclass c,jint deny,jint budget){zip_deny=deny;zip_budget=budget;}
-JNIEXPORT jint JNICALL Java_ZipAllocTest_live(JNIEnv*env,jclass c){return zip_live;}
+JNIEXPORT jint JNICALL Java_ZipAllocTest_live(JNIEnv*env,jclass c){return zip_live+ps5_test_direct_live();}
 JNIEXPORT void JNICALL Java_ZipAllocTest_install(JNIEnv*env,jclass c){
 '''+''.join(hookparts)+r'''
 Java_java_util_zip_Inflater_initIDs(env,Inflater);
 }
 ''';p=w/'bridge.c';p.write_text(bridge);sources.append(str(p))
-subprocess.run(['clang','-O1','-g','-dynamiclib','-undefined','dynamic_lookup','-I'+str(jdk/'include'),'-I'+str(jdk/'include/darwin'),'-I'+str(headers),'-I'+str(base),*sources,'-lz','-o',str(w/'libtest.dylib')],check=True)
+subprocess.run(['clang','-O1','-g','-dynamiclib','-undefined','dynamic_lookup','-I'+str(jdk/'include'),'-I'+str(jdk/'include/darwin'),'-I'+str(headers),'-I'+str(base),*sources,direct_object,'-lz','-o',str(w/'libtest.dylib')],check=True)
 p=w/'ZipAllocTest.java';p.write_text(r'''
 import java.util.*;import java.util.zip.*;import java.nio.file.*;import java.nio.*;
 public class ZipAllocTest{
- static native void install();static native void mode(int deny,int budget);static native int live();
+ static native void install();static native void mode(int deny,int budget);static native int live();static native void directMode(int budget);static native int directMaps();
  static void roundtrip(boolean raw)throws Exception{
   byte[]input=new byte[120000],packed=new byte[121000],output=new byte[120000];new Random(37).nextBytes(input);
   int size;try(Deflater d=new Deflater(6,raw)){d.setInput(input);d.finish();size=d.deflate(packed);if(!d.finished())throw new AssertionError("deflate");}
@@ -75,7 +80,19 @@ public class ZipAllocTest{
  }finally{Files.deleteIfExists(jar);}
  for(int budget:new int[]{0,1}){mode(1,budget);try(Inflater ignored=new Inflater()){throw new AssertionError("exhaustion accepted");}catch(OutOfMemoryError expected){}if(live()!=0)throw new AssertionError("failed init leak");}
  mode(1,2);try(Deflater ignored=new Deflater()){throw new AssertionError("deflater exhaustion accepted");}catch(OutOfMemoryError expected){}if(live()!=0)throw new AssertionError("deflater failed init leak");
- mode(1,-1);System.out.println("PASS: actual complete Inflater/Deflater JNI and zlib callbacks, native/mapped raw+wrapped128 roundtrips, real ZipFS compressed asset, allocation-budget failure cleanup and genuine OOM");
+ // Force both libc and anonymous mapping refusal; execute the real VM bridge
+ // and shared ledger over real aligned storage from the controlled kernel.
+ mode(1,0);directMode(-1);for(int n=0;n<64;n++){roundtrip(false);roundtrip(true);}
+ if(directMaps()==0)throw new AssertionError("No direct allocation used");
+ Path directJar=Files.createTempFile("ps5-direct-zipfs-",".zip");Files.delete(directJar);
+ try{
+  try(var fs=FileSystems.newFileSystem(directJar,Map.of("create","true"))){Files.writeString(fs.getPath("/asset"),"world-save".repeat(10000));}
+  try(var fs=FileSystems.newFileSystem(directJar,Map.of())){if(!Files.readString(fs.getPath("/asset")).equals("world-save".repeat(10000)))throw new AssertionError("Direct ZipFS content");}
+ }finally{Files.deleteIfExists(directJar);}
+ if(live()!=0)throw new AssertionError("Direct ZipFS leak");
+ for(int budget:new int[]{0,1}){directMode(budget);try(Inflater ignored=new Inflater()){throw new AssertionError("direct exhaustion accepted");}catch(OutOfMemoryError expected){}if(live()!=0)throw new AssertionError("direct init leak");}
+ directMode(2);try(Deflater ignored=new Deflater()){throw new AssertionError("direct deflater exhaustion accepted");}catch(OutOfMemoryError expected){}if(live()!=0)throw new AssertionError("direct deflater failed init leak");
+ directMode(0);mode(1,-1);System.out.println("PASS: actual complete Inflater/Deflater JNI and zlib callbacks, native/mapped/shared-direct raw+wrapped roundtrips, real ZipFS compressed asset, allocation-budget failure cleanup and genuine OOM");
  }
 }''');subprocess.run([str(jdk/'bin/javac'),'-d',str(w),str(p)],check=True);subprocess.run([str(jdk/'bin/java'),'-Xint','--enable-native-access=ALL-UNNAMED','-cp',str(w),'ZipAllocTest',str(w/'libtest.dylib')],check=True)
 # Sanitizers on the actual allocator and actual zlib under refused libc allocation.
@@ -95,4 +112,4 @@ int main(){
  for(int i=0;i<1024;i++){z_stream s={0};s.zalloc=ps5_zip_zalloc;s.zfree=ps5_zip_zfree;assert(inflateInit(&s)==Z_OK);assert(inflateEnd(&s)==Z_OK);}
  return 0;
 }
-''');subprocess.run(['clang','-O1','-g','-fsanitize=address,undefined','-I'+str(base),str(p),'-lz','-o',str(w/'allocator')],check=True);subprocess.run([str(w/'allocator')],check=True);print('PASS: actual allocator ASan/UBSan zeroing/alignment/overflow/errno and1024 real zlib lifetimes')
+''');subprocess.run(['clang','-O1','-g','-fsanitize=address,undefined','-I'+str(base),'-I'+str(jdk/'include'),'-I'+str(jdk/'include/darwin'),str(p),build_direct(r,w/'sanitized',jdk,['-fsanitize=address,undefined']),'-lz','-o',str(w/'allocator')],check=True);subprocess.run([str(w/'allocator')],check=True);print('PASS: actual allocator ASan/UBSan zeroing/alignment/overflow/errno and1024 real zlib lifetimes')

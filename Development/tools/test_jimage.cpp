@@ -20,6 +20,9 @@
 extern "C" void zip_test_mode(int,int);
 extern "C" int zip_test_live();
 extern "C" int zip_test_maps();
+extern "C" void ps5_test_direct_mode(int);
+extern "C" int ps5_test_direct_live();
+extern "C" int ps5_test_direct_maps();
 extern "C" jboolean ZIP_InflateFully(void*,jlong,void*,jlong,char**);
 static bool image_deny=false;
 static int image_budget=-1,image_live=0,image_maps=0;
@@ -58,7 +61,7 @@ void read_object(const char *expected_root) {
  assert(JIMAGE_GetResource(image,location,reinterpret_cast<char *>(bytes.data()),size)==size);
  assert(bytes[0]==0xca && bytes[1]==0xfe && bytes[2]==0xba && bytes[3]==0xbe);
  assert(bytes[6]==0 && bytes[7]==69);
- const char *resources[][2]={{"java.base","java/lang/String.class"},{"java.base","jdk/internal/icu/impl/data/icudt76b/nfkc.nrm"},{"java.base","java/lang/Object.class"},{"java.base","sun/security/ssl/SSLSocketImpl.class"},{"java.base","sun/security/ssl/DTLSInputRecord.class"},{"java.base","javax/net/ssl/HttpsURLConnection$DefaultHostnameVerifier.class"},{"java.base","sun/net/www/protocol/https/DelegateHttpsURLConnection.class"},{"jdk.jfr","jdk/jfr/internal/types/metadata.bin"},{"java.desktop","java/awt/Color.class"}};
+ const char *resources[][2]={{"java.base","java/nio/file/Path$1.class"},{"java.base","java/lang/String.class"},{"java.base","jdk/internal/icu/impl/data/icudt76b/nfkc.nrm"},{"java.base","java/lang/Object.class"},{"java.base","sun/security/ssl/SSLSocketImpl.class"},{"java.base","sun/security/ssl/DTLSInputRecord.class"},{"java.base","javax/net/ssl/HttpsURLConnection$DefaultHostnameVerifier.class"},{"java.base","sun/net/www/protocol/https/DelegateHttpsURLConnection.class"},{"jdk.jfr","jdk/jfr/internal/types/metadata.bin"},{"java.desktop","java/awt/Color.class"}};
  for(auto &resource:resources){
   auto location=JIMAGE_FindResource(image,resource[0],"25",resource[1],&size);assert(location && size>0);
   std::vector<char> actual(static_cast<size_t>(size));assert(JIMAGE_GetResource(image,location,actual.data(),size)==size);
@@ -112,6 +115,24 @@ int main(int argc,char **argv) {
   for(char b:buffer)assert(b==0x5a);assert(image_live==0);
  }
  image_budget=2;assert(JIMAGE_GetResource(image,location,buffer.data(),bytes)==bytes);assert(image_live==0);
+ // Both resource buffers and zlib must survive refused libc/anonymous pages,
+ // sharing the real VM direct ledger. The cold Path$1 resource failed on085.
+ image_budget=0;zip_test_mode(1,0);
+ for(const char* resource:{"java/nio/file/Path$1.class","sun/security/ssl/DTLSInputRecord.class","sun/net/www/protocol/https/DelegateHttpsURLConnection.class"}) {
+  jlong size=0;auto where=JIMAGE_FindResource(image,"java.base","25",resource,&size);assert(where&&size>0);
+  for(int budget:{0,1}) {
+   ps5_test_direct_mode(budget);std::vector<char> denied(size,0x5a);
+   assert(JIMAGE_GetResource(image,where,denied.data(),size)==0);
+   for(char b:denied)assert(b==0x5a);
+   assert(ps5_test_direct_live()==0&&image_live==0&&zip_test_live()==0);
+  }
+  ps5_test_direct_mode(-1);std::vector<char> actual(size);assert(JIMAGE_GetResource(image,where,actual.data(),size)==size);
+  std::ifstream input(std::string(argv[1])+"/java.base/"+resource,std::ios::binary);assert(input);
+  std::vector<char> expected((std::istreambuf_iterator<char>(input)),{});assert(actual==expected);
+  assert(ps5_test_direct_maps()>0&&ps5_test_direct_live()==0&&image_live==0&&zip_test_live()==0);
+ }
+ ps5_test_direct_mode(0);zip_test_mode(1,-1);
+
  image_budget=-1;image_deny=false;
  for(int mode: {2,3}) {
   read_mode=mode;buffer.assign(bytes,0x5a);assert(JIMAGE_GetResource(image,location,buffer.data(),bytes)==0);
@@ -128,5 +149,5 @@ int main(int argc,char **argv) {
  jint error=0;
  assert(!JIMAGE_Open("build/java25/boot-image/lib/modules",&error));
  assert(file_mappings==0 && anonymous_mappings==8);
- std::puts("Real JIMAGE reader PASS: index-only anonymous copies below2MiB, zero file mappings, short/EINTR/EIO/EOF pread controls, actual ZIP and image-buffer allocation fallback/refusal/cleanup/recovery; truncated/corrupt controls; DTLS/classes/TLS/JFR/desktop identity; failed decode returns0 without publishing bytes; mapping rejection");
+ std::puts("Real JIMAGE reader PASS: index-only anonymous copies below2MiB, zero file mappings, short/EINTR/EIO/EOF pread controls, actual ZIP and image-buffer libc/page/shared-direct fallback/refusal/cleanup/recovery; truncated/corrupt controls; DTLS/classes/TLS/JFR/desktop identity; failed decode returns0 without publishing bytes; mapping rejection");
 }

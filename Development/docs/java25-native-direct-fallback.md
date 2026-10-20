@@ -1,5 +1,9 @@
 # PS5 native allocator direct-memory fallback (0101)
 
+Update: raw direct mapping/release is observed on PS5, but a native ZIP save
+allocation then fails. [0102](java25-zip-image-direct-memory.md) extends the same
+ledger to ZIP/image temporary buffers. The original0101scope below is historical.
+
 A consumer's current-run fatal report identifies C1 native arena allocation
 failure:32664bytes requested, followed by two failed32KiB anonymous-page attempts
 with ENOMEM, then Chunk::new abort. The fault occurs124.632seconds into the JVM.

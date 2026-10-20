@@ -4,6 +4,7 @@ from pathlib import Path
 import os
 import subprocess
 import tempfile
+from java25_direct_memory_fixture import build as build_direct
 ROOT=Path(__file__).resolve().parents[1]
 source=ROOT/'.tools/java25/openjdk'
 work=ROOT/'build/java25'
@@ -57,7 +58,8 @@ extern "C" int image_test_unmap(void*,size_t);
 engine=[]
 for name in ['endian.cpp','imageDecompressor.cpp','imageFile.cpp','jimage.cpp']:
     obj=work/('host-'+name+'.o');subprocess.run(base+['-DNDEBUG','-include',str(work/'host-image-buffer-test.hpp'),'-c',str(share/name),'-o',str(obj)],check=True);engine.append(str(obj))
-subprocess.run(base+[str(ROOT/'tools/test_jimage.cpp'),*engine,str(work/'host-jimage-os.o'),'-L'+str(jdk/'lib/server'),'-Wl,-rpath,'+str(jdk/'lib/server'),'-ljvm',str(work/'host-jimage-zip.o'),'-lz','-o',str(work/'test-jimage')],check=True)
+direct_object=build_direct(ROOT,work,jdk,['-fsanitize=address,undefined'])
+subprocess.run(base+[direct_object,str(ROOT/'tools/test_jimage.cpp'),*engine,str(work/'host-jimage-os.o'),'-L'+str(jdk/'lib/server'),'-Wl,-rpath,'+str(jdk/'lib/server'),'-ljvm',str(work/'host-jimage-zip.o'),'-lz','-o',str(work/'test-jimage')],check=True)
 with tempfile.TemporaryDirectory(prefix='ps5-jimage-identity-') as expected:
     subprocess.run([str(jdk/'bin/jimage'),'extract','--dir',expected,str(work/'boot-image/lib/modules')],check=True)
     subprocess.run([str(work/'test-jimage'),expected],cwd=ROOT,check=True,timeout=20)

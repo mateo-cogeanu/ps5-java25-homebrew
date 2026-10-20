@@ -1,0 +1,108 @@
+--- a/src/hotspot/share/runtime/os.cpp
++++ b/src/hotspot/share/runtime/os.cpp
+@@ -2673,3 +2673,23 @@
+   }
+   return agent_entry_name;
+ }
++
++#ifdef __PROSPERO__
++// Native-library pressure shares the raw allocator's exact ledger/budget.
++// No JNI transition or JavaThread dependency: image decoding also uses this
++// path during early bootstrap. Only native data can use these CPU RW mappings.
++extern "C" JNIEXPORT void* JNICALL JVM_PS5MapNativeMemory(size_t bytes) {
++  int saved=errno;
++  void* result=ps5_native_direct::map(bytes);
++  ps5_native_direct::report();
++  if(result!=MAP_FAILED)errno=saved;
++  return result;
++}
++extern "C" JNIEXPORT int JNICALL JVM_PS5UnmapNativeMemory(void* address,size_t bytes) {
++  int saved=errno,result=-1;
++  if(!ps5_native_direct::unmap(address,bytes,&result))errno=EINVAL;
++  ps5_native_direct::report();
++  if(result==0)errno=saved;
++  return result;
++}
++#endif
+--- a/src/java.base/share/native/libzip/ps5ZipAlloc.h
++++ b/src/java.base/share/native/libzip/ps5ZipAlloc.h
+@@ -7,6 +7,7 @@
+ #include <string.h>
+ #include <errno.h>
+ #include <sys/mman.h>
++#include "../libjava/ps5NativeMemory.h"
+ /* One ownership prefix for the stream and zlib's private allocations. */
+ typedef union {max_align_t alignment;struct{size_t mapped;}owner;} Ps5ZipAllocation;
+ static void* ps5_zip_calloc(size_t count,size_t size) {
+@@ -21,6 +22,10 @@
+         if(total>SIZE_MAX-(page-1)){errno=ENOMEM;return NULL;}
+         mapped=(total+page-1)&~(page-1);
+         base=mmap(NULL,mapped,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
++        if(base==MAP_FAILED&&errno==ENOMEM){
++            base=JVM_PS5MapNativeMemory(mapped);
++            if(base!=MAP_FAILED)mapped|=1; /* Low bit tags shared direct ownership. */
++        }
+         if(base==MAP_FAILED)return NULL;
+     }
+     base->owner.mapped=mapped;void*result=base+1;memset(result,0,bytes);errno=saved;return result;
+@@ -28,7 +33,8 @@
+ static void ps5_zip_free(void*value) {
+     if(!value)return;
+     int saved=errno;Ps5ZipAllocation*base=(Ps5ZipAllocation*)value-1;
+-    if(base->owner.mapped)munmap(base,base->owner.mapped);else free(base);
++    if(base->owner.mapped&1)JVM_PS5UnmapNativeMemory(base,base->owner.mapped&~(size_t)1);
++    else if(base->owner.mapped)munmap(base,base->owner.mapped);else free(base);
+     errno=saved;
+ }
+ static voidpf ps5_zip_zalloc(voidpf opaque,uInt count,uInt size){(void)opaque;return ps5_zip_calloc(count,size);}
+--- a/src/java.base/share/native/libjimage/imageResourceBuffer.hpp
++++ b/src/java.base/share/native/libjimage/imageResourceBuffer.hpp
+@@ -8,6 +8,7 @@
+ #include <stdio.h>
+ #ifdef __PROSPERO__
+ #include <sys/mman.h>
++#include "../libjava/ps5NativeMemory.h"
+ #endif
+ #ifndef IMAGE_BUFFER_MALLOC
+ #define IMAGE_BUFFER_MALLOC malloc
+@@ -28,6 +29,10 @@
+         if(total>SIZE_MAX-(page-1)){errno=ENOMEM;return NULL;}
+         mapped=(total+page-1)&~(page-1);
+         void* p=IMAGE_BUFFER_MMAP(NULL,mapped,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
++        if(p==MAP_FAILED&&errno==ENOMEM){
++            p=JVM_PS5MapNativeMemory(mapped);
++            if(p!=MAP_FAILED)mapped|=1;
++        }
+         if(p!=MAP_FAILED)base=(ImageBufferOwner*)p;
+     }
+ #endif
+@@ -38,7 +43,8 @@
+     if(!buffer)return;
+     int saved=errno;ImageBufferOwner* base=(ImageBufferOwner*)buffer-1;
+ #ifdef __PROSPERO__
+-    if(base->mapped)IMAGE_BUFFER_MUNMAP(base,base->mapped);else
++    if(base->mapped&1)JVM_PS5UnmapNativeMemory(base,base->mapped&~(size_t)1);
++    else if(base->mapped)IMAGE_BUFFER_MUNMAP(base,base->mapped);else
+ #endif
+     IMAGE_BUFFER_FREE(base);
+     errno=saved;
+--- /dev/null
++++ b/src/java.base/share/native/libjava/ps5NativeMemory.h
+@@ -0,0 +1,17 @@
++/* SPDX-License-Identifier: GPL-2.0-only WITH Classpath-exception-2.0 */
++#ifndef PS5_NATIVE_MEMORY_H
++#define PS5_NATIVE_MEMORY_H
++#include <stddef.h>
++#include "jni.h"
++#ifdef __cplusplus
++extern "C" {
++#endif
++/* Shared VM ledger: MAP_FAILED on refusal; zero on successful release.
++ * These helpers neither safepoint nor require an initialized JavaThread.
++ * Call only for owned native data, never Java heap or executable mappings. */
++JNIEXPORT void* JNICALL JVM_PS5MapNativeMemory(size_t bytes);
++JNIEXPORT int JNICALL JVM_PS5UnmapNativeMemory(void* address,size_t bytes);
++#ifdef __cplusplus
++}
++#endif
++#endif
