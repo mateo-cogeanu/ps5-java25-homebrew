@@ -32,6 +32,12 @@ static void* test_malloc(size_t n){if(deny_heap)return nullptr;void* p=std::mall
 static void* test_realloc(void* p,size_t n){if(deny_heap||deny_resize)return nullptr;return std::realloc(p,n);}
 static void test_free(void* p){if(p)--heap_live;std::free(p);}
 static void test_note();
+extern "C" size_t sceKernelGetDirectMemorySize(){return 0;}
+extern "C" int sceKernelAllocateDirectMemory(int64_t,int64_t,size_t,size_t,int,int64_t*){return -1;}
+extern "C" int sceKernelMapDirectMemory(void**,size_t,int,int,int64_t,size_t){return -1;}
+extern "C" int sceKernelMunmap(void*,size_t){return -1;}
+extern "C" int sceKernelReleaseDirectMemory(int64_t,size_t){return -1;}
+
 static void* test_mmap(void* p,size_t n,int prot,int flags,int fd,off_t off){
  if(deny_maps||n>map_limit){errno=ENOMEM;return MAP_FAILED;}
  void* memory=::mmap(p,n,prot,flags,fd,off);if(memory!=MAP_FAILED){++map_live;++map_total;}return memory;

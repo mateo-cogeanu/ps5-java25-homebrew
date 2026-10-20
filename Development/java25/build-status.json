@@ -348,5 +348,12 @@
     "failure": "078all40JARhashespass, then ExceptionInInitializerError inJarFilebytecodecheck. JavaMAP_ALL64bitdefault mismatchesnativeindex-onlymap; nestedconsolecausenotcaptured.",
     "host": "PASS: actualJava/native/ZIP/JNI integration withUBSan; oldMAP_ALLmode reproducesJarFileinitializererror/Unicodebufferbounds; fixedPS5modewithforcedmapall=true anddesktopcontrolpass, exactObject/Unicode/HTTPS/DTLS/JFRresourceidentity. NativeASan/UBSancontrols retained. TargetJava/native rebuild passes.",
     "console": "079now reaches normal-world readiness and authenticated join; user reports shorter/morefrequent freezes. Current49sJVMcapture has5CodeCacheGCThreshold fullpauses177.555-269.367ms. NotALLPASS/endurance."
+  },
+  "native_direct_fallback": {
+    "date": "2026-10-20",
+    "patch": "0101-ps5-native-direct-memory-fallback.patch",
+    "scope": "Raw native allocator only: libc -> anonymous pages -> bounded direct-memory fallback on ENOMEM; no Java heap/metaspace/codecache mapping change.2048slots/128MiB held budget; CPU RW/no fixed mapping.",
+    "host": "PASS: actual allocator/direct ledger ASan/UBSan with real aligned storage and simulated kernel success/refusal/rollback/unmap/release failure/budget/slot limits/4000concurrent lifetimes. Existing os.cpp NMT/preinit regression with unavailable direct backend passes. Exact clean patch application and targetHotSpot build pass.",
+    "console": "Pending; direct kernel behavior/cache/headroom/stability unvalidated. No compiler OOM bailout; all-backend failure retains fatal contract. Other allocators remain unchanged."
   }
 }

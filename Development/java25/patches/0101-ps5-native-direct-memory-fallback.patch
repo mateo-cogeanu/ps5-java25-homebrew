@@ -1,0 +1,183 @@
+--- a/src/hotspot/share/runtime/ps5NativeHeap.hpp
++++ b/src/hotspot/share/runtime/ps5NativeHeap.hpp
+@@ -10,6 +10,7 @@
+ #include <string.h>
+ #include "utilities/permitForbiddenFunctions.hpp"
+ #include "runtime/ps5StartupTrace.hpp"
++#include "runtime/ps5NativeDirectMemory.hpp"
+ 
+ // Raw storage below NMT. All os:: and NMT-preinit raw allocations use the same
+ // prefix, so blocks remain compatible across the NMT initialization boundary.
+@@ -54,10 +55,16 @@
+   return true;
+ }
+ inline void* map_pages(size_t bytes) {
+-  return mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
++  void* memory=mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
++  return memory==MAP_FAILED&&errno==ENOMEM ? ps5_native_direct::map(bytes) : memory;
++}
++inline int unmap_pages(void* address,size_t bytes) {
++  int result;
++  return ps5_native_direct::unmap(address,bytes,&result) ? result : munmap(address,bytes);
+ }
+ inline void note(const char* label, size_t requested, size_t mapped, int error) {
+   ps5_vm_trace_values(label, requested, " mapped=", mapped, " errno=", (unsigned long long)error);
++  ps5_native_direct::report();
+ }
+ // At most one empty slab per class stays warm (<=8*64KiB). Reclaim it
+ // before propagating mapping pressure. Live allocations are never displaced.
+@@ -66,7 +73,7 @@
+     Slab** link=&classes()[index];
+     while (*link) {
+       Slab* slab=*link;
+-      if (slab->live==0) {*link=slab->next;munmap(slab,slab->mapped);}
++      if (slab->live==0) {*link=slab->next;unmap_pages(slab,slab->mapped);}
+       else link=&slab->next;
+     }
+   }
+@@ -186,8 +193,8 @@
+       *link = slab->next; mapped = slab->mapped;
+     }
+     unlock();
+-    if (mapped) munmap(slab, mapped);
+-  } else if (mapped_bytes(header)) munmap(header, mapped_bytes(header));
++    if (mapped) unmap_pages(slab, mapped);
++  } else if (mapped_bytes(header)) unmap_pages(header, mapped_bytes(header));
+   else permit_forbidden_function::free(header);
+   errno = saved_errno;
+ }
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5NativeDirectMemory.hpp
+@@ -0,0 +1,132 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHARE_RUNTIME_PS5NATIVEDIRECTMEMORY_HPP
++#define SHARE_RUNTIME_PS5NATIVEDIRECTMEMORY_HPP
++#ifdef __PROSPERO__
++#include <stddef.h>
++#include <stdint.h>
++#include <errno.h>
++#include <sys/mman.h>
++#include "runtime/ps5StartupTrace.hpp"
++
++extern "C" size_t sceKernelGetDirectMemorySize();
++extern "C" int sceKernelAllocateDirectMemory(int64_t, int64_t, size_t, size_t, int, int64_t*);
++extern "C" int sceKernelMapDirectMemory(void**, size_t, int, int, int64_t, size_t);
++extern "C" int sceKernelMunmap(void*, size_t);
++extern "C" int sceKernelReleaseDirectMemory(int64_t, size_t);
++
++// Only the raw native allocator's ENOMEM fallback uses this pool. Java heap,
++// metaspace, executable memory and ordinary successful mappings are unchanged.
++namespace ps5_native_direct {
++constexpr size_t page_bytes = 16384;
++constexpr size_t budget_bytes = 128 * 1024 * 1024;
++constexpr unsigned entry_count = 2048;
++struct Entry { void* address; int64_t physical; size_t bytes; bool occupied; };
++struct State { unsigned mutex; size_t held, mappings, releases, failures; int last_result; Entry entries[entry_count]; };
++inline State& state() { static State value = {}; return value; }
++inline void lock() {
++  while (__atomic_exchange_n(&state().mutex, 1u, __ATOMIC_ACQUIRE)) {
++    while (__atomic_load_n(&state().mutex, __ATOMIC_RELAXED)) {
++#if defined(__x86_64__)
++      __asm__ volatile("pause");
++#elif defined(__aarch64__)
++      __asm__ volatile("yield");
++#endif
++    }
++  }
++}
++inline void unlock() { __atomic_store_n(&state().mutex, 0u, __ATOMIC_RELEASE); }
++inline void note(const char* label, size_t bytes, int result, size_t held) {
++  // Mapping can be requested under the raw allocator lock. Defer all trace IO
++  // until its existing outer diagnostic point, after that lock is released.
++  (void)label; (void)bytes; (void)held;
++  lock();state().last_result=result;if(result!=0)++state().failures;unlock();
++}
++inline void abandon(unsigned slot) {
++  state().held -= state().entries[slot].bytes;
++  state().entries[slot] = {};
++}
++inline void* map(size_t bytes) {
++  if (bytes == 0 || bytes % page_bytes != 0 || bytes > budget_bytes) {
++    errno = ENOMEM; return MAP_FAILED;
++  }
++  // Reserve a ledger slot and budget before invoking the kernel. No allocation
++  // or diagnostic IO is allowed under this lock, including failure reporting.
++  lock();
++  unsigned slot = entry_count;
++  if (bytes <= budget_bytes - state().held) {
++    for (unsigned i=0; i<entry_count; ++i) if (!state().entries[i].occupied) {slot=i;break;}
++  }
++  if (slot == entry_count) {unlock();errno=ENOMEM;return MAP_FAILED;}
++  state().held += bytes;
++  state().entries[slot] = {nullptr, -1, bytes, true};
++  unlock();
++  size_t pool = sceKernelGetDirectMemorySize();
++  int64_t physical = -1;
++  int result = pool >= bytes && pool <= INT64_MAX
++    ? sceKernelAllocateDirectMemory(0, (int64_t)pool, bytes, page_bytes, 12, &physical)
++    : -1;
++  if (result != 0) {
++    lock();abandon(slot);size_t held=state().held;unlock();
++    note("PS5 native direct allocation failed bytes=",bytes,result,held);
++    errno=ENOMEM;return MAP_FAILED;
++  }
++  // A hint, never MAP_FIXED: do not replace existing VM mappings. Keep CPU
++  // native buffers away from the low address window used by later graphics.
++  void* address = (void*)(uintptr_t)0x1000000000ULL;
++  result = sceKernelMapDirectMemory(&address,bytes,PROT_READ|PROT_WRITE,0,physical,page_bytes);
++  if (result != 0) {
++    int released = sceKernelReleaseDirectMemory(physical,bytes);
++    lock();state().entries[slot].physical=physical;
++    if (released==0) abandon(slot); // A failed release retains its budget/slot.
++    size_t held=state().held;unlock();
++    note("PS5 native direct mapping failed bytes=",bytes,result,held);
++    if(released!=0)note("PS5 native direct rollback failed bytes=",bytes,released,held);
++    errno=ENOMEM;return MAP_FAILED;
++  }
++  // A successful kernel mapping must produce usable, page-aligned storage.
++  if (address == nullptr || address == MAP_FAILED || (uintptr_t)address % page_bytes != 0) {
++    // Keep ownership recorded if a kernel anomaly prevents safe cleanup.
++    int unmapped = sceKernelMunmap(address,bytes);
++    int released = unmapped==0 ? sceKernelReleaseDirectMemory(physical,bytes) : -1;
++    lock();state().entries[slot].address=address;state().entries[slot].physical=physical;
++    if(unmapped==0&&released==0)abandon(slot);
++    size_t held=state().held;unlock();
++    note("PS5 native direct invalid address bytes=",bytes,unmapped ? unmapped : released,held);
++    errno=ENOMEM;return MAP_FAILED;
++  }
++  lock();state().entries[slot].address=address;state().entries[slot].physical=physical;
++  ++state().mappings;size_t held=state().held;unlock();
++  note("PS5 native direct mapped bytes=",bytes,0,held);
++  return address;
++ }
++// Return false only for an ordinary mapping. A direct failure must never fall
++// through to libc munmap or release backing that is still mapped.
++inline bool unmap(void* address,size_t bytes,int* result) {
++  lock();
++  unsigned slot=entry_count;
++  for(unsigned i=0;i<entry_count;++i)if(state().entries[i].occupied&&state().entries[i].address==address){slot=i;break;}
++  if(slot==entry_count){unlock();return false;}
++  Entry entry=state().entries[slot];
++  if(entry.bytes!=bytes){unlock();*result=-1;errno=EINVAL;return true;}
++  // Ownership remains locked until both kernel operations finish; no kernel
++  // callback enters this ledger. This excludes a second release of a live entry.
++  int unmapped=sceKernelMunmap(address,bytes);
++  int released=unmapped==0?sceKernelReleaseDirectMemory(entry.physical,bytes):-1;
++  if(unmapped==0&&released==0){abandon(slot);++state().releases;}
++  else if(unmapped==0)state().entries[slot].address=nullptr;
++  size_t held=state().held;unlock();
++  *result=unmapped==0&&released==0?0:-1;
++  note(*result==0?"PS5 native direct released bytes=":"PS5 native direct release failed bytes=",bytes,unmapped?unmapped:released,held);
++  if(*result!=0)errno=EIO;
++  return true;
++}
++inline void report() {
++  lock();size_t held=state().held,mappings=state().mappings,releases=state().releases,failures=state().failures;int result=state().last_result;unlock();
++  if(mappings||failures) {
++    ps5_vm_trace_values("PS5 native direct held_bytes=",held," mappings=",mappings," releases=",releases);
++    ps5_vm_trace_values("PS5 native direct failures=",failures," last_result=",(uint32_t)result," budget_bytes=",budget_bytes);
++  }
++}
++}
++#endif
++#endif

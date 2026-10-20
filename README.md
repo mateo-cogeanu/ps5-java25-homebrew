@@ -19,6 +19,8 @@ This repository contains the **Java runtime port, platform adaptations and accep
 
 **Related project:** [ps5-minecraft-java](https://github.com/mateo-cogeanu/ps5-minecraft-java) uses this runtime and tracks Minecraft-specific work and console milestones separately.
 
+Development is testing a [bounded native direct-memory fallback](Development/docs/java25-native-direct-fallback.md) after a consumer C1 allocation failure. Host allocator checks and the target build pass; PS5 validation is pending.
+
 ## Milestones
 
 Each milestone is a **frozen source snapshot** of a build that received **ALL PASS on the PS5**. Its release includes the matching app ZIP, SHA-256 checksum and console validation record.
