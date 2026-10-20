@@ -189,6 +189,25 @@ ARENA_ENUM_PLACEHOLDER
 };
 int main(){
  heap_stress_main();deny_heap=false;deny_maps=false;
+ assert(heap::libc_held()==0);
+ // Prefix-inclusive cap, retained shrink capacity, failed growth rollback,
+ // migration and full backend refusal must all preserve exact accounting.
+ void* budget=heap::allocate(1024*1024);assert(budget&&heap::libc_held()==1024*1024+sizeof(heap::Header));
+ void* overflow=heap::allocate(1024*1024);assert(overflow&&heap::libc_held()==1024*1024+sizeof(heap::Header));
+ budget=heap::reallocate(budget,64);assert(heap::libc_held()==1024*1024+sizeof(heap::Header));
+ std::memset(budget,0x25,64);budget=heap::reallocate(budget,1536*1024);check(budget,64,0x25);assert(heap::libc_held()==1536*1024+sizeof(heap::Header));
+ deny_resize=true;budget=heap::reallocate(budget,1600*1024);check(budget,64,0x25);assert(heap::libc_held()==0);deny_resize=false;
+ heap::release(budget);heap::release(overflow);heap::trim_idle();assert(heap::libc_held()==0&&heap_live==0&&map_live==0);
+ budget=heap::allocate(heap::libc_budget-sizeof(heap::Header));assert(budget&&heap::libc_held()==heap::libc_budget);
+ deny_maps=true;assert(!heap::allocate(8192));assert(heap::libc_held()==heap::libc_budget);deny_maps=false;heap::release(budget);
+ // Hold simultaneous allocations above the cap while sampling the atomic
+ // reservation. In-flight reservations are included, so no race can overspend.
+ parallel=true;std::atomic<int> arrivals{0};std::atomic<bool> proceed{false};std::vector<std::thread> budget_workers;
+ for(int i=0;i<8;++i)budget_workers.emplace_back([&]{void* p=heap::allocate(512*1024);assert(p&&heap::libc_held()<=heap::libc_budget);++arrivals;while(!proceed.load())std::this_thread::yield();heap::release(p);});
+ while(arrivals.load()!=8)std::this_thread::yield();assert(heap::libc_held()<=heap::libc_budget&&heap_live==3);proceed=true;
+ for(auto& worker:budget_workers)worker.join();parallel=false;heap::trim_idle();assert(heap::libc_held()==0&&heap_live==0&&map_live==0);
+ std::puts("PASS: libc prefix-inclusive2MiB cap, exact grow/shrink/migrate/failure accounting, true refusal and concurrent reservations/cleanup");
+
  // Raw NMT pre-init block survives transition to ordinary NMT-off os APIs.
  void* early=raw_malloc(90);assert(early);std::memset(early,0x61,90);
  deny_heap=true;early=raw_realloc(early,128);check(early,90,0x61);

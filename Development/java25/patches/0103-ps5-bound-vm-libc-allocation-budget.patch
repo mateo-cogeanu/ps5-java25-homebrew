@@ -1,0 +1,84 @@
+--- a/src/hotspot/share/runtime/ps5NativeHeap.hpp
++++ b/src/hotspot/share/runtime/ps5NativeHeap.hpp
+@@ -34,6 +34,23 @@
+ inline size_t mapped_bytes(const Header* h) {
+   return (h->block.owner & 1) ? 0 : (size_t)h->block.owner;
+ }
++// Bound only VM-owned libc blocks, including prefixes and in-flight requests.
++// SDK services (notably pthread creation) cannot use the VM page fallback.
++// This is not a guarantee about libc capacity or system-wide native headroom.
++inline constexpr size_t libc_budget = 2 * 1024 * 1024;
++inline size_t* libc_held_word() { static size_t bytes = 0; return &bytes; }
++inline size_t libc_held() { return __atomic_load_n(libc_held_word(), __ATOMIC_RELAXED); }
++inline bool reserve_libc(size_t bytes) {
++  size_t held = libc_held();
++  while (bytes <= libc_budget && held <= libc_budget - bytes) {
++    if (__atomic_compare_exchange_n(libc_held_word(), &held, held + bytes,
++                                    false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) return true;
++  }
++  return false;
++}
++inline void release_libc(size_t bytes) {
++  __atomic_fetch_sub(libc_held_word(), bytes, __ATOMIC_RELAXED);
++}
+ inline Slab** classes() { static Slab* heads[8] = {}; return heads; }
+ inline unsigned* mutex_word() { static unsigned lock = 0; return &lock; }
+ inline void lock() {
+@@ -64,6 +81,7 @@
+ }
+ inline void note(const char* label, size_t requested, size_t mapped, int error) {
+   ps5_vm_trace_values(label, requested, " mapped=", mapped, " errno=", (unsigned long long)error);
++  ps5_vm_trace_values("PS5 native libc held_bytes=", libc_held(), " budget_bytes=", libc_budget, " reserved=", 0);
+   ps5_native_direct::report();
+ }
+ // At most one empty slab per class stays warm (<=8*64KiB). Reclaim it
+@@ -85,9 +103,14 @@
+   int saved_errno = errno;
+   size = size == 0 ? 1 : size;
+   if (size > SIZE_MAX - sizeof(Header)) { errno = ENOMEM; return nullptr; }
+-  Header* header = (Header*)permit_forbidden_function::malloc(sizeof(Header) + size);
+-  if (header != nullptr) {
+-    header->block = {size, 0}; errno = saved_errno; return header + 1;
++  Header* header = nullptr;
++  const size_t libc_bytes = sizeof(Header) + size;
++  if (reserve_libc(libc_bytes)) {
++    header = (Header*)permit_forbidden_function::malloc(libc_bytes);
++    if (header != nullptr) {
++      header->block = {size, 0}; errno = saved_errno; return header + 1;
++    }
++    release_libc(libc_bytes);
+   }
+   if (size > 4096) {
+     size_t mapped;
+@@ -195,7 +218,11 @@
+     unlock();
+     if (mapped) unmap_pages(slab, mapped);
+   } else if (mapped_bytes(header)) unmap_pages(header, mapped_bytes(header));
+-  else permit_forbidden_function::free(header);
++  else {
++    size_t bytes = sizeof(Header) + header->block.size;
++    permit_forbidden_function::free(header);
++    release_libc(bytes);
++  }
+   errno = saved_errno;
+ }
+ inline void* reallocate(void* memory, size_t size) {
+@@ -204,11 +231,16 @@
+   if (size > SIZE_MAX - sizeof(Header)) { errno = ENOMEM; return nullptr; }
+   Header* header = (Header*)memory - 1;
+   const size_t old_size = header->block.size;
+-  if (size <= old_size) { header->block.size = size; return memory; }
++  if (size <= old_size) {
++    // Retain the actual libc capacity charge until free or successful growth.
++    if (header->block.owner != 0) header->block.size = size;
++    return memory;
++  }
+   int saved_errno = errno;
+-  if (header->block.owner == 0) {
++  if (header->block.owner == 0 && reserve_libc(size - old_size)) {
+     Header* resized = (Header*)permit_forbidden_function::realloc(header, sizeof(Header) + size);
+     if (resized) { resized->block = {size, 0}; errno = saved_errno; return resized + 1; }
++    release_libc(size - old_size);
+   }
+   void* replacement = allocate(size);
+   if (!replacement) return nullptr; // Original bytes and ownership are intact.

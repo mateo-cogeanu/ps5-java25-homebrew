@@ -1958,3 +1958,11 @@ pauses totaling1.029seconds within the short console capture. The consumer080
 candidate[adjusts an existing threshold](../docs/java25-serial-codecache-pauses.md)
 while preserving aggressive near-full cleanup and memory limits. PS5pause
 frequency/nativeheadroom/endurance still need comparison; no freeze-free claim.
+
+## Native libc budget (0103)
+
+[0103](../docs/java25-native-libc-budget.md) bounds VM-owned libc blocks and
+in-flight requests to2MiB before using existing page/slab/direct backends. This
+reduces competition with SDK services that cannot use the VM fallback, without
+guaranteeing native headroom or changing thread/heap mappings. ASan/UBSan/NMT/
+concurrency/target checks pass; actual PS5 effectiveness and stability pending.

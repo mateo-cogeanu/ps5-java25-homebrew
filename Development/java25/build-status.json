@@ -366,5 +366,12 @@
     "scope": "Fixed read-only routes for bounded HotSpot thrown-exception active/rotated files and previous-run archive; collector includes current pair. No exception semantics change.",
     "host": "PASS: actual native HTTP and collector ASan/UBSan, exact binary pair downloads and archive/clear behavior.",
     "console": "Consumer087 pending PS5; diagnostic overhead and hidden player-save cause unresolved."
+  },
+  "native_libc_budget": {
+    "patch": "0103-ps5-bound-vm-libc-allocation-budget.patch",
+    "libc_budget_bytes": 2097152,
+    "scope": "VM raw allocator only; atomic prefix-inclusive/in-flight libc charge, existing page/slab/direct fallback above budget; exact shrink/grow/failure/migration/free accounting. No SDK interposition/reserve or thread lifecycle/heap/metaspace/codecache mapping changes.",
+    "host": "PASS: actual allocator/os.cpp NMT/pre-init ASan/UBSan, budget boundaries, shrink/grow/migrate/rollback/refusal/concurrent reservation and cleanup; existing actual direct-ledger/fault/concurrency and prefix footprint controls; exact forward patch and targetHotSpot build.",
+    "console": "Pending; no guarantee of SDK headroom or performance. Other allocators/map budgets/resource limits can still refuse."
   }
 }
