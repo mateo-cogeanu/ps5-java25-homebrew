@@ -12,13 +12,20 @@ with tempfile.TemporaryDirectory() as directory:
     (root/'data').write_bytes(payload)
     (root/'server.cpp').write_text(r'''
 #include "log_share.hpp"
+#include <sys/resource.h>
+static bool fail_limits=false;
+static int controlled_getrlimit(int resource,struct rlimit* value) {
+ if(fail_limits){errno=ENOTSUP;return -1;}return getrlimit(resource,value);
+}
+#define getrlimit controlled_getrlimit
 #include "process_usage.hpp"
+#undef getrlimit
 #include <cassert>
 int main(int argc,char **argv){
  assert(ps5::log_share::begin_session("test-build","test-run",argv[2]));
  assert(!ps5::log_share::begin_session("test-build","failed-archive",argv[5]));
 
- errno=EBUSY;assert(ps5::process_usage::append(argv[7],17));assert(errno==EBUSY);assert(!ps5::process_usage::append("/missing-parent-for-probe-test/usage.log",18));assert(errno==EBUSY);
+ errno=EBUSY;assert(ps5::process_usage::append(argv[7],0));assert(errno==EBUSY);assert(ps5::process_usage::append(argv[7],17));assert(errno==EBUSY);fail_limits=true;assert(ps5::process_usage::append(argv[7],60));assert(errno==EBUSY);fail_limits=false;assert(!ps5::process_usage::append("/missing-parent-for-probe-test/usage.log",18));assert(errno==EBUSY);
  ps5::log_share::start(0);if(ps5::log_share::state!=1)return 2;ps5::log_share::stop();
  int listener=socket(AF_INET,SOCK_STREAM,0);sockaddr_in a{};a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
  if(bind(listener,(sockaddr*)&a,sizeof(a))||listen(listener,8))return 3;
@@ -51,6 +58,9 @@ int main(int argc,char **argv){
         for name in ['java25-class-load.log','process-usage.log','java25-jit.log']:assert (root/('previous-'+name)).read_text()=='prior diagnostic: '+name
         assert not (root/'java25-class-load.log').exists()
         assert 'elapsed_s=17 getrusage=0 maxrss_raw=' in (root/'process-usage.log').read_text()
+        for kind in ['data','as','rss']:
+            assert f'elapsed_s=0 rlimit={kind} result=0 errno=0 soft_raw=' in (root/'process-usage.log').read_text()
+            assert f'elapsed_s=60 rlimit={kind} result=-1 errno=' in (root/'process-usage.log').read_text()
         assert 'test-build' in (root/'probe-session.txt').read_text()
         assert (failed/'probe-exception.txt').read_text()=='preserve me'
         assert 'incomplete' in (failed/'probe-session.txt').read_text()
