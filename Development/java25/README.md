@@ -2039,3 +2039,5 @@ prepare call for the existing16KiB pool/resolver before VM pressure. No query or
 answer cache is introduced. Partial failures release the lease and propagate;
 hostactualadapter/SDKallocation/concurrency/prepareASanUBSan checks pass.
 PS5earlyavailability andlaterDNS/TLS/nativepressure remain pending.
+
+Patch0111 increases the shared on-demand native direct ledger ceiling to256MiB and reports policy refusals separately from kernel errors. See [headroom and validation limits](../docs/java25-native-direct-headroom.md). Console validation is pending; frozen snapshots remain unchanged.

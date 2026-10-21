@@ -102,6 +102,19 @@ int main(){
  assert(direct::unmap(mapping,16384,&result)&&result==0);empty();
  mapping=direct::map(16384);fail_release=true;assert(direct::unmap(mapping,16384,&result)&&result==-1);assert(live_mappings==0&&live_physical==1);fail_release=false;clean_retained_for_test();
  assert(direct::map(0)==MAP_FAILED&&direct::map(SIZE_MAX)==MAP_FAILED&&direct::map(1)==MAP_FAILED);
+ // Reproduce Paper's old128MiB ceiling: mixed owners exceed it, then stop at256MiB.
+ static_assert(direct::budget_bytes==256ULL*1024*1024);
+ constexpr size_t old_cap=128ULL*1024*1024, meta_bytes=4ULL*1024*1024;
+ void* data=direct::map(old_cap);assert(data!=MAP_FAILED);
+ void* meta=direct::map(meta_bytes,16384,true);assert(meta!=MAP_FAILED&&direct::metadata_range(meta,meta_bytes));
+ void* rest=direct::map(direct::budget_bytes-old_cap-meta_bytes);assert(rest!=MAP_FAILED);
+ size_t rejected=direct::state().policy_rejections;before=alloc_calls;
+ assert(direct::map(16384)==MAP_FAILED&&errno==ENOMEM&&alloc_calls==before&&direct::state().policy_rejections==rejected+1);
+ assert(direct::unmap(meta,meta_bytes,&result)&&result==0);
+ meta=direct::map(meta_bytes,16384,true);assert(meta!=MAP_FAILED);
+ assert(direct::unmap(rest,direct::budget_bytes-old_cap-meta_bytes,&result)&&result==0);
+ assert(direct::unmap(meta,meta_bytes,&result)&&result==0);
+ assert(direct::unmap(data,old_cap,&result)&&result==0);empty();
  mapping=direct::map(direct::budget_bytes);assert(mapping!=MAP_FAILED);before=alloc_calls;assert(direct::map(16384)==MAP_FAILED&&alloc_calls==before);assert(direct::unmap(mapping,direct::budget_bytes,&result)&&result==0);empty();
  std::vector<void*> slots;for(unsigned i=0;i<direct::entry_count;++i){void* q=direct::map(16384);assert(q!=MAP_FAILED);slots.push_back(q);}before=alloc_calls;assert(direct::map(16384)==MAP_FAILED&&alloc_calls==before);for(void* q:slots)assert(direct::unmap(q,16384,&result)&&result==0);empty();
  parallel=true;std::vector<std::thread> threads;for(int t=0;t<4;++t)threads.emplace_back([t]{for(int i=0;i<1000;++i){size_t n=1+(i*137+t*17)%9000;void* q=heap::allocate(n);assert(q);memset(q,t+1,n);void* grown=heap::reallocate(q,n+500);assert(grown);for(size_t j=0;j<n;++j)assert(((unsigned char*)grown)[j]==t+1);heap::release(grown);}});for(auto& t:threads)t.join();parallel=false;empty();

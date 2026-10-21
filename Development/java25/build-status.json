@@ -422,5 +422,13 @@
     "scope": "ps5_dns_prepare creates/leases/releases existing16KiB SDK pool+resolver beforeVMpressure; no query/cache/newpair,partialfailreleaseslease/realerrors.",
     "host": "PASSactualadapter+pinnedSDK/JDKblocksASanUBSan preparepool/resolverfaults/partialretry/zeroqueries/idempotence/errno,400concurrentfreshlookupswithlateallocationrefusal/error/cleanupcontrols.",
     "console": "098firstlookup poolcreate0x804101ce/neterrno206/errnoENOMEM; worker/TLSinitcomplete. Earlyprepare/laterDNS/TLSpressurependingPS5."
+  },
+  "native_direct_headroom": {
+    "patch": "0111-ps5-native-direct-headroom.patch",
+    "held_budget_bytes": 268435456,
+    "slots": 2048,
+    "scope": "Shared on-demand native direct ledger only; unchanged ownership, in-flight and failed-cleanup charging. Separate policy rejection counter; no Java heap or executable mapping changes.",
+    "host": "PASS actual allocator/ledger ASan/UBSan mixed owners beyond128MiB, exact256MiB boundary, reject without kernel call, release/reuse; existing faults/slots/concurrent lifetimes and target HotSpot build.",
+    "console": "Pending increased backing availability, class loading/GC/thread lifecycle and sustained stability."
   }
 }

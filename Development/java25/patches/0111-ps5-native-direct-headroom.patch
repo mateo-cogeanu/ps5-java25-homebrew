@@ -1,0 +1,43 @@
+--- a/src/hotspot/share/runtime/ps5NativeDirectMemory.hpp
++++ b/src/hotspot/share/runtime/ps5NativeDirectMemory.hpp
+@@ -16,13 +16,14 @@
+ extern "C" int sceKernelReleaseDirectMemory(int64_t, size_t);
+ 
+ // Shared bounded native-data pool. Metadata reservations may use it only
+-// after ordinary allocation fails; Java heap/class space/code cache are excluded.
++// after ordinary allocation fails. Compact class space has its separate gated
++// fallback; Java heap and executable mappings remain excluded.
+ namespace ps5_native_direct {
+ constexpr size_t page_bytes = 16384;
+-constexpr size_t budget_bytes = 128 * 1024 * 1024;
++constexpr size_t budget_bytes = 256 * 1024 * 1024;
+ constexpr unsigned entry_count = 2048;
+ struct Entry { void* address; int64_t physical; size_t bytes; bool occupied; bool metadata; bool stack; };
+-struct State { unsigned mutex; size_t held, mappings, releases, failures; int last_result; Entry entries[entry_count]; };
++struct State { unsigned mutex; size_t held, mappings, releases, failures, policy_rejections; int last_result; Entry entries[entry_count]; };
+ inline State& state() { static State value = {}; return value; }
+ inline void lock() {
+   while (__atomic_exchange_n(&state().mutex, 1u, __ATOMIC_ACQUIRE)) {
+@@ -57,7 +58,7 @@
+   if (bytes <= budget_bytes - state().held) {
+     for (unsigned i=0; i<entry_count; ++i) if (!state().entries[i].occupied) {slot=i;break;}
+   }
+-  if (slot == entry_count) {unlock();errno=ENOMEM;return MAP_FAILED;}
++  if (slot == entry_count) {++state().policy_rejections;unlock();errno=ENOMEM;return MAP_FAILED;}
+   state().held += bytes;
+   state().entries[slot] = {nullptr, -1, bytes, true, metadata, stack};
+   unlock();
+@@ -153,10 +154,11 @@
+   return ::mprotect(address,bytes,PROT_NONE)==0;
+ }
+ inline void report() {
+-  lock();size_t held=state().held,mappings=state().mappings,releases=state().releases,failures=state().failures;int result=state().last_result;unlock();
+-  if(mappings||failures) {
++  lock();size_t held=state().held,mappings=state().mappings,releases=state().releases,failures=state().failures,rejections=state().policy_rejections;int result=state().last_result;unlock();
++  if(mappings||failures||rejections) {
+     ps5_vm_trace_values("PS5 native direct held_bytes=",held," mappings=",mappings," releases=",releases);
+     ps5_vm_trace_values("PS5 native direct failures=",failures," last_result=",(uint32_t)result," budget_bytes=",budget_bytes);
++    ps5_vm_trace_values("PS5 native direct policy_rejections=",rejections," held_bytes=",held," budget_bytes=",budget_bytes);
+   }
+ }
+ }
