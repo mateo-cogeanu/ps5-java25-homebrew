@@ -1979,3 +1979,12 @@ actual PS5 lifecycle/headroom/stability validation remains pending.
 External probe JSON may set `menu_audio:false` to omit generated menu music and
 selection PCM assets. The consumer must also omit its audio playback calls;
 existing consumers default to the previous packaged audio behavior.
+
+## Owned Java thread-stack fallback (0105)
+
+[0105](../docs/java25-direct-thread-stacks.md) retries final Java-thread EAGAIN/
+ENOMEM with a direct-backed stack and dedicated attributes. A native reaper
+joins finished threads before freeing their stacks, including TLS destruction.
+64slots/32MiB stack budget share the existing direct pool; guard uncommit retains
+owned backing. Ordinary paths/errors remain; SDK allocation success is not
+guaranteed. Host lifecycle/fault/target checks pass; actualPS5pending.

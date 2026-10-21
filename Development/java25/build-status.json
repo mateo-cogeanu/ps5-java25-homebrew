@@ -378,7 +378,13 @@
     "patch": "0104-ps5-direct-metaspace-reservation-fallback.patch",
     "scope": "Ordinary non-fixed/nonexec mtMetaspace ENOMEM only; shared direct ledger/requested alignment, new backing zeroed/PROT_NONE/NMT reserve; existing RWcommit, zero+NONE logicaluncommit retaining physicalbudget, exactwhole release dispatch. Heap/classspace/exec/other tags excluded.",
     "host": "PASS: actual MemoryReserver/direct ledger/helpers/OSrelease ASan/UBSan real alignedstorage:4MiB alignment, firstcommit zeroing, PROT_NONE faults, subrangezero/recommit/adjacentdata, gates/NMTevent/rollback/exactrelease/cleanupretention. Existing allocator/os.cppNMT/directfault/concurrency/metaspacehints/prefix tests and exactpatch/targetHotSpot pass.",
-    "console": "089 ordinary4MiB metadata reserve fails ENOMEM before readiness.0104pendingPS5 protection/commit/reclaim/NMT/pressure/stability; shared128MiB/2048slot budget unchanged."
+    "console": "090 observes successful aligned4MiB directmetadata reservation with no recorded direct failures; then ordinary Java pthread creation fails EAGAIN/errnoENOMEM before readiness. No current JVMfatalreport. Full lifecycle/pressure/stability remain unvalidated."
   },
-  "external_probe_audio": "Optional menu_audio boolean defaults true; false skips generated menu music/selection PCM. Consumer must omit playback; frozen probes unchanged."
+  "external_probe_audio": "Optional menu_audio boolean defaults true; false skips generated menu music/selection PCM. Consumer must omit playback; frozen probes unchanged.",
+  "direct_thread_stacks": {
+    "patch": "0105-ps5-owned-java-thread-stack-fallback.patch",
+    "scope": "Final ordinaryJavaThread EAGAIN/errnoENOMEM only; early native128KiB reaper,64dedicatedattribute/owner slots,32MiB stackbudget sharing128MiB directledger. Zeroed explicitstack/joinablepthread; guarduncommit preservesdirectbacking. Entryreturn signals join; actualjoin completes TLS before physicalrelease. Join/cleanup/nonreturn paths retain bounded ownership.",
+    "host": "PASS: actual owner/helpers real512KiB custom-stack pthreads underASan/UBSan, gatedTLS destructor join-before-free,220reclaimedlifetimes, allocation/attr/create/join/release faults, slot/budget andguard/purpose checks. Existing metadata/attribute800thread/pthreadchecks/directfault-concurrency/prefix regressions, exactpatch/targetHotSpot pass. Reaper scheduling controlled; no fulltargetVM hostclaim.",
+    "console": "091pendingPS5 SDKexplicitstack/guard/TLS/join/NMT/nativeheadroom/GC/stability. Exact SDKfailingallocationunknown; stackfallbacknotguaranteeSDKmetadataallocation."
+  }
 }

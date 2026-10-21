@@ -1,0 +1,168 @@
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5ThreadStacks.hpp
+@@ -0,0 +1,77 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHARE_RUNTIME_PS5THREADSTACKS_HPP
++#define SHARE_RUNTIME_PS5THREADSTACKS_HPP
++#ifdef __PROSPERO__
++#include <pthread.h>
++#include <unistd.h>
++#include <errno.h>
++#include "runtime/ps5NativeDirectMemory.hpp"
++namespace ps5_thread_stacks {
++constexpr unsigned capacity=64;
++constexpr size_t stack_budget=32*1024*1024;
++struct Slot {pthread_attr_t attr;bool valid;unsigned state,done;pthread_t thread;void* memory;size_t bytes;void*(*entry)(void*);void* argument;};
++inline Slot* slots(){static Slot value[capacity]={};return value;}
++inline unsigned* mutex(){static unsigned value=0;return &value;}
++inline unsigned* initialized(){static unsigned value=0;return &value;}
++inline unsigned* available(){static unsigned value=0;return &value;}
++inline size_t* held(){static size_t value=0;return &value;}
++inline void lock(){while(__atomic_exchange_n(mutex(),1u,__ATOMIC_ACQUIRE)){
++#if defined(__x86_64__)
++ __asm__ volatile("pause");
++#endif
++}}
++inline void unlock(){__atomic_store_n(mutex(),0u,__ATOMIC_RELEASE);}
++inline void* entry(void* pointer){
++ Slot* slot=(Slot*)pointer;void* result=slot->entry(slot->argument);
++ // A return is only a hint to join. It does not prove TLS destructors finished.
++ __atomic_store_n(&slot->done,1u,__ATOMIC_RELEASE);return result;
++}
++inline void reap_once(){
++ for(unsigned i=0;i<capacity;++i){
++  lock();Slot* s=&slots()[i];bool ready=s->state==2&&__atomic_load_n(&s->done,__ATOMIC_ACQUIRE);
++  if(ready)s->state=3;unlock();if(!ready)continue;
++  int joined=pthread_join(s->thread,nullptr);
++  int released=-1;bool owned=joined==0&&ps5_native_direct::unmap(s->memory,s->bytes,&released);
++  ps5_vm_trace_values("PS5 direct stack reap: joined=",joined," release=",(unsigned)released," bytes=",s->bytes);
++  lock();
++  if(owned&&released==0){*held()-=s->bytes;s->state=0;s->memory=nullptr;s->bytes=0;}
++  else s->state=4; // Retain ownership/budget; never retry a failed join unsafely.
++  unlock();
++ }
++}
++inline void* reaper(void*){for(;;){reap_once();usleep(100000);}return nullptr;}
++inline void initialize(){
++ unsigned expected=0;
++ if(!__atomic_compare_exchange_n(initialized(),&expected,1u,false,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE))return;
++ for(unsigned i=0;i<capacity;++i){Slot& s=slots()[i];s.valid=pthread_attr_init(&s.attr)==0;
++  if(s.valid)s.valid=pthread_attr_setdetachstate(&s.attr,PTHREAD_CREATE_JOINABLE)==0&&pthread_attr_setguardsize(&s.attr,0)==0;
++ }
++ pthread_attr_t attr;int status=pthread_attr_init(&attr);
++ if(!status){status=pthread_attr_setstacksize(&attr,128*1024);
++  if(!status)status=pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
++  pthread_t thread;if(!status)status=pthread_create(&thread,&attr,reaper,nullptr);pthread_attr_destroy(&attr);
++ }
++ __atomic_store_n(available(),status==0?1u:0u,__ATOMIC_RELEASE);
++ ps5_vm_trace_values("PS5 direct stack reaper: result=",status," capacity=",capacity," budget=",stack_budget);
++}
++inline int create(pthread_t* thread,size_t bytes,void*(*function)(void*),void* argument){
++ int saved=errno;
++ if(!__atomic_load_n(available(),__ATOMIC_ACQUIRE)||!bytes||bytes%ps5_native_direct::page_bytes||bytes>stack_budget){errno=saved;return EAGAIN;}
++ lock();Slot* s=nullptr;
++ if(bytes<=stack_budget-*held())for(unsigned i=0;i<capacity;++i)if(slots()[i].valid&&slots()[i].state==0){s=&slots()[i];s->state=1;*held()+=bytes;break;}
++ unlock();if(!s){errno=saved;return EAGAIN;}
++ s->bytes=bytes;s->memory=ps5_native_direct::map(bytes,ps5_native_direct::page_bytes,false,true);s->entry=function;s->argument=argument;__atomic_store_n(&s->done,0u,__ATOMIC_RELAXED);
++ void* mapped=s->memory;
++ if(mapped!=MAP_FAILED)memset(mapped,0,bytes);
++ int result=s->memory==MAP_FAILED?EAGAIN:pthread_attr_setstack(&s->attr,s->memory,bytes);
++ if(!result)result=pthread_create(&s->thread,&s->attr,entry,s);
++ if(result){int released=0;bool clean=s->memory==MAP_FAILED;
++  if(!clean)clean=ps5_native_direct::unmap(s->memory,bytes,&released)&&released==0;
++  lock();if(clean){*held()-=bytes;s->state=0;s->memory=nullptr;s->bytes=0;}else s->state=4;unlock();
++ }else{*thread=s->thread;lock();s->state=2;unlock();}
++ ps5_vm_trace_values("PS5 direct stack create: result=",result," bytes=",bytes," address=",result?0:(uintptr_t)mapped);
++ errno=saved;return result;
++}
++}
++#endif
++#endif
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -39,6 +39,7 @@
+ #include "os_bsd.inline.hpp"
+ #ifdef __PROSPERO__
+ #include "runtime/ps5NativeDirectMemory.hpp"
++#include "runtime/ps5ThreadStacks.hpp"
+ #endif
+ #include "os_posix.inline.hpp"
+ #include "prims/jniFastGetField.hpp"
+@@ -905,6 +906,11 @@
+       next_delay *= 2;
+     }
+ 
++#ifdef __PROSPERO__
++    if (ret == EAGAIN && errno == ENOMEM && thr_type == java_thread) {
++      ret=ps5_thread_stacks::create(&tid,stack_size,(void*(*)(void*))thread_native_entry,thread);
++    }
++#endif
+     char buf[64];
+     if (ret == 0) {
+       log_info(os, thread)("Thread \"%s\" started (pthread id: %zu, attributes: %s). ",
+@@ -2092,7 +2098,7 @@
+ 
+ bool os::pd_uncommit_memory(char* addr, size_t size, bool exec) {
+ #ifdef __PROSPERO__
+-  if (!exec && ps5_native_direct::metadata_range(addr,size)) {
++  if (!exec && (ps5_native_direct::metadata_range(addr,size) || ps5_native_direct::stack_range(addr,size))) {
+     return ps5_native_direct::uncommit_metadata(addr,size);
+   }
+ #endif
+@@ -2490,6 +2496,9 @@
+ 
+   ps5_vm_trace("ENTER: BSD system information");
+   Bsd::initialize_system_info();
++#ifdef __PROSPERO__
++  ps5_thread_stacks::initialize();
++#endif
+   ps5_vm_trace("DONE: BSD system information");
+ 
+   // _main_thread points to the thread that created/loaded the JVM.
+--- a/src/hotspot/share/runtime/ps5NativeDirectMemory.hpp
++++ b/src/hotspot/share/runtime/ps5NativeDirectMemory.hpp
+@@ -21,7 +21,7 @@
+ constexpr size_t page_bytes = 16384;
+ constexpr size_t budget_bytes = 128 * 1024 * 1024;
+ constexpr unsigned entry_count = 2048;
+-struct Entry { void* address; int64_t physical; size_t bytes; bool occupied; bool metadata; };
++struct Entry { void* address; int64_t physical; size_t bytes; bool occupied; bool metadata; bool stack; };
+ struct State { unsigned mutex; size_t held, mappings, releases, failures; int last_result; Entry entries[entry_count]; };
+ inline State& state() { static State value = {}; return value; }
+ inline void lock() {
+@@ -46,7 +46,7 @@
+   state().held -= state().entries[slot].bytes;
+   state().entries[slot] = {};
+ }
+-inline void* map(size_t bytes, size_t alignment = page_bytes, bool metadata = false) {
++inline void* map(size_t bytes, size_t alignment = page_bytes, bool metadata = false, bool stack = false) {
+   if (bytes == 0 || bytes % page_bytes != 0 || bytes > budget_bytes || alignment < page_bytes || (alignment & (alignment - 1)) != 0) {
+     errno = ENOMEM; return MAP_FAILED;
+   }
+@@ -59,7 +59,7 @@
+   }
+   if (slot == entry_count) {unlock();errno=ENOMEM;return MAP_FAILED;}
+   state().held += bytes;
+-  state().entries[slot] = {nullptr, -1, bytes, true, metadata};
++  state().entries[slot] = {nullptr, -1, bytes, true, metadata, stack};
+   unlock();
+   size_t pool = sceKernelGetDirectMemorySize();
+   int64_t physical = -1;
+@@ -134,6 +134,17 @@
+   }
+   unlock();return found;
+ }
++inline bool stack_range(void* address, size_t bytes) {
++  uintptr_t start=(uintptr_t)address;
++  if (!bytes || start > UINTPTR_MAX-bytes) return false;
++  lock();bool found=false;
++  for (unsigned i=0;i<entry_count;++i) {
++    const Entry& e=state().entries[i];uintptr_t base=(uintptr_t)e.address;
++    if(e.occupied && e.stack && e.address && start>=base &&
++       start-base<=e.bytes && bytes<=e.bytes-(start-base)) {found=true;break;}
++  }
++  unlock();return found;
++}
+ inline bool uncommit_metadata(void* address,size_t bytes) {
+   // Metaspace only uncommits unused granules. Keep backing owned/budgeted,
+   // zero before protecting so a later commit sees fresh anonymous semantics.
