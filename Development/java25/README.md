@@ -1996,3 +1996,12 @@ memory fallback to PS5 directory context/record buffers after ordinary-map
 ENOMEM, with exact backend cleanup and unchanged enumeration/failure semantics.
 java.io diagnostics distinguish fd/context/buffer stages; no fd-allocation fix
 is claimed. Actual JNI/VM-ledger/host/parser/target checks pass; PS5pending.
+
+## Selector wakeup without pipe writes (0107)
+
+[0107](../docs/java25-selector-user-wakeup.md) adds a PS5-only pre-registered
+kqueue user-event wakeup after a current capture fails IOUtil.write1/ENOMEM
+and shuts down network event loops. Existing coalescing/close locking remains;
+real errors propagate, unsupported kernels retain a diagnosed pipe fallback.
+Actual selector/JNI host concurrency/readiness/error tests and target classes/
+native compilation pass. PS5 event support and joined stability remain pending.

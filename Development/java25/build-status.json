@@ -392,5 +392,11 @@
     "scope": "PS5 context/64KiB recordbuffer ordinarymap ENOMEM -> existing VM C ABI/shared ledger; separately tagged backends/exact cleanup/partial rollback.16KiB contextlength and stagedfd/context/buffer diagnostics; PS5libnioexplicitVMdependency. No newpool/export/empty-on-error behavior or fdallocation fix.",
     "host": "PASS: actual File.list/listFiles JNI -Xcheck:jni/UBSan plus actual VM ABI/shared ledger over controlled real storage. Forced ordinarymap refusal preserves351Unicodeentries,converterfilter,empty/repeated listings; partialbudget rollback. Existingfd/read/partial/close/map/symlink/arraygrowth/recovery controls, NIOJNI/Files.walk andparserASan/UBSan pass. Exactpatch and targetjava.base nativebuild pass.",
     "console": "092pendingPS5;091directory openerrnoENOMEM lacks stage, so buffercause not established. Kernel fd/open/enum behavior/nativepressure/persistence/stability unvalidated."
+  },
+  "selector_user_wakeup": {
+    "patch": "0107-ps5-selector-user-wakeup.patch",
+    "host": "PASS actual patched Java selector/new JNI on macOS kqueue:1200 wake-before/blocking/coalescing rounds,socket readiness/cancel,100 close races,EINTR,unsupported fallback,register ENOMEM/trigger EIO; -Xcheck:jni/UBSan. Targetjava.base classes/native build PASS.",
+    "console": "Pending PS5 user-filter availability/marker,wakeups under native pressure,connection/stop stability; unsupported kernel retains pipe and observed pipe ENOMEM remains possible.",
+    "design": "PS5 EV_ADD|EV_CLEAR once,NOTE_TRIGGER on wakeup,actual native filter returned,no pipe buffer; existing interrupt lock/coalescing,matched close; genuine errors preserved. No game changes."
   }
 }

@@ -1,0 +1,158 @@
+--- a/src/java.base/macosx/classes/sun/nio/ch/KQueue.java
++++ b/src/java.base/macosx/classes/sun/nio/ch/KQueue.java
+@@ -111,6 +111,11 @@
+ 
+     private static native int flagsOffset();
+ 
++    // Native backend chooses user events only on PS5.
++    static native int registerUserWakeup(int kqfd) throws IOException;
++
++    static native void triggerUserWakeup(int kqfd) throws IOException;
++
+     static native int create() throws IOException;
+ 
+     static native int register(int kqfd, int fd, int filter, int flags);
+--- a/src/java.base/macosx/classes/sun/nio/ch/KQueueSelectorImpl.java
++++ b/src/java.base/macosx/classes/sun/nio/ch/KQueueSelectorImpl.java
+@@ -57,6 +57,7 @@
+     private final long pollArrayAddress;
+ 
+     // file descriptors used for interrupt
++    private final int userWakeupFilter;
+     private final int fd0;
+     private final int fd1;
+ 
+@@ -82,9 +83,14 @@
+         this.pollArrayAddress = KQueue.allocatePollArray(MAX_KEVENTS);
+ 
+         try {
+-            long fds = IOUtil.makePipe(false);
+-            this.fd0 = (int) (fds >>> 32);
+-            this.fd1 = (int) fds;
++            this.userWakeupFilter = KQueue.registerUserWakeup(kqfd);
++            if (userWakeupFilter != 0) {
++                this.fd0 = this.fd1 = -1;
++            } else {
++                long fds = IOUtil.makePipe(false);
++                this.fd0 = (int) (fds >>> 32);
++                this.fd1 = (int) fds;
++            }
+         } catch (IOException ioe) {
+             KQueue.freePollArray(pollArrayAddress);
+             FileDispatcherImpl.closeIntFD(kqfd);
+@@ -92,7 +98,9 @@
+         }
+ 
+         // register one end of the socket pair for wakeups
+-        KQueue.register(kqfd, fd0, EVFILT_READ, EV_ADD);
++        if (userWakeupFilter == 0) {
++            KQueue.register(kqfd, fd0, EVFILT_READ, EV_ADD);
++        }
+     }
+ 
+     @Override
+@@ -247,7 +255,7 @@
+         for (int i = 0; i < numEntries; i++) {
+             long kevent = KQueue.getEvent(pollArrayAddress, i);
+             int fd = KQueue.getDescriptor(kevent);
+-            if (fd == fd0) {
++            if (userWakeupFilter != 0 ? KQueue.getFilter(kevent) == userWakeupFilter : fd == fd0) {
+                 interrupted = true;
+             } else {
+                 SelectionKeyImpl ski = fdToKey.get(fd);
+@@ -287,8 +295,10 @@
+         FileDispatcherImpl.closeIntFD(kqfd);
+         KQueue.freePollArray(pollArrayAddress);
+ 
+-        FileDispatcherImpl.closeIntFD(fd0);
+-        FileDispatcherImpl.closeIntFD(fd1);
++        if (userWakeupFilter == 0) {
++            FileDispatcherImpl.closeIntFD(fd0);
++            FileDispatcherImpl.closeIntFD(fd1);
++        }
+     }
+ 
+     @Override
+@@ -323,7 +333,11 @@
+         synchronized (interruptLock) {
+             if (!interruptTriggered) {
+                 try {
+-                    IOUtil.write1(fd1, (byte)0);
++                    if (userWakeupFilter != 0) {
++                        KQueue.triggerUserWakeup(kqfd);
++                    } else {
++                        IOUtil.write1(fd1, (byte)0);
++                    }
+                 } catch (IOException ioe) {
+                     throw new InternalError(ioe);
+                 }
+@@ -335,7 +349,9 @@
+ 
+     private void clearInterrupt() throws IOException {
+         synchronized (interruptLock) {
+-            IOUtil.drain(fd0);
++            if (userWakeupFilter == 0) {
++                IOUtil.drain(fd0);
++            }
+             interruptTriggered = false;
+         }
+     }
+--- a/src/java.base/macosx/native/libnio/ch/KQueue.c
++++ b/src/java.base/macosx/native/libnio/ch/KQueue.c
+@@ -24,6 +24,8 @@
+  */
+ 
+ #include <strings.h>
++#include <stdio.h>
++#include "jvm.h"
+ #include <sys/types.h>
+ #include <sys/event.h>
+ #include <sys/time.h>
+@@ -111,3 +113,47 @@
+     }
+     return res;
+ }
++
++/* PS5 pipe writes can fail with ENOMEM after the server is running. A
++ * pre-registered user event needs no pipe buffer for subsequent wakeups.
++ * Keep the ordinary pipe backend on other platforms and on kernels that
++ * explicitly reject the user filter; genuine allocation errors still fail.
++ */
++JNIEXPORT jint JNICALL
++Java_sun_nio_ch_KQueue_registerUserWakeup(JNIEnv *env, jclass clazz, jint kqfd)
++{
++#ifdef __PROSPERO__
++    struct kevent event;
++    int res;
++    EV_SET(&event, 0, EVFILT_USER, EV_ADD | EV_CLEAR, 0, 0, 0);
++    RESTARTABLE(kevent(kqfd, &event, 1, NULL, 0, NULL), res);
++    if (res < 0) {
++        if (errno == EINVAL || errno == ENOTSUP || errno == ENOSYS) {
++            jio_fprintf(stderr, "PS5 selector wakeup: user events unsupported; pipe backend\n");
++            return 0;
++        }
++        JNU_ThrowIOExceptionWithLastError(env, "Register selector user event");
++        return 0;
++    }
++    jio_fprintf(stderr, "PS5 selector wakeup: registered user event\n");
++    return EVFILT_USER;
++#else
++    return 0;
++#endif
++}
++
++JNIEXPORT void JNICALL
++Java_sun_nio_ch_KQueue_triggerUserWakeup(JNIEnv *env, jclass clazz, jint kqfd)
++{
++#ifdef __PROSPERO__
++    struct kevent event;
++    int res;
++    EV_SET(&event, 0, EVFILT_USER, 0, NOTE_TRIGGER, 0, 0);
++    RESTARTABLE(kevent(kqfd, &event, 1, NULL, 0, NULL), res);
++    if (res < 0) {
++        JNU_ThrowIOExceptionWithLastError(env, "Trigger selector user event");
++    }
++#else
++    JNU_ThrowIOException(env, "Selector user events are not enabled");
++#endif
++}
