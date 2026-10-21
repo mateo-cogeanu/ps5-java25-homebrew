@@ -2014,3 +2014,11 @@ bounded direct metadata ownership/commit/release and preserves normal class
 encoding initialization. Actual reservation/ledger/release ASan/UBSan controls
 and targetHotSpot compilation pass. FullPS5 VM/classloading/GC lifecycle and
 shared native headroom remain pending; no heap or direct budget increase.
+
+## Compiler-thread owned stacks (0109)
+
+[0109](../docs/java25-compiler-thread-stack.md) extends the existing final
+EAGAIN/ENOMEM owned-stack fallback to compiler_thread, retaining its1MiB request,
+normal JavaThread entry/guards and join-before-release lifecycle. Budgets and C1
+settings stay unchanged. Actualgate/1MiBownerASan/UBSan/512KiBregressions and
+targetHotSpot build pass; actualPS5 C1/thread/TLS/nativepressure pending.

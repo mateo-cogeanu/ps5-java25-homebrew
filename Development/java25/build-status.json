@@ -403,6 +403,12 @@
     "patch": "0108-ps5-compact-class-space-direct-fallback.patch",
     "scope": "PS5AMD64compactheaders only,ordinaryENOMEN afteroptimized+alignedreserve; boundedrange,existingdirectmetadataownership,zero/PROT_NONE/mtClassNMT; originalclassencodinginit retained.",
     "host": "PASS actualreservation/ledger/releasedispatch ASan/UBSan32MiB/4MiBalignment,protection/zero/subrange/adjacentdata,budget/error/header/range/rollback/cleanup controls; targetHotSpotbuild andexactpatch. Compactarithmeticroundtrip notfullVMproof.",
-    "console": "095 consumerVMinitabort ordinary32MiBclassreserveENOMEM.0108pendingPS5 VMcreate/classloading/C1/GC/NMT/nativeheadroom. Shared128MiBbudgetunchanged;classbacking32MiBimmediatecharge."
+    "console": "096PS5classdirect32MiB/alignment4MiB success,0reportedallocfailures; latercompilerthreadENOMEM abort. Fullclassloading/GC/NMT/protection/nativepressure pending."
+  },
+  "compiler_thread_owned_stack": {
+    "patch": "0109-ps5-owned-compiler-thread-stack.patch",
+    "scope": "OnlyfinalEAGAIN+ENOMEM afterordinaryretries; java_thread ORcompiler_thread. Existingentry/guard/stacksize/owner/reaper/TLS/exactrelease/budgetsunchanged.",
+    "host": "PASS actualgate45combinations+actual1MiBcustompthreadowner/TLSdestructor/join-before-release220lifetimes/fault/budgetcontrolsASanUBSan;512KiBregression,targetHotSpot/exactpatch.",
+    "console": "096classspacereservation succeeds; compiler_thread1MiB ordinaryEAGAIN/ENOMEM abort.0109pendingPS5VMcreate/C1/nativepressure/lifecycle."
   }
 }

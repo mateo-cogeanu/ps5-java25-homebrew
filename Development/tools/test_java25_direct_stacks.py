@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Actual direct stack owner with real custom-stack pthreads and gated TLS destruction."""
 from pathlib import Path
-import subprocess
+import subprocess,argparse
+parser=argparse.ArgumentParser(description=__doc__);parser.add_argument("--compiler",action="store_true");args=parser.parse_args()
 r=Path(__file__).resolve().parents[1];w=r/'build/java25/direct-stack-test';(w/'runtime').mkdir(parents=True,exist_ok=True)
 (w/'runtime/ps5StartupTrace.hpp').write_text('#pragma once\ninline void ps5_vm_trace_values(const char*,unsigned long long,const char*,unsigned long long,const char*,unsigned long long){}\n')
 code=r'''
@@ -66,6 +67,7 @@ int main(){
  puts("PASS: actual direct stack owner, real512KiB custom-stack pthreads, gated TLS destructors/join-before-free,220reclaimed lifetimes, allocation/attribute/create/join/release faults and slot/budget caps; ASan/UBSan");
 }
 '''
+if args.compiler:code=code.replace('constexpr size_t bytes=512*1024','constexpr size_t bytes=1024*1024').replace('real512KiB','real1024KiB')
 (w/'test.cpp').write_text('#include <cstdio>\n'+code)
 subprocess.run(['clang++','-std=c++17','-O1','-g','-pthread','-fsanitize=address,undefined','-I'+str(w),'-I'+str(r/'.tools/java25/openjdk/src/hotspot/share'),str(w/'test.cpp'),'-o',str(w/'check')],check=True)
 subprocess.run([str(w/'check')],check=True,timeout=90)

@@ -1,0 +1,14 @@
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -907,7 +907,10 @@
+     }
+ 
+ #ifdef __PROSPERO__
+-    if (ret == EAGAIN && errno == ENOMEM && thr_type == java_thread) {
++    // CompilerThread is a JavaThread with the same entry/guard/exit contract.
++    // Keep its requested stack size and the existing owned-stack lifecycle.
++    if (ret == EAGAIN && errno == ENOMEM &&
++        (thr_type == java_thread || thr_type == compiler_thread)) {
+       ret=ps5_thread_stacks::create(&tid,stack_size,(void*(*)(void*))thread_native_entry,thread);
+     }
+ #endif
