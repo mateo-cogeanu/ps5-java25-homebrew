@@ -36,7 +36,7 @@ source=r'''
 static std::atomic<bool> deny_heap{false},deny_map{false};
 static std::atomic<int> heaps{0},maps{0},pool_live{0},resolver_live{0},fail_stage{0},map_count{0};
 static std::atomic<int> queries{0},active_queries{0},pool_creates{0},resolver_creates{0};
-static int fail_map_n=0;static thread_local int net_error=0;
+static int transient_timeouts=0,expected_timeout=0,expected_flags=0;static int fail_map_n=0;static thread_local int net_error=0;
 namespace std {inline void* injected_malloc(size_t n){if(deny_heap){errno=ENOMEM;return nullptr;}void*p=::malloc(n);if(p)heaps++;return p;}inline void injected_free(void*p){if(p)heaps--;::free(p);}}
 void* test_mmap(void*p,size_t n,int prot,int flags,int fd,off_t off){int count=++map_count;if(deny_map||(fail_map_n&&count==fail_map_n)){errno=ENOMEM;return MAP_FAILED;}p=::mmap(p,n,prot,flags,fd,off);if(p!=MAP_FAILED)maps++;return p;}
 int test_munmap(void*p,size_t n){int e=::munmap(p,n);if(!e)maps--;return e;}
@@ -57,7 +57,7 @@ int sceNetPoolCreate(const char*,int n,int f){assert(n==0x4000&&f==0);pool_creat
 int sceNetPoolDestroy(int p){assert(p==11);pool_live--;if(fail_stage==5){net_error=105;return -1;}return 0;}
 int sceNetResolverCreate(const char*,int p,int f){assert(p==11&&f==0);resolver_creates++;if(fail_stage==2){net_error=102;return -1;}resolver_live++;return 12;}
 int sceNetResolverDestroy(int h){assert(h==12);resolver_live--;if(fail_stage==4){net_error=104;return -1;}return 0;}
-int sceNetResolverStartNtoa(int h,const char*n,in_addr_t*a,int t,int retry,int flags){assert(h==12&&n&&t==0&&retry==0&&flags==0);assert(++active_queries==1);queries++;std::this_thread::yield();if(fail_stage==3){active_queries--;net_error=103;return -1;}*a=htonl(0xcb007109+(queries%2));active_queries--;return 0;}
+int sceNetResolverStartNtoa(int h,const char*n,in_addr_t*a,int t,int retry,int flags){assert(h==12&&n&&t==expected_timeout&&retry==0&&flags==expected_flags);assert(++active_queries==1);queries++;std::this_thread::yield();if(transient_timeouts>0||fail_stage==6){if(transient_timeouts>0)--transient_timeouts;*a=0xdeadbeef;active_queries--;net_error=226;errno=EAGAIN;return (int)0x804101e2u;}if(fail_stage==3){active_queries--;net_error=103;return -1;}*a=htonl(0xcb007109+(queries%2));active_queries--;return 0;}
 }
 ''' +adapter+r'''
 #define sceNetPoolCreate ps5_dns_pool_create
@@ -99,6 +99,20 @@ int main(){
  std::vector<std::thread> threads;for(int i=0;i<8;i++)threads.emplace_back([]{for(int j=0;j<50;j++)check();});for(auto&t:threads)t.join();
  assert(pool_creates==pools&&resolver_creates==resolvers&&queries==before+400);
  assert(!maps&&!heaps&&pool_live==1&&resolver_live==1&&!active_queries);
+ // Completed default-parameter timeouts retry within the same lease;
+ // failed answers never escape and the third attempt is the hard limit.
+ before=queries;transient_timeouts=1;check();assert(queries==before+2);
+ before=queries;transient_timeouts=2;check();assert(queries==before+3);
+ before=queries;fail_stage=6;failed_lookup();assert(queries==before+3&&net_error==226&&errno==EAGAIN);
+ fail_stage=0;check();
+ before=queries;transient_timeouts=1;fail_stage=3;failed_lookup();assert(queries==before+2&&net_error==103);
+ before=queries;failed_lookup();assert(queries==before+1&&net_error==103);
+ // Explicit timeout policy is passed through and never multiplied.
+ in_addr_t untouched=0x12345678;expected_timeout=7;fail_stage=6;before=queries;
+ assert(ps5_dns_ntoa(12,"unit.example",&untouched,7,0,0)<0&&queries==before+1&&untouched==0xdeadbeef&&net_error==226);
+ expected_timeout=0;expected_flags=1;before=queries;untouched=0x12345678;
+ assert(ps5_dns_ntoa(12,"unit.example",&untouched,0,0,1)<0&&queries==before+1&&untouched==0xdeadbeef&&net_error==226);
+ expected_flags=0;fail_stage=0;check();
  // Fresh query errors remain real, release the lease and permit recovery.
  fail_stage=3;failed_lookup();assert(net_error==103);fail_stage=0;check();
  reset_pair();fail_stage=1;failed_lookup();assert(!pool_live&&!resolver_live&&net_error==101);
@@ -110,7 +124,7 @@ int main(){
  fail_map_n=0;check();hints.ai_family=AF_INET6;assert(test_getaddrinfo("unit.example",nullptr,&hints,&res)==EAI_FAMILY);
  assert(!ps5_dns_malloc(SIZE_MAX)&&errno==ENOMEM);ps5_dns_free(nullptr);
  reset_pair();assert(!maps&&!heaps);
- puts("PASS: actual SDK lookup/free and scoped adapter; early pair creation withoutquery/answers,partialpreparefailure/retry/leasecleanup,one retained pair,400 serialized cross-thread fresh queries with late pool/resolver/heap allocation denied, changed answers, real query failure/recovery, partial initialization failure/retry, all result allocation failures, IPv4/IPv6 conversion allocation blocks, errno, overflow, unsupported IPv6 and matched cleanup; ASan/UBSan. Network injected, not console proof.");
+ puts("PASS: actual SDK lookup/free and scoped adapter; early pair creation withoutquery/answers,partialpreparefailure/retry/leasecleanup,one retained pair,400 serialized cross-thread fresh queries with late pool/resolver/heap allocation denied, changed answers, timeout recovery onsecond/thirdattempt, persistenttimeout hardcap, explicitpolicy/flags passthrough, permanenterror no-retry, real query failure/recovery, partial initialization failure/retry, all result allocation failures, IPv4/IPv6 conversion allocation blocks, errno, overflow, unsupported IPv6 and matched cleanup; ASan/UBSan. Network injected, not console proof.");
 }
 
 '''

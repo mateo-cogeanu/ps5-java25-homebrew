@@ -430,5 +430,11 @@
     "scope": "Shared on-demand native direct ledger only; unchanged ownership, in-flight and failed-cleanup charging. Separate policy rejection counter; no Java heap or executable mapping changes.",
     "host": "PASS actual allocator/ledger ASan/UBSan mixed owners beyond128MiB, exact256MiB boundary, reject without kernel call, release/reuse; existing faults/slots/concurrent lifetimes and target HotSpot build.",
     "console": "Pending increased backing availability, class loading/GC/thread lifecycle and sustained stability."
+  },
+  "dns_timeout_retries": {
+    "source": "java25/probe/netdb_alloc.cpp",
+    "scope": "At most3 completed default-parameter synchronous attempts for neterrno226 only; same lease; nondefault calls unchanged; final errors preserved. No cached answers or security changes.",
+    "host": "PASS actual adapter+SHA-pinned SDK lookup/conversion/cleanup ASan/UBSan transient success2/3, persistent exact3, permanent error/no retry, explicit timeout/flags pass-through, errno/failed-answer isolation and existing400-threaded-query controls.",
+    "console": "101 firstDNSquery0x804101E2/neterrno226; pool/resolver preparation succeeds, no native direct failures/refusals. Retry recovery and Paper readiness pending."
   }
 }

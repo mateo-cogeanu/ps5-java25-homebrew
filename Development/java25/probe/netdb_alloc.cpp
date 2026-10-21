@@ -55,7 +55,30 @@ int ps5_dns_resolver_destroy(int h){
  if(h!=dns_resolver)return sceNetResolverDestroy(h);
  dns_result("DNS resolver lease release",0,0);return 0;
 }
-int ps5_dns_ntoa(int h,const char*n,in_addr_t*a,int timeout,int retry,int flags){int r=sceNetResolverStartNtoa(h,n,a,timeout,retry,flags);int e=r<0?*sceNetErrnoLoc():0;dns_result("DNS resolver query",r,e);return r;}
+int ps5_dns_ntoa(int h,const char*n,in_addr_t*a,int timeout,int retry,int flags){
+ // The pinned SDK uses synchronous default parameters and turns every DNS
+ // error into EAI_FAIL. Retry only a completed timeout before that conversion
+ // and before Java can negatively cache it. Preserve explicit caller policy.
+ if(timeout!=0 || retry!=0 || flags!=0){
+  int r=sceNetResolverStartNtoa(h,n,a,timeout,retry,flags);
+  dns_result("DNS resolver query",r,r<0?*sceNetErrnoLoc():0);return r;
+ }
+ const unsigned attempts=3;
+ const int saved_errno=errno,saved_net_error=*sceNetErrnoLoc();
+ for(unsigned attempt=0;attempt<attempts;++attempt){
+  in_addr_t answer=0;
+  int r=sceNetResolverStartNtoa(h,n,&answer,timeout,retry,flags);
+  int e=r<0?*sceNetErrnoLoc():0;
+  dns_result("DNS resolver query",r,e);
+  if(r>=0){*a=answer;errno=saved_errno;*sceNetErrnoLoc()=saved_net_error;return r;}
+  // SCE_NET_RESOLVER_ETIMEDOUT=226; console returned0x804101E2/neterrno226.
+  if(e!=226 || attempt+1==attempts)return r;
+  ps5_vm_trace_values("DNS resolver timeout retry attempt=",attempt+2," max_attempts=",attempts," net_errno=",e);
+  // Tracing must not change the failure state presented to the next call.
+  errno=saved_errno;*sceNetErrnoLoc()=saved_net_error;
+ }
+ return -1; // The bounded loop always returns on success or its last failure.
+}
 // Create the same pinned SDK pair before VM allocation pressure, without a
 // DNS query or cached answer. Release the normal lease on every path.
 int ps5_dns_prepare(){
