@@ -2005,3 +2005,12 @@ and shuts down network event loops. Existing coalescing/close locking remains;
 real errors propagate, unsupported kernels retain a diagnosed pipe fallback.
 Actual selector/JNI host concurrency/readiness/error tests and target classes/
 native compilation pass. PS5 event support and joined stability remain pending.
+
+## Compact class-space reservation (0108)
+
+[0108](../docs/java25-compact-class-space-direct.md) adds a PS5AMD64 compact-header
+class-space fallback only after ordinary reservation ENOMEM. It shares existing
+bounded direct metadata ownership/commit/release and preserves normal class
+encoding initialization. Actual reservation/ledger/release ASan/UBSan controls
+and targetHotSpot compilation pass. FullPS5 VM/classloading/GC lifecycle and
+shared native headroom remain pending; no heap or direct budget increase.

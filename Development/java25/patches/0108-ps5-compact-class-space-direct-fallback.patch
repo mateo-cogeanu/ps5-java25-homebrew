@@ -1,0 +1,43 @@
+--- a/src/hotspot/share/memory/metaspace.cpp
++++ b/src/hotspot/share/memory/metaspace.cpp
+@@ -34,6 +34,9 @@
+ #include "memory/memoryReserver.hpp"
+ #include "memory/metaspace.hpp"
+ #include "runtime/ps5StartupTrace.hpp"
++#ifdef __PROSPERO__
++#include "runtime/ps5NativeDirectMemory.hpp"
++#endif
+ #include "memory/metaspace/chunkHeaderPool.hpp"
+ #include "memory/metaspace/chunkManager.hpp"
+ #include "memory/metaspace/commitLimiter.hpp"
+@@ -602,6 +605,30 @@
+     result = os::reserve_memory_aligned(size, Metaspace::reserve_alignment(), mtClass);
+   }
+ 
++#if defined(__PROSPERO__) && defined(AMD64)
++  // Compact headers use a range-relative narrowKlass base. Only after all
++  // ordinary placement attempts fail can a non-fixed direct mapping be used.
++  // The usual CompressedKlassPointers::initialize validation still follows.
++  if (result == nullptr && errno == ENOMEM && UseCompactObjectHeaders &&
++      size <= CompressedKlassPointers::max_klass_range_size()) {
++    void* direct = ps5_native_direct::map(size, Metaspace::reserve_alignment(), true);
++    if (direct != MAP_FAILED) {
++      ::memset(direct, 0, size);
++      if (::mprotect(direct, size, PROT_NONE) == 0) {
++        MemTracker::record_virtual_memory_reserve(direct, size, CALLER_PC, mtClass);
++        ps5_vm_trace_values("PS5 class space direct reservation: bytes=", size,
++                            " alignment=", Metaspace::reserve_alignment(), " address=", (uintptr_t)direct);
++        ps5_native_direct::report();
++        result = (char*)direct;
++      } else {
++        int error = errno, release_result;
++        ps5_native_direct::unmap(direct, size, &release_result);
++        errno = error;
++      }
++    }
++  }
++#endif
++
+   // Wrap resulting range in ReservedSpace
+   if (result != nullptr) {
+     log_debug(metaspace, map)("Mapped at " PTR_FORMAT, p2i(result));

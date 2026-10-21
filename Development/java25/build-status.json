@@ -398,5 +398,11 @@
     "host": "PASS actual patched Java selector/new JNI on macOS kqueue:1200 wake-before/blocking/coalescing rounds,socket readiness/cancel,100 close races,EINTR,unsupported fallback,register ENOMEM/trigger EIO; -Xcheck:jni/UBSan. Targetjava.base classes/native build PASS.",
     "console": "Pending PS5 user-filter availability/marker,wakeups under native pressure,connection/stop stability; unsupported kernel retains pipe and observed pipe ENOMEM remains possible.",
     "design": "PS5 EV_ADD|EV_CLEAR once,NOTE_TRIGGER on wakeup,actual native filter returned,no pipe buffer; existing interrupt lock/coalescing,matched close; genuine errors preserved. No game changes."
+  },
+  "compact_class_space_direct": {
+    "patch": "0108-ps5-compact-class-space-direct-fallback.patch",
+    "scope": "PS5AMD64compactheaders only,ordinaryENOMEN afteroptimized+alignedreserve; boundedrange,existingdirectmetadataownership,zero/PROT_NONE/mtClassNMT; originalclassencodinginit retained.",
+    "host": "PASS actualreservation/ledger/releasedispatch ASan/UBSan32MiB/4MiBalignment,protection/zero/subrange/adjacentdata,budget/error/header/range/rollback/cleanup controls; targetHotSpotbuild andexactpatch. Compactarithmeticroundtrip notfullVMproof.",
+    "console": "095 consumerVMinitabort ordinary32MiBclassreserveENOMEM.0108pendingPS5 VMcreate/classloading/C1/GC/NMT/nativeheadroom. Shared128MiBbudgetunchanged;classbacking32MiBimmediatecharge."
   }
 }
