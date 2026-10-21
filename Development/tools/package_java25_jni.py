@@ -28,6 +28,7 @@ external=json.loads(args.probe_spec.read_text()) if args.probe_spec else None
 if external:
     for key in ("source","param","asset_dir"):
         if not Path(external[key]).exists():parser.error("External probe input missing: "+key)
+    if "menu_audio" in external and type(external["menu_audio"]) is not bool:parser.error("External menu_audio must be a boolean")
     compile_classpath=external.get("java_compile_classpath",[])
     if not isinstance(compile_classpath,list) or not all(isinstance(p,str) and Path(p).is_file() for p in compile_classpath):
         parser.error("External java_compile_classpath must list existing JARs")
@@ -214,7 +215,7 @@ if args.startup:
         (assets/"probe.properties").unlink(missing_ok=True) # No endpoint/address configuration for listeners.
     sounds=assets.parent/"sounds"
     sounds.mkdir(exist_ok=True)
-    for name in ("menu_music", "sel"):
+    for name in (("menu_music", "sel") if not external or external.get("menu_audio", True) else ()):
         subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(ROOT/"sounds"/(name+".wav")),
                         "-ar", "48000", "-ac", "2", "-f", "s16le", str(sounds/(name+".pcm"))], check=True)
     extra_args=["--asset-dir",str(assets.parent)]

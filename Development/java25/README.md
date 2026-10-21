@@ -1966,3 +1966,16 @@ in-flight requests to2MiB before using existing page/slab/direct backends. This
 reduces competition with SDK services that cannot use the VM fallback, without
 guaranteeing native headroom or changing thread/heap mappings. ASan/UBSan/NMT/
 concurrency/target checks pass; actual PS5 effectiveness and stability pending.
+
+## Non-class metadata fallback (0104)
+
+[0104](../docs/java25-direct-metaspace.md) retries ENOMEM for ordinary non-fixed,
+non-executable mtMetaspace reservations through the existing bounded direct
+ledger, with requested alignment and zero/protect/commit/reclaim/release handling.
+Java heap, compressed class space and executable mappings remain excluded.
+Physical backing stays budgeted across logical uncommit. Target/host checks pass;
+actual PS5 lifecycle/headroom/stability validation remains pending.
+
+External probe JSON may set `menu_audio:false` to omit generated menu music and
+selection PCM assets. The consumer must also omit its audio playback calls;
+existing consumers default to the previous packaged audio behavior.

@@ -373,5 +373,12 @@
     "scope": "VM raw allocator only; atomic prefix-inclusive/in-flight libc charge, existing page/slab/direct fallback above budget; exact shrink/grow/failure/migration/free accounting. No SDK interposition/reserve or thread lifecycle/heap/metaspace/codecache mapping changes.",
     "host": "PASS: actual allocator/os.cpp NMT/pre-init ASan/UBSan, budget boundaries, shrink/grow/migrate/rollback/refusal/concurrent reservation and cleanup; existing actual direct-ledger/fault/concurrency and prefix footprint controls; exact forward patch and targetHotSpot build.",
     "console": "Pending; no guarantee of SDK headroom or performance. Other allocators/map budgets/resource limits can still refuse."
-  }
+  },
+  "direct_metaspace": {
+    "patch": "0104-ps5-direct-metaspace-reservation-fallback.patch",
+    "scope": "Ordinary non-fixed/nonexec mtMetaspace ENOMEM only; shared direct ledger/requested alignment, new backing zeroed/PROT_NONE/NMT reserve; existing RWcommit, zero+NONE logicaluncommit retaining physicalbudget, exactwhole release dispatch. Heap/classspace/exec/other tags excluded.",
+    "host": "PASS: actual MemoryReserver/direct ledger/helpers/OSrelease ASan/UBSan real alignedstorage:4MiB alignment, firstcommit zeroing, PROT_NONE faults, subrangezero/recommit/adjacentdata, gates/NMTevent/rollback/exactrelease/cleanupretention. Existing allocator/os.cppNMT/directfault/concurrency/metaspacehints/prefix tests and exactpatch/targetHotSpot pass.",
+    "console": "089 ordinary4MiB metadata reserve fails ENOMEM before readiness.0104pendingPS5 protection/commit/reclaim/NMT/pressure/stability; shared128MiB/2048slot budget unchanged."
+  },
+  "external_probe_audio": "Optional menu_audio boolean defaults true; false skips generated menu music/selection PCM. Consumer must omit playback; frozen probes unchanged."
 }

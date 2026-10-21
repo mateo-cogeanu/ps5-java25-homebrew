@@ -1,0 +1,169 @@
+--- a/src/hotspot/share/runtime/ps5NativeDirectMemory.hpp
++++ b/src/hotspot/share/runtime/ps5NativeDirectMemory.hpp
+@@ -5,6 +5,7 @@
+ #include <stddef.h>
+ #include <stdint.h>
+ #include <errno.h>
++#include <string.h>
+ #include <sys/mman.h>
+ #include "runtime/ps5StartupTrace.hpp"
+ 
+@@ -14,13 +15,13 @@
+ extern "C" int sceKernelMunmap(void*, size_t);
+ extern "C" int sceKernelReleaseDirectMemory(int64_t, size_t);
+ 
+-// Only the raw native allocator's ENOMEM fallback uses this pool. Java heap,
+-// metaspace, executable memory and ordinary successful mappings are unchanged.
++// Shared bounded native-data pool. Metadata reservations may use it only
++// after ordinary allocation fails; Java heap/class space/code cache are excluded.
+ namespace ps5_native_direct {
+ constexpr size_t page_bytes = 16384;
+ constexpr size_t budget_bytes = 128 * 1024 * 1024;
+ constexpr unsigned entry_count = 2048;
+-struct Entry { void* address; int64_t physical; size_t bytes; bool occupied; };
++struct Entry { void* address; int64_t physical; size_t bytes; bool occupied; bool metadata; };
+ struct State { unsigned mutex; size_t held, mappings, releases, failures; int last_result; Entry entries[entry_count]; };
+ inline State& state() { static State value = {}; return value; }
+ inline void lock() {
+@@ -45,8 +46,8 @@
+   state().held -= state().entries[slot].bytes;
+   state().entries[slot] = {};
+ }
+-inline void* map(size_t bytes) {
+-  if (bytes == 0 || bytes % page_bytes != 0 || bytes > budget_bytes) {
++inline void* map(size_t bytes, size_t alignment = page_bytes, bool metadata = false) {
++  if (bytes == 0 || bytes % page_bytes != 0 || bytes > budget_bytes || alignment < page_bytes || (alignment & (alignment - 1)) != 0) {
+     errno = ENOMEM; return MAP_FAILED;
+   }
+   // Reserve a ledger slot and budget before invoking the kernel. No allocation
+@@ -58,12 +59,12 @@
+   }
+   if (slot == entry_count) {unlock();errno=ENOMEM;return MAP_FAILED;}
+   state().held += bytes;
+-  state().entries[slot] = {nullptr, -1, bytes, true};
++  state().entries[slot] = {nullptr, -1, bytes, true, metadata};
+   unlock();
+   size_t pool = sceKernelGetDirectMemorySize();
+   int64_t physical = -1;
+   int result = pool >= bytes && pool <= INT64_MAX
+-    ? sceKernelAllocateDirectMemory(0, (int64_t)pool, bytes, page_bytes, 12, &physical)
++    ? sceKernelAllocateDirectMemory(0, (int64_t)pool, bytes, alignment, 12, &physical)
+     : -1;
+   if (result != 0) {
+     lock();abandon(slot);size_t held=state().held;unlock();
+@@ -73,7 +74,7 @@
+   // A hint, never MAP_FIXED: do not replace existing VM mappings. Keep CPU
+   // native buffers away from the low address window used by later graphics.
+   void* address = (void*)(uintptr_t)0x1000000000ULL;
+-  result = sceKernelMapDirectMemory(&address,bytes,PROT_READ|PROT_WRITE,0,physical,page_bytes);
++  result = sceKernelMapDirectMemory(&address,bytes,PROT_READ|PROT_WRITE,0,physical,alignment);
+   if (result != 0) {
+     int released = sceKernelReleaseDirectMemory(physical,bytes);
+     lock();state().entries[slot].physical=physical;
+@@ -84,7 +85,7 @@
+     errno=ENOMEM;return MAP_FAILED;
+   }
+   // A successful kernel mapping must produce usable, page-aligned storage.
+-  if (address == nullptr || address == MAP_FAILED || (uintptr_t)address % page_bytes != 0) {
++  if (address == nullptr || address == MAP_FAILED || (uintptr_t)address % alignment != 0) {
+     // Keep ownership recorded if a kernel anomaly prevents safe cleanup.
+     int unmapped = sceKernelMunmap(address,bytes);
+     int released = unmapped==0 ? sceKernelReleaseDirectMemory(physical,bytes) : -1;
+@@ -120,6 +121,26 @@
+   if(*result!=0)errno=EIO;
+   return true;
+ }
++// Metadata subranges may be logically committed/decommitted, but only the
++// exact whole mapping may release physical ownership. Raw data entries excluded.
++inline bool metadata_range(void* address, size_t bytes) {
++  uintptr_t start=(uintptr_t)address;
++  if (!bytes || start > UINTPTR_MAX-bytes) return false;
++  lock();bool found=false;
++  for (unsigned i=0;i<entry_count;++i) {
++    const Entry& e=state().entries[i];uintptr_t base=(uintptr_t)e.address;
++    if(e.occupied && e.metadata && e.address && start>=base &&
++       start-base<=e.bytes && bytes<=e.bytes-(start-base)) {found=true;break;}
++  }
++  unlock();return found;
++}
++inline bool uncommit_metadata(void* address,size_t bytes) {
++  // Metaspace only uncommits unused granules. Keep backing owned/budgeted,
++  // zero before protecting so a later commit sees fresh anonymous semantics.
++  if (::mprotect(address,bytes,PROT_READ|PROT_WRITE)!=0) return false;
++  ::memset(address,0,bytes);
++  return ::mprotect(address,bytes,PROT_NONE)==0;
++}
+ inline void report() {
+   lock();size_t held=state().held,mappings=state().mappings,releases=state().releases,failures=state().failures;int result=state().last_result;unlock();
+   if(mappings||failures) {
+--- a/src/hotspot/share/memory/memoryReserver.cpp
++++ b/src/hotspot/share/memory/memoryReserver.cpp
+@@ -25,6 +25,9 @@
+ #include "jvm.h"
+ #include "logging/log.hpp"
+ #include "memory/memoryReserver.hpp"
++#ifdef __PROSPERO__
++#include "runtime/ps5NativeDirectMemory.hpp"
++#endif
+ #include "oops/compressedOops.hpp"
+ #include "oops/markWord.hpp"
+ #include "runtime/globals_extension.hpp"
+@@ -146,6 +149,23 @@
+     return ReservedSpace(base, size, alignment, page_size, exec, false /* special */);
+   }
+ 
++#ifdef __PROSPERO__
++  // Non-class metadata has no low-address encoding requirement. Do not extend
++  // this to Java heap, compressed class space, executable or fixed mappings.
++  if (requested_address == nullptr && !exec && mem_tag == mtMetaspace && errno == ENOMEM) {
++    void* direct=ps5_native_direct::map(size, alignment, true);
++    if (direct != MAP_FAILED) {
++      ::memset(direct,0,size); // Direct physical backing is not anonymous zero-fill.
++      if (::mprotect(direct,size,PROT_NONE)==0) {
++        MemTracker::record_virtual_memory_reserve(direct,size,CALLER_PC,mem_tag);
++        ps5_vm_trace_values("PS5 metaspace direct reservation: bytes=",size," alignment=",alignment," address=",(uintptr_t)direct);
++        ps5_native_direct::report();
++        return ReservedSpace((char*)direct,size,alignment,page_size,false,false);
++      }
++      int error=errno,result;ps5_native_direct::unmap(direct,size,&result);errno=error;
++    }
++  }
++#endif
+   // Failed
+   return {};
+ }
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -37,6 +37,9 @@
+ #include "nmt/memTracker.hpp"
+ #include "oops/oop.inline.hpp"
+ #include "os_bsd.inline.hpp"
++#ifdef __PROSPERO__
++#include "runtime/ps5NativeDirectMemory.hpp"
++#endif
+ #include "os_posix.inline.hpp"
+ #include "prims/jniFastGetField.hpp"
+ #include "prims/jvm_misc.hpp"
+@@ -2088,6 +2091,11 @@
+ }
+ 
+ bool os::pd_uncommit_memory(char* addr, size_t size, bool exec) {
++#ifdef __PROSPERO__
++  if (!exec && ps5_native_direct::metadata_range(addr,size)) {
++    return ps5_native_direct::uncommit_metadata(addr,size);
++  }
++#endif
+   if (exec) {
+     if (::madvise(addr, size, MADV_FREE) != 0) {
+       ErrnoPreserver ep;
+@@ -2192,6 +2200,10 @@
+ }
+ 
+ bool os::pd_release_memory(char* addr, size_t size) {
++#ifdef __PROSPERO__
++  int result;
++  if (ps5_native_direct::unmap(addr,size,&result)) return result==0;
++#endif
+   return anon_munmap(addr, size);
+ }
+ 

@@ -9,6 +9,7 @@ for name in ['baseline/runtime','stubs/runtime','stubs/utilities']:(w/name).mkdi
 # prefix-only control; the current compact allocator remains the other arm.
 control=w/'pre-direct';(control/'src/hotspot/share/runtime').mkdir(parents=True,exist_ok=True)
 for name in ['ps5NativeHeap.hpp','ps5NativeDirectMemory.hpp']:shutil.copy2(actual.parent/name,control/'src/hotspot/share/runtime'/name)
+subprocess.run(['git','apply','--reverse','--include=*ps5NativeDirectMemory.hpp',str(r/'java25/patches/0104-ps5-direct-metaspace-reservation-fallback.patch')],cwd=control,check=True)
 subprocess.run(['git','apply','--reverse',str(r/'java25/patches/0103-ps5-bound-vm-libc-allocation-budget.patch')],cwd=control,check=True)
 subprocess.run(['git','apply','--reverse',str(r/'java25/patches/0101-ps5-native-direct-memory-fallback.patch')],cwd=control,check=True)
 subprocess.run(['patch','-R','-o',str(w/'baseline/runtime/ps5NativeHeap.hpp'),str(control/'src/hotspot/share/runtime/ps5NativeHeap.hpp'),str(patch)],check=True,capture_output=True)
