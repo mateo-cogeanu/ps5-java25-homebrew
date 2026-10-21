@@ -10,9 +10,12 @@ The reusable JNI worker now offers prepare(), called before VM allocation
 pressure to initialize separate ordinary and direct-stack pthread attributes.
 The ordinary path remains first with its8MiB requested stack. Only on PS5, after
 pthread_create returns EAGAIN with errnoENOMEM, a page-multiple stack of at most
-8MiB can use the existing JVM_PS5MapNativeMemory C ABI/shared direct ledger.
+8MiB can use the existing JVM_PS5MapNativeThreadStack C ABI/shared direct ledger.
 Storage is zeroed and set with explicit stack attributes/guardsize0. No executable
-mapping or kernel default guard is fabricated. The callback follows real
+mapping or kernel default guard is fabricated. Runtime0110 exposes a stack-
+purpose mapper so VM guard-page removal uses existing stack subrange handling
+instead of replacing direct storage with anonymous MAP_FIXED. The same exact
+unmap ABI handles cleanup. The callback follows real
 AttachCurrentThread, uses its own JNIEnv and DetachCurrentThread.
 
 This worker has one explicit stack mapping per Job; it does not use the VM's
@@ -39,5 +42,7 @@ by real8MiB custom-stack pthread success, non-ENOMEM exclusion, map/create/join/
 release faults, gated TLS-destructor proof of join-before-free and retained
 ownership. The direct-stack test supplies controlled real mappings behind the
 VM memory ABI; it does not retest the already separately covered shared ledger
-or PS5 kernel behavior. Target linking/package checks establish the actual VM
+or PS5 kernel behavior. Actual0110VMABI/shared-ledger ASan/UBSan checks also cover stack-purpose tagging,
+8MiBcap/page gates,guard-subrange zero/uncommit/recommit/adjacent data and exact
+release. TargetHotSpot compiles; linking/package checks establish the actual VM
 ABI binding. FullPS5 pressure/stack guards/TLS/attachment/lifecycle remain pending.

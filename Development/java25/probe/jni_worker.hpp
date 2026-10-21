@@ -8,7 +8,7 @@
 #ifdef __PROSPERO__
 #include <sys/mman.h>
 #include <cstring>
-extern "C" JNIEXPORT void* JNICALL JVM_PS5MapNativeMemory(size_t);
+extern "C" JNIEXPORT void* JNICALL JVM_PS5MapNativeThreadStack(size_t);
 extern "C" JNIEXPORT int JNICALL JVM_PS5UnmapNativeMemory(void*,size_t);
 #endif
 namespace ps5::jni_worker {
@@ -62,7 +62,7 @@ struct Job {
   phase="worker ordinary pthread_create";errno=0;rc=pthread_create(&thread,&ordinary_attr,entry,this);int native_error=errno;
   if(rc==EAGAIN&&native_error==ENOMEM&&stack_size&&stack_size%16384==0&&stack_size<=8*1024*1024){
    phase="worker direct stack allocation";
-   stack_memory=JVM_PS5MapNativeMemory(stack_size);
+   stack_memory=JVM_PS5MapNativeThreadStack(stack_size);
    if(stack_memory==MAP_FAILED){stack_memory=nullptr;return ENOMEM;}
    stack_bytes=stack_size;std::memset(stack_memory,0,stack_size);
    phase="worker direct stack attributes";rc=pthread_attr_setstack(&direct_attr,stack_memory,stack_size);

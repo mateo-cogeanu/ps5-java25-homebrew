@@ -1,0 +1,19 @@
+--- a/src/hotspot/share/runtime/os.cpp
++++ b/src/hotspot/share/runtime/os.cpp
+@@ -2681,6 +2681,16 @@
+ extern "C" JNIEXPORT void* JNICALL JVM_PS5MapNativeMemory(size_t bytes) {
+   int saved=errno;
+   void* result=ps5_native_direct::map(bytes);
++  ps5_native_direct::report();
++  if(result!=MAP_FAILED)errno=saved;
++  return result;
++}
++// Externally attached JNI workers need stack-purpose ownership so guard-page
++// removal cannot replace a subrange of the direct mapping with MAP_FIXED.
++extern "C" JNIEXPORT void* JNICALL JVM_PS5MapNativeThreadStack(size_t bytes) {
++  if (bytes == 0 || bytes > 8*1024*1024) { errno=ENOMEM; return MAP_FAILED; }
++  int saved=errno;
++  void* result=ps5_native_direct::map(bytes,ps5_native_direct::page_bytes,false,true);
+   ps5_native_direct::report();
+   if(result!=MAP_FAILED)errno=saved;
+   return result;

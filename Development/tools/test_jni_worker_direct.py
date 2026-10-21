@@ -24,7 +24,7 @@ static int fake_create(pthread_t*t,const pthread_attr_t*a,void*(*f)(void*),void*
 }
 static bool refuse_join=false,refuse_release=false;
 static int fake_join(pthread_t t,void**v){return refuse_join?EINVAL:pthread_join(t,v);}
-extern "C" JNIEXPORT void* JNICALL JVM_PS5MapNativeMemory(size_t bytes){
+extern "C" JNIEXPORT void* JNICALL JVM_PS5MapNativeThreadStack(size_t bytes){
  ++maps;if(mode==3){errno=ENOMEM;return MAP_FAILED;}assert(!memory);length=bytes;memory=mmap(nullptr,bytes,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);assert(memory!=MAP_FAILED);memset(memory,0x71,bytes);return memory;
 }
 extern "C" JNIEXPORT int JNICALL JVM_PS5UnmapNativeMemory(void*p,size_t bytes){assert(p==memory&&bytes==length);if(refuse_release)return EIO;++unmaps;int rc=munmap(p,bytes);memory=nullptr;return rc;}
