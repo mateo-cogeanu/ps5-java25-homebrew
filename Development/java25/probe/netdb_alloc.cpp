@@ -56,6 +56,18 @@ int ps5_dns_resolver_destroy(int h){
  dns_result("DNS resolver lease release",0,0);return 0;
 }
 int ps5_dns_ntoa(int h,const char*n,in_addr_t*a,int timeout,int retry,int flags){int r=sceNetResolverStartNtoa(h,n,a,timeout,retry,flags);int e=r<0?*sceNetErrnoLoc():0;dns_result("DNS resolver query",r,e);return r;}
+// Create the same pinned SDK pair before VM allocation pressure, without a
+// DNS query or cached answer. Release the normal lease on every path.
+int ps5_dns_prepare(){
+ int saved=errno;
+ int pool=ps5_dns_pool_create("",0x4000,0);if(pool<0)return pool;
+ int resolver=ps5_dns_resolver_create("",pool,0);
+ int failure=resolver<0?*sceNetErrnoLoc():0;
+ if(resolver>=0)ps5_dns_resolver_destroy(resolver);
+ ps5_dns_pool_destroy(pool);
+ if(resolver<0){*sceNetErrnoLoc()=failure;return resolver;}
+ dns_result("DNS early pair ready",0,0);errno=saved;return 0;
+}
 int getaddrinfo(const char*n,const char*s,const struct addrinfo*h,struct addrinfo**r){
  int result=ps5_sdk_getaddrinfo(n,s,h,r),saved=errno;
  ps5_vm_trace_values("DNS getaddrinfo result=",(uint32_t)result," family=",h?(uint32_t)h->ai_family:0," flags=",h?(uint32_t)h->ai_flags:0);

@@ -416,5 +416,11 @@
     "scope": "Earlyprepare cachedordinary/directattrs; ordinary8MiBfirst; PS5finalcreateEAGAIN+ENOMEM only->0110sharedVMstack-purposeABI explicitstack<=8MiB; zero,joinTLS-before-unmap,retainfailedcleanup; phasediagnostics.",
     "host": "PASS actualheader/realJVM/pthread ordinaryattach/callback/distinctJNIEnv/detach; controlledlateattrENOMEM/nativecreateENOMEM/directmap/create/join/releasefaults,8MiBstack,gatedTLSjoin-before-free/retention. Targetbinding/packagepending. Actual0110stackVMABI/sharedledger stacktag/guarduncommit/exactreleaseASanUBSan andtargetHotSpotPASS.",
     "console": "097VMcreate/C1verifycomplete,playfailsbeforecallback; oldreportlacksnumericstage so exactcauseunknown. Newpath/diagnosticconsolepending."
+  },
+  "early_dns_pair": {
+    "source": "java25/probe/netdb_alloc.cpp",
+    "scope": "ps5_dns_prepare creates/leases/releases existing16KiB SDK pool+resolver beforeVMpressure; no query/cache/newpair,partialfailreleaseslease/realerrors.",
+    "host": "PASSactualadapter+pinnedSDK/JDKblocksASanUBSan preparepool/resolverfaults/partialretry/zeroqueries/idempotence/errno,400concurrentfreshlookupswithlateallocationrefusal/error/cleanupcontrols.",
+    "console": "098firstlookup poolcreate0x804101ce/neterrno206/errnoENOMEM; worker/TLSinitcomplete. Earlyprepare/laterDNS/TLSpressurependingPS5."
   }
 }

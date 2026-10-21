@@ -86,6 +86,11 @@ void check(){struct addrinfo hints={};hints.ai_family=AF_UNSPEC;hints.ai_flags=A
 void reset_pair(){fail_stage=0;if(dns_resolver>=0){assert(sceNetResolverDestroy(dns_resolver)==0);dns_resolver=-1;}if(dns_pool>=0){assert(sceNetPoolDestroy(dns_pool)==0);dns_pool=-1;}assert(!pool_live&&!resolver_live);}
 void failed_lookup(){struct addrinfo hints={};hints.ai_flags=AI_CANONNAME;struct addrinfo*res=nullptr;assert(test_getaddrinfo("unit.example",nullptr,&hints,&res)==EAI_FAIL&&!res);assert(!maps&&!heaps);}
 int main(){
+ fail_stage=1;assert(ps5_dns_prepare()<0&&!pool_live&&!resolver_live&&net_error==101);
+ fail_stage=2;assert(ps5_dns_prepare()<0&&pool_live==1&&!resolver_live&&net_error==102);
+ fail_stage=0;errno=EDOM;assert(!ps5_dns_prepare()&&errno==EDOM&&queries==0&&pool_live==1&&resolver_live==1);
+ int pools_before=pool_creates,resolvers_before=resolver_creates;
+ assert(!ps5_dns_prepare()&&pool_creates==pools_before&&resolver_creates==resolvers_before&&queries==0);
  check();assert(!maps&&!heaps&&pool_live==1&&resolver_live==1);
  // Reproduce the console: create once early, deny every later pool/resolver
  // allocation, then resolve from other threads under libc allocation refusal.
@@ -105,7 +110,7 @@ int main(){
  fail_map_n=0;check();hints.ai_family=AF_INET6;assert(test_getaddrinfo("unit.example",nullptr,&hints,&res)==EAI_FAMILY);
  assert(!ps5_dns_malloc(SIZE_MAX)&&errno==ENOMEM);ps5_dns_free(nullptr);
  reset_pair();assert(!maps&&!heaps);
- puts("PASS: actual SDK lookup/free and scoped adapter; one retained pair,400 serialized cross-thread fresh queries with late pool/resolver/heap allocation denied, changed answers, real query failure/recovery, partial initialization failure/retry, all result allocation failures, IPv4/IPv6 conversion allocation blocks, errno, overflow, unsupported IPv6 and matched cleanup; ASan/UBSan. Network injected, not console proof.");
+ puts("PASS: actual SDK lookup/free and scoped adapter; early pair creation withoutquery/answers,partialpreparefailure/retry/leasecleanup,one retained pair,400 serialized cross-thread fresh queries with late pool/resolver/heap allocation denied, changed answers, real query failure/recovery, partial initialization failure/retry, all result allocation failures, IPv4/IPv6 conversion allocation blocks, errno, overflow, unsupported IPv6 and matched cleanup; ASan/UBSan. Network injected, not console proof.");
 }
 
 '''

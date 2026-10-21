@@ -2031,3 +2031,11 @@ first. PS5EAGAIN/ENOMEM can use the existing shared VM memory ABI for an owned
 explicit stack released only after real join/TLS completion. Stage diagnostics
 preserve launch/attach/join/cleanup failures. Actualheader/realJVM/pthread host
 fault/lifecycle tests pass; PS5 native launch/guard/lifecycle remains pending.
+
+## Early retained DNS-pair preparation
+
+[DNS preparation](../docs/java25-early-dns-pair.md) exposes an idempotent native
+prepare call for the existing16KiB pool/resolver before VM pressure. No query or
+answer cache is introduced. Partial failures release the lease and propagate;
+hostactualadapter/SDKallocation/concurrency/prepareASanUBSan checks pass.
+PS5earlyavailability andlaterDNS/TLS/nativepressure remain pending.
