@@ -435,6 +435,6 @@
     "source": "java25/probe/netdb_alloc.cpp",
     "scope": "At most3 completed default-parameter synchronous attempts for neterrno226 only; same lease; nondefault calls unchanged; final errors preserved. No cached answers or security changes.",
     "host": "PASS actual adapter+SHA-pinned SDK lookup/conversion/cleanup ASan/UBSan transient success2/3, persistent exact3, permanent error/no retry, explicit timeout/flags pass-through, errno/failed-answer isolation and existing400-threaded-query controls.",
-    "console": "101 firstDNSquery0x804101E2/neterrno226; pool/resolver preparation succeeds, no native direct failures/refusals. Retry recovery and Paper readiness pending."
+    "console": "102PS5 observes exactly3 completed timeout226 queries, retryattempt2/3 diagnostics and lease cleanup, then actual failure propagates; no timeout recovery or application readiness established. Direct kernel/policy counters zero in current run. Resolver service availability investigation pending; raw logs local."
   }
 }
