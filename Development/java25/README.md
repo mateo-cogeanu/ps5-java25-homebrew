@@ -1988,3 +1988,11 @@ joins finished threads before freeing their stacks, including TLS destruction.
 64slots/32MiB stack budget share the existing direct pool; guard uncommit retains
 owned backing. Ordinary paths/errors remain; SDK allocation success is not
 guaranteed. Host lifecycle/fault/target checks pass; actualPS5pending.
+
+## Directory buffer headroom (0106)
+
+[0106](../docs/java25-directory-direct-memory.md) extends existing shared direct
+memory fallback to PS5 directory context/record buffers after ordinary-map
+ENOMEM, with exact backend cleanup and unchanged enumeration/failure semantics.
+java.io diagnostics distinguish fd/context/buffer stages; no fd-allocation fix
+is claimed. Actual JNI/VM-ledger/host/parser/target checks pass; PS5pending.

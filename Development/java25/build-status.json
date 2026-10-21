@@ -385,6 +385,12 @@
     "patch": "0105-ps5-owned-java-thread-stack-fallback.patch",
     "scope": "Final ordinaryJavaThread EAGAIN/errnoENOMEM only; early native128KiB reaper,64dedicatedattribute/owner slots,32MiB stackbudget sharing128MiB directledger. Zeroed explicitstack/joinablepthread; guarduncommit preservesdirectbacking. Entryreturn signals join; actualjoin completes TLS before physicalrelease. Join/cleanup/nonreturn paths retain bounded ownership.",
     "host": "PASS: actual owner/helpers real512KiB custom-stack pthreads underASan/UBSan, gatedTLS destructor join-before-free,220reclaimedlifetimes, allocation/attr/create/join/release faults, slot/budget andguard/purpose checks. Existing metadata/attribute800thread/pthreadchecks/directfault-concurrency/prefix regressions, exactpatch/targetHotSpot pass. Reaper scheduling controlled; no fulltargetVM hostclaim.",
-    "console": "091pendingPS5 SDKexplicitstack/guard/TLS/join/NMT/nativeheadroom/GC/stability. Exact SDKfailingallocationunknown; stackfallbacknotguaranteeSDKmetadataallocation."
+    "console": "091actualPS5 observes3successful512KiB directstack creations and2successfuljoin/release pairs, progressing through server init; thenjava.io list ENOMEM/null causeslegacy-converter NPE. Fullguard/TLS/NMT/headroom/stability remain unvalidated."
+  },
+  "directory_direct_memory": {
+    "patch": "0106-ps5-directory-buffer-direct-fallback.patch",
+    "scope": "PS5 context/64KiB recordbuffer ordinarymap ENOMEM -> existing VM C ABI/shared ledger; separately tagged backends/exact cleanup/partial rollback.16KiB contextlength and stagedfd/context/buffer diagnostics; PS5libnioexplicitVMdependency. No newpool/export/empty-on-error behavior or fdallocation fix.",
+    "host": "PASS: actual File.list/listFiles JNI -Xcheck:jni/UBSan plus actual VM ABI/shared ledger over controlled real storage. Forced ordinarymap refusal preserves351Unicodeentries,converterfilter,empty/repeated listings; partialbudget rollback. Existingfd/read/partial/close/map/symlink/arraygrowth/recovery controls, NIOJNI/Files.walk andparserASan/UBSan pass. Exactpatch and targetjava.base nativebuild pass.",
+    "console": "092pendingPS5;091directory openerrnoENOMEM lacks stage, so buffercause not established. Kernel fd/open/enum behavior/nativepressure/persistence/stability unvalidated."
   }
 }

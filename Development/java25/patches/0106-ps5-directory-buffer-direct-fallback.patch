@@ -1,0 +1,127 @@
+--- a/src/java.base/unix/native/libnio/fs/ps5Directory.h
++++ b/src/java.base/unix/native/libnio/fs/ps5Directory.h
+@@ -8,6 +8,9 @@
+ #include <fcntl.h>
+ #include <unistd.h>
+ #include <sys/mman.h>
++#ifdef __PROSPERO__
++#include "../../../../share/native/libjava/ps5NativeMemory.h"
++#endif
+ /* libkernel export, not the SDK's desktop syscall wrapper. */
+ #ifndef PS5_DIRECTORY_NOTE
+ #define PS5_DIRECTORY_NOTE(phase) ((void)0)
+@@ -17,6 +20,8 @@
+ extern int sceKernelGetdirentries(int,void*,int,long*);
+ typedef struct {
+     int fd, failure, alternate, delivered;
++    unsigned context_direct, data_direct;
++    size_t context_bytes;
+     long position;
+     size_t cursor, used;
+     unsigned char* data;
+@@ -27,15 +32,39 @@
+     if((bits&0xffff0000u)==0x80020000u)return bits&0xffffu;
+     return result==-1&&errno?errno:EIO;
+ }
+-static Ps5Directory* ps5_directory_open(const char*path) {
++static void* ps5_directory_map(size_t bytes,unsigned*direct) {
++    *direct=0;
++    void* memory=mmap(NULL,bytes,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
++#ifdef __PROSPERO__
++    if(memory==MAP_FAILED&&errno==ENOMEM){
++        memory=JVM_PS5MapNativeMemory(bytes);
++        if(memory!=MAP_FAILED)*direct=1;
++    }
++#endif
++    return memory;
++}
++static int ps5_directory_unmap(void* memory,size_t bytes,unsigned direct) {
++#ifdef __PROSPERO__
++    if(direct)return JVM_PS5UnmapNativeMemory(memory,bytes);
++#endif
++    return munmap(memory,bytes);
++}
++static Ps5Directory* ps5_directory_open_checked(const char*path,int*stage) {
++    if(stage)*stage=1;
+     int fd;do{fd=open(path,O_RDONLY|O_DIRECTORY|O_NONBLOCK);}while(fd<0&&errno==EINTR);
+     if(fd<0)return NULL;
+-    Ps5Directory*d=mmap(NULL,sizeof(*d),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
++    if(stage)*stage=2;
++    const size_t context_bytes=(sizeof(Ps5Directory)+16383u)&~(size_t)16383u;
++    unsigned context_direct=0;
++    Ps5Directory*d=ps5_directory_map(context_bytes,&context_direct);
+     if(d==MAP_FAILED){int error=errno;close(fd);errno=error;return NULL;}
+-    d->data=mmap(NULL,PS5_DIRECTORY_BUFFER_SIZE,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+-    if(d->data==MAP_FAILED){int error=errno;munmap(d,sizeof(*d));close(fd);errno=error;return NULL;}
+-    d->fd=fd;d->failure=0;d->alternate=d->delivered=0;d->position=0;d->cursor=d->used=0;return d;
++    d->context_direct=context_direct;d->context_bytes=context_bytes;
++    if(stage)*stage=3;
++    d->data=ps5_directory_map(PS5_DIRECTORY_BUFFER_SIZE,&d->data_direct);
++    if(d->data==MAP_FAILED){int error=errno;ps5_directory_unmap(d,context_bytes,context_direct);close(fd);errno=error;return NULL;}
++    d->fd=fd;d->failure=0;d->alternate=d->delivered=0;d->position=0;d->cursor=d->used=0;if(stage)*stage=0;return d;
+ }
++static Ps5Directory* ps5_directory_open(const char*path) {return ps5_directory_open_checked(path,NULL);}
+ static const char* ps5_directory_read(Ps5Directory*d) {
+     if(d->failure){errno=d->failure;return NULL;}
+     for(;;){
+@@ -72,8 +101,9 @@
+ }
+ static int ps5_directory_close(Ps5Directory*d) {
+     int result=close(d->fd),error=result<0?errno:0;
+-    if(munmap(d->data,PS5_DIRECTORY_BUFFER_SIZE)!=0&&!error)error=errno;
+-    if(munmap(d,sizeof(*d))!=0&&!error)error=errno;
++    unsigned context_direct=d->context_direct;size_t context_bytes=d->context_bytes;
++    if(ps5_directory_unmap(d->data,PS5_DIRECTORY_BUFFER_SIZE,d->data_direct)!=0&&!error)error=errno;
++    if(ps5_directory_unmap(d,context_bytes,context_direct)!=0&&!error)error=errno;
+     if(error){errno=error;return -1;}return 0;
+ }
+ #endif
+--- a/make/modules/java.base/Lib.gmk
++++ b/make/modules/java.base/Lib.gmk
+@@ -72,6 +72,10 @@
+ ## Build libnio
+ ################################################################################
+ 
++ifeq ($(PS5_BOOTSTRAP), yes)
++  LIBNIO_PS5_VM_LIB := libjvm
++endif
++
+ $(eval $(call SetupJdkLibrary, BUILD_LIBNIO, \
+     NAME := nio, \
+     OPTIMIZATION := HIGH, \
+@@ -82,7 +86,7 @@
+         libjvm, \
+     DISABLED_WARNINGS_clang_Net.c := unused-function unused-variable, \
+     DISABLED_WARNINGS_clang_UnixNativeDispatcher.c := unused-variable, \
+-    JDK_LIBS := libjava libnet, \
++    JDK_LIBS := libjava libnet $(LIBNIO_PS5_VM_LIB), \
+     LIBS_linux := $(LIBDL) $(LIBPTHREAD), \
+     LIBS_bsd := $(LIBPTHREAD), \
+     LIBS_aix := $(LIBDL), \
+--- a/src/java.base/unix/native/libjava/UnixFileSystem_md.c
++++ b/src/java.base/unix/native/libjava/UnixFileSystem_md.c
+@@ -334,6 +334,7 @@
+ {
+ #ifdef __PROSPERO__
+     Ps5Directory *dir = NULL;
++    int open_stage=0;
+     const char *entry;
+ #else
+     DIR *dir = NULL;
+@@ -348,14 +349,14 @@
+ 
+     WITH_FIELD_PLATFORM_STRING(env, file, ids.path, path) {
+ #ifdef __PROSPERO__
+-        dir = ps5_directory_open(path);
++        dir = ps5_directory_open_checked(path,&open_stage);
+ #else
+         dir = opendir(path);
+ #endif
+     } END_PLATFORM_STRING(env, path);
+     if (dir == NULL) {
+ #ifdef __PROSPERO__
+-        int error=errno;jio_fprintf(stderr,"PS5 java.io list open failed errno=%d\n",error);errno=error;
++        int error=errno;jio_fprintf(stderr,"PS5 java.io list open failed errno=%d stage=%d (1=fd,2=context,3=buffer)\n",error,open_stage);errno=error;
+ #endif
+         return NULL;
+     }
