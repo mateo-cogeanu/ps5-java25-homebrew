@@ -1,5 +1,5 @@
---- a/src/java.base/macosx/classes/sun/nio/ch/KQueue.java
-+++ b/src/java.base/macosx/classes/sun/nio/ch/KQueue.java
+--- a/src/java.base/bsd/classes/sun/nio/ch/KQueue.java
++++ b/src/java.base/bsd/classes/sun/nio/ch/KQueue.java
 @@ -111,6 +111,11 @@
  
      private static native int flagsOffset();
@@ -12,8 +12,8 @@
      static native int create() throws IOException;
  
      static native int register(int kqfd, int fd, int filter, int flags);
---- a/src/java.base/macosx/classes/sun/nio/ch/KQueueSelectorImpl.java
-+++ b/src/java.base/macosx/classes/sun/nio/ch/KQueueSelectorImpl.java
+--- a/src/java.base/bsd/classes/sun/nio/ch/KQueueSelectorImpl.java
++++ b/src/java.base/bsd/classes/sun/nio/ch/KQueueSelectorImpl.java
 @@ -57,6 +57,7 @@
      private final long pollArrayAddress;
  
@@ -97,8 +97,8 @@
              interruptTriggered = false;
          }
      }
---- a/src/java.base/macosx/native/libnio/ch/KQueue.c
-+++ b/src/java.base/macosx/native/libnio/ch/KQueue.c
+--- a/src/java.base/bsd/native/libnio/ch/KQueue.c
++++ b/src/java.base/bsd/native/libnio/ch/KQueue.c
 @@ -24,6 +24,8 @@
   */
  

@@ -2,7 +2,7 @@
 """Run the actual patched selector and native user-event bodies on macOS kqueue."""
 from pathlib import Path
 import subprocess, os
-r=Path(__file__).resolve().parents[1]; src=r/'.tools/java25/openjdk/src/java.base/macosx'
+r=Path(__file__).resolve().parents[1]; src=r/'.tools/java25/openjdk/src/java.base/bsd'
 w=r/'build/java25/selector-wakeup-test';w.mkdir(parents=True,exist_ok=True)
 jdk=Path('/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home')
 classes=w/'classes';classes.mkdir(exist_ok=True)
