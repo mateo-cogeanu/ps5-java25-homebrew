@@ -2022,3 +2022,12 @@ EAGAIN/ENOMEM owned-stack fallback to compiler_thread, retaining its1MiB request
 normal JavaThread entry/guards and join-before-release lifecycle. Budgets and C1
 settings stay unchanged. Actualgate/1MiBownerASan/UBSan/512KiBregressions and
 targetHotSpot build pass; actualPS5 C1/thread/TLS/nativepressure pending.
+
+## JNI worker launch under native pressure
+
+[Worker preparation and fallback](../docs/java25-jni-worker-stack.md) caches
+attribute objects before VM pressure, retaining ordinary8MiB stack creation
+first. PS5EAGAIN/ENOMEM can use the existing shared VM memory ABI for an owned
+explicit stack released only after real join/TLS completion. Stage diagnostics
+preserve launch/attach/join/cleanup failures. Actualheader/realJVM/pthread host
+fault/lifecycle tests pass; PS5 native launch/guard/lifecycle remains pending.

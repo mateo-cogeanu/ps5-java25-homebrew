@@ -410,5 +410,11 @@
     "scope": "OnlyfinalEAGAIN+ENOMEM afterordinaryretries; java_thread ORcompiler_thread. Existingentry/guard/stacksize/owner/reaper/TLS/exactrelease/budgetsunchanged.",
     "host": "PASS actualgate45combinations+actual1MiBcustompthreadowner/TLSdestructor/join-before-release220lifetimes/fault/budgetcontrolsASanUBSan;512KiBregression,targetHotSpot/exactpatch.",
     "console": "096classspacereservation succeeds; compiler_thread1MiB ordinaryEAGAIN/ENOMEM abort.0109pendingPS5VMcreate/C1/nativepressure/lifecycle."
+  },
+  "jni_worker_stack": {
+    "source": "java25/probe/jni_worker.hpp",
+    "scope": "Earlyprepare cachedordinary/directattrs; ordinary8MiBfirst; PS5finalcreateEAGAIN+ENOMEM only->sharedVMABI explicitstack<=8MiB; zero,joinTLS-before-unmap,retainfailedcleanup; phasediagnostics.",
+    "host": "PASS actualheader/realJVM/pthread ordinaryattach/callback/distinctJNIEnv/detach; controlledlateattrENOMEM/nativecreateENOMEM/directmap/create/join/releasefaults,8MiBstack,gatedTLSjoin-before-free/retention. Targetbinding/packagepending.",
+    "console": "097VMcreate/C1verifycomplete,playfailsbeforecallback; oldreportlacksnumericstage so exactcauseunknown. Newpath/diagnosticconsolepending."
   }
 }
