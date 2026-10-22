@@ -1,0 +1,7 @@
+# PS5 file timestamps
+
+Patch 0117 replaces PS5 NIO futimens0 with the SDK's resident futimes API and the AT_FDCWD/flags=0 utimensat0 case with resident utimes. The SDK supplies newer futimens/utimensat through raw BSD syscall stubs, while the kernel library exports the older timeval APIs. No claim is made that the last console termination mechanism was identified by a fatal report.
+
+Nanoseconds are floored to microseconds, including normalized negative timestamps; sub-microsecond precision is unavailable. Actual native errors propagate and EINTR is retried. Descriptor updates retain inode identity even after unlink. Directory-descriptor and no-follow path modes report ENOTSUP before accessing the path; they must be ported before claiming complete NIO timestamp support. Non-PS5 bodies remain unchanged. There is no fabricated timestamp success, game code change or server JAR transformation.
+
+Host checks compile the actual JNI bodies under ASan/UBSan and verify real descriptor/path writes, unlinked inode identity, precision, negative and extreme conversion, EINTR, EBADF/EACCES/ENOENT and unsupported modes. The filesystem fixture registers both actual JNI methods in a real JVM and checks an exact FileTime write plus twenty COPY_ATTRIBUTES timestamps, alongside prior capacity/ownership/xattr/canonicalization controls under XcheckJNI/UBSan. Target libnio builds; reverse patch check passes. Resident API availability in the title sandbox, configuration copy completion and sustained console behavior remain unvalidated.

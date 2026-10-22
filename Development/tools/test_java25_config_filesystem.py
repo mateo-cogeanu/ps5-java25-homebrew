@@ -13,6 +13,7 @@ for name,kind in [('fgetxattr0','jint'),('fsetxattr0','void'),('fremovexattr0','
  a=s.index('JNIEXPORT '+kind+' JNICALL\nJava_sun_nio_fs_UnixNativeDispatcher_'+name);b=s.find('\nJNIEXPORT',a)
  if b<0:b=len(s)
  xattrs+=s[a:b]+'\n'
+a=s.index('#ifdef __PROSPERO__\n// The title SDK exposes timeval APIs');b=s.index('\nJNIEXPORT jlong JNICALL',a);timestamps=s[a:b]
 s=(src/'libjava/UnixFileSystem_md.c').read_text();a=s.index('JNIEXPORT jlong JNICALL\nJava_java_io_UnixFileSystem_getSpace0');b=s.index('\nJNIEXPORT',a);space=s[a:b]
 s=(src/'libjava/canonicalize_md.c').read_text();a=s.index('static char *ps5_canonical_realpath');b=s.index('\n#endif',a);wrapper=s[a:b].replace('= realpath(path, resolved)', '= selected_realpath(path, resolved)',1);a=s.index('JNIEXPORT int\nJDK_Canonicalize');canonical=s[a:]
 c=r'''
@@ -26,6 +27,7 @@ c=r'''
 #include <errno.h>
 #include <limits.h>
 #include <sys/mount.h>
+#include <sys/time.h>
 #include "ps5Realpath.h"
 #include "path_util.h"
 static int mode=0,statmode=0,statcalls=0,ownership_denials=0,xattr_denials=0;
@@ -43,7 +45,7 @@ static void throwUnixException(JNIEnv*env,int error){jclass c=(*env)->FindClass(
 #define long_to_jlong(n) ((jlong)(n))
 #define RESTARTABLE(cmd,result) do{result=(cmd);}while(result==-1&&errno==EINTR)
 #define statfs(...) selected_statfs(__VA_ARGS__)
-'''+stats+owners+xattrs+r'''
+'''+stats+owners+xattrs+timestamps+r'''
 #define jlong_mul(a,b) ((jlong)((uint64_t)(a)*(uint64_t)(b)))
 #define java_io_FileSystem_SPACE_TOTAL 0
 #define java_io_FileSystem_SPACE_FREE 1
@@ -77,7 +79,11 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*vm,void*reserved){(void)reserved;JNIEnv
  {"fsetxattr0","(IJJI)V",(void*)Java_sun_nio_fs_UnixNativeDispatcher_fsetxattr0},
  {"fremovexattr0","(IJ)V",(void*)Java_sun_nio_fs_UnixNativeDispatcher_fremovexattr0},
  {"flistxattr","(IJI)I",(void*)Java_sun_nio_fs_UnixNativeDispatcher_flistxattr}};
- if((*env)->RegisterNatives(env,dispatcher,xattrs,4))return JNI_ERR;return JNI_VERSION_1_8;}
+ if((*env)->RegisterNatives(env,dispatcher,xattrs,4))return JNI_ERR;
+ JNINativeMethod times[]={
+ {"futimens0","(IJJ)V",(void*)Java_sun_nio_fs_UnixNativeDispatcher_futimens0},
+ {"utimensat0","(IJJJI)V",(void*)Java_sun_nio_fs_UnixNativeDispatcher_utimensat0}};
+ if((*env)->RegisterNatives(env,dispatcher,times,2))return JNI_ERR;return JNI_VERSION_1_8;}
 '''
 (w/'test.c').write_text(c)
 (w/'ConfigFs.java').write_text(r'''
@@ -114,8 +120,11 @@ public class ConfigFs {
   Path link=Files.createSymbolicLink(root.resolve("link"),dir);fail(link.resolve("a.yml"));fail(root.resolve("broken-link"));
   Files.createSymbolicLink(root.resolve("broken-link"),root.resolve("absent"));fail(root.resolve("broken-link"));
   modes(2,0);fail(file);modes(0,0);if(!canonical(link.resolve("a.yml").toString()).equals(file.toString()))throw new AssertionError("native symlink behavior");
+  var stamp=java.nio.file.attribute.FileTime.from(1700000000123456L,java.util.concurrent.TimeUnit.MICROSECONDS);
+  Files.setLastModifiedTime(file,stamp);
+  if(!Files.getLastModifiedTime(file).equals(stamp))throw new AssertionError("real timestamp write");
   // Real NIO copy/replace of configuration data uses the actual hooked stat JNI.
-  for(int i=0;i<20;i++){Path copy=dir.resolve("copy.yml");Files.copy(file,copy,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.COPY_ATTRIBUTES);if(!Files.readString(copy).equals("hello config"))throw new AssertionError("copy bytes");}
+  for(int i=0;i<20;i++){Path copy=dir.resolve("copy.yml");Files.copy(file,copy,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.COPY_ATTRIBUTES);if(!Files.readString(copy).equals("hello config"))throw new AssertionError("copy bytes");if(!Files.getLastModifiedTime(copy).equals(stamp))throw new AssertionError("copy timestamp");}
   if(calls()!=0)throw new AssertionError("NIO copies queried raw statfs");
   if(denials()<20)throw new AssertionError("COPY_ATTRIBUTES did not exercise denied ownership");
   Class<?> dispatcher=Class.forName("sun.nio.fs.UnixNativeDispatcher");
@@ -139,7 +148,7 @@ public class ConfigFs {
   if(!Files.readString(file).equals("hello config"))throw new AssertionError("ownership operation changed data");
   try{Files.copy(root.resolve("absent-source"),root.resolve("bad-copy"));throw new AssertionError("missing source accepted");}catch(NoSuchFileException expected){}
   try{Files.copy(file,root.resolve("missing-parent/bad-copy"));throw new AssertionError("missing parent accepted");}catch(NoSuchFileException expected){}
-  System.out.println("PASS actual unavailable File/NIO capacity JNI in real JVM, zero native statfs calls and COPY_ATTRIBUTES config copies with actual EPERM ownership and existing Java buffer fallback; explicit ownership IOException;4xattr ENOTSUP entries/optionalcopy/no fake empty-list; actual JDK canonicalizer+descriptor walker for EPERM existing/missing-tail/dot-parent/symlink refusal/native-links/EIO. XcheckJNI/UBSan; target behavior pending.");
+  System.out.println("PASS actual unavailable File/NIO capacity JNI in real JVM, zero native statfs calls and COPY_ATTRIBUTES config copies with actual EPERM ownership and existing Java buffer fallback; explicit ownership IOException;4xattr ENOTSUP entries/optionalcopy/no fake empty-list; actual JDK canonicalizer+descriptor walker for EPERM existing/missing-tail/dot-parent/symlink refusal/native-links/EIO. actual timeval timestamp JNI registered, real FileTime write and20copy timestamps exact; XcheckJNI/UBSan; target behavior pending.");
  }
 }
 ''')

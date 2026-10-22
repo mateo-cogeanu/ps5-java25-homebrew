@@ -1,0 +1,80 @@
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -975,10 +975,37 @@
+     }
+ }
+ 
++#ifdef __PROSPERO__
++// The title SDK exposes timeval APIs; do not issue newer BSD timestamp syscalls.
++// Floor negative nanoseconds, retaining a nonnegative subsecond component.
++static void ps5_timeval(jlong nanos, struct timeval* value) {
++    jlong seconds = nanos / 1000000000;
++    jlong remainder = nanos % 1000000000;
++    if (remainder < 0) {
++        --seconds;
++        remainder += 1000000000;
++    }
++    value->tv_sec = seconds;
++    value->tv_usec = remainder / 1000;
++}
++#endif
++
+ JNIEXPORT void JNICALL
+ Java_sun_nio_fs_UnixNativeDispatcher_futimens0(JNIEnv* env, jclass this, jint filedes,
+     jlong accessTime, jlong modificationTime)
+ {
++#ifdef __PROSPERO__
++    struct timeval times[2];
++    int err;
++    ps5_timeval(accessTime, &times[0]);
++    ps5_timeval(modificationTime, &times[1]);
++    PS5_REALPATH_NOTE("timestamp futimes enter", "");
++    RESTARTABLE(futimes(filedes, times), err);
++    PS5_REALPATH_NOTE("timestamp futimes returned", "");
++    if (err == -1) {
++        throwUnixException(env, errno);
++    }
++#else
+     struct timespec times[2];
+     int err = 0;
+ 
+@@ -992,11 +1019,31 @@
+     if (err == -1) {
+         throwUnixException(env, errno);
+     }
++#endif
+ }
+ 
+ JNIEXPORT void JNICALL
+ Java_sun_nio_fs_UnixNativeDispatcher_utimensat0(JNIEnv* env, jclass this,
+     jint fd, jlong pathAddress, jlong accessTime, jlong modificationTime, jint flags) {
++#ifdef __PROSPERO__
++    // Do not silently follow a link for NOFOLLOW, or resolve relative to the
++    // process directory when a directory descriptor was requested.
++    if (fd != AT_FDCWD || flags != 0) {
++        throwUnixException(env, ENOTSUP);
++        return;
++    }
++    const char* path = (const char*)jlong_to_ptr(pathAddress);
++    struct timeval times[2];
++    int err;
++    ps5_timeval(accessTime, &times[0]);
++    ps5_timeval(modificationTime, &times[1]);
++    PS5_REALPATH_NOTE("timestamp utimes enter", path);
++    RESTARTABLE(utimes(path, times), err);
++    PS5_REALPATH_NOTE("timestamp utimes returned", path);
++    if (err == -1) {
++        throwUnixException(env, errno);
++    }
++#else
+     int err;
+     struct timespec times[2];
+     const char* path = (const char*)jlong_to_ptr(pathAddress);
+@@ -1012,6 +1059,7 @@
+     if (err == -1) {
+         throwUnixException(env, errno);
+     }
++#endif
+ }
+ 
+ JNIEXPORT jlong JNICALL
