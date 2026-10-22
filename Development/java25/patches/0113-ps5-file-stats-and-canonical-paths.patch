@@ -1,0 +1,72 @@
+--- a/src/java.base/unix/native/libjava/canonicalize_md.c
++++ b/src/java.base/unix/native/libjava/canonicalize_md.c
+@@ -36,6 +36,18 @@
+ 
+ #include "jdk_util.h"
+ #include "path_util.h"
++#ifdef __PROSPERO__
++#include "../libnio/fs/ps5Realpath.h"
++static char *ps5_canonical_realpath(const char *path, char *resolved) {
++    char *result = realpath(path, resolved);
++    if (result == NULL && errno == EPERM &&
++        ps5_descriptor_realpath(path, resolved) == 0) {
++        result = resolved;
++    }
++    return result;
++}
++#define realpath ps5_canonical_realpath
++#endif
+ 
+ /* Note: The comments in this file use the terminology
+          defined in the java.io.File class */
+@@ -64,6 +76,13 @@
+         collapse(out);
+         return 0;
+     } else {
++#ifdef __PROSPERO__
++        // A descriptor fallback that found a link must not be reduced to an
++        // unresolved final suffix. Native successful link resolution is kept.
++        if (errno == ELOOP) {
++            return -1;
++        }
++#endif
+         /* Something's bogus in the original path, so remove names from the end
+            until either some subpath works or we run out of names */
+         char *p, *end, *r = NULL;
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -53,7 +53,7 @@
+ #include <dlfcn.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+-#ifdef MACOSX
++#if defined(MACOSX) || defined(__PROSPERO__)
+ #include <sys/param.h>
+ #include <sys/mount.h>
+ #else
+@@ -1284,14 +1284,14 @@
+     jlong pathAddress, jobject attrs)
+ {
+     int err;
+-#ifdef MACOSX
++#if defined(MACOSX) || defined(__PROSPERO__)
+     struct statfs buf;
+ #else
+     struct statvfs buf;
+ #endif
+     const char* path = (const char*)jlong_to_ptr(pathAddress);
+ 
+-#ifdef MACOSX
++#if defined(MACOSX) || defined(__PROSPERO__)
+     RESTARTABLE(statfs(path, &buf), err);
+ #else
+     RESTARTABLE(statvfs(path, &buf), err);
+@@ -1311,7 +1311,7 @@
+             buf.f_bavail = 0;
+         }
+ #endif
+-#ifdef MACOSX
++#if defined(MACOSX) || defined(__PROSPERO__)
+         (*env)->SetLongField(env, attrs, attrs_f_frsize, long_to_jlong(buf.f_bsize));
+ #else
+         (*env)->SetLongField(env, attrs, attrs_f_frsize, long_to_jlong(buf.f_frsize));

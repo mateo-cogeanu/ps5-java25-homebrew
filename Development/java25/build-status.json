@@ -442,5 +442,11 @@
     "scope": "PS5 IPv4/IPv6 successful empty gethostname output uses existing localhost fallback. Valid names/nonPS5/null termination/externalDNS unchanged; actual Java loopback shortcut retained.",
     "host": "PASS actual JNI bodies/real JVM registration empty/error/named/unterminated boundaries, PS5/nonPS5 and IPv4/IPv6 preferences; InetAddress.getLocalHost real loopback shortcut; XcheckJNI/UBSan, target java.base-libs/exact patch.",
     "console": "Current102 reports empty-name UnknownHostException during logging initialization. Newfallback pendingPS5; separate discovery lookup returns ENODNS225, not fixed by this patch."
+  },
+  "config_filesystem": {
+    "patch": "0113-ps5-file-stats-and-canonical-paths.patch",
+    "scope": "PS5 pathname NIOstatvfs0 uses real SDKstatfs/block-size conversion. java.io canonicalizer reuses existing descriptor fallback for native realpath EPERM; known originalpath ELOOP rejected, existing missing suffix contract retained. Native successful link resolution/nonPS5 unchanged.",
+    "host": "PASS actual statsJNI/JDKcanonicalizer/pathcollapse/helper realJVM, four actualstatfields/EINTR/permission/missing/configNIOcopy/publicFilecanonical; EPERM existing/missing suffix/parent/symlink/native-link/EIO controls XcheckJNI/UBSan. Existing NIO/ZipFS/descriptor ASanUBSan tests and targetjava.base-libs/exactpatch PASS.",
+    "console": "103 reaches configuration startup; native SIGSEGV through statvfs0 whilecopying config; targetstatvfs import unresolved. java.io configcanonicalize EPERM errors.0113 actualPS5 pending. OptionaldirectI/O fstatvfs remains unported."
   }
 }
