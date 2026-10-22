@@ -70,3 +70,31 @@
          (*env)->SetLongField(env, attrs, attrs_f_frsize, long_to_jlong(buf.f_bsize));
  #else
          (*env)->SetLongField(env, attrs, attrs_f_frsize, long_to_jlong(buf.f_frsize));
+--- a/src/java.base/unix/native/libjava/UnixFileSystem_md.c
++++ b/src/java.base/unix/native/libjava/UnixFileSystem_md.c
+@@ -28,7 +28,7 @@
+ #include <sys/types.h>
+ #include <sys/time.h>
+ #include <sys/stat.h>
+-#ifdef MACOSX
++#if defined(MACOSX) || defined(__PROSPERO__)
+ #include <sys/param.h>
+ #include <sys/mount.h>
+ #else
+@@ -522,14 +522,14 @@
+     jlong rv = 0L;
+ 
+     WITH_FIELD_PLATFORM_STRING(env, file, ids.path, path) {
+-#ifdef MACOSX
++#if defined(MACOSX) || defined(__PROSPERO__)
+         struct statfs fsstat;
+ #else
+         struct statvfs fsstat;
+         int res;
+ #endif
+         memset(&fsstat, 0, sizeof(fsstat));
+-#ifdef MACOSX
++#if defined(MACOSX) || defined(__PROSPERO__)
+         if (statfs(path, &fsstat) == 0) {
+             switch(t) {
+                 case java_io_FileSystem_SPACE_TOTAL:

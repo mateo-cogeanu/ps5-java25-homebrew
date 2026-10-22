@@ -5,10 +5,12 @@ import subprocess
 r=Path(__file__).resolve().parents[1];w=r/'build/java25/config-filesystem-test';w.mkdir(parents=True,exist_ok=True)
 jdk=Path('/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home');src=r/'.tools/java25/openjdk/src/java.base/unix/native'
 s=(src/'libnio/fs/UnixNativeDispatcher.c').read_text();a=s.index('JNIEXPORT void JNICALL\nJava_sun_nio_fs_UnixNativeDispatcher_statvfs0');b=s.index('\nJNIEXPORT',a);stats=s[a:b]
+s=(src/'libjava/UnixFileSystem_md.c').read_text();a=s.index('JNIEXPORT jlong JNICALL\nJava_java_io_UnixFileSystem_getSpace0');b=s.index('\nJNIEXPORT',a);space=s[a:b]
 s=(src/'libjava/canonicalize_md.c').read_text();a=s.index('static char *ps5_canonical_realpath');b=s.index('\n#endif',a);wrapper=s[a:b].replace('= realpath(path, resolved)', '= selected_realpath(path, resolved)',1);a=s.index('JNIEXPORT int\nJDK_Canonicalize');canonical=s[a:]
 c=r'''
 #define __PROSPERO__ 1
 #include <jni.h>
+#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,6 +34,13 @@ static void throwUnixException(JNIEnv*env,int error){jclass c=(*env)->FindClass(
 #define RESTARTABLE(cmd,result) do{result=(cmd);}while(result==-1&&errno==EINTR)
 #define statfs(...) selected_statfs(__VA_ARGS__)
 '''+stats+r'''
+#define jlong_mul(a,b) ((jlong)((uint64_t)(a)*(uint64_t)(b)))
+#define java_io_FileSystem_SPACE_TOTAL 0
+#define java_io_FileSystem_SPACE_FREE 1
+#define java_io_FileSystem_SPACE_USABLE 2
+#define WITH_FIELD_PLATFORM_STRING(e,f,field,path) {jclass fc=(*e)->GetObjectClass(e,f);if(!fc)return 0;jfieldID pf=(*e)->GetFieldID(e,fc,"path","Ljava/lang/String;");if(!pf)return 0;jstring ss=(jstring)(*e)->GetObjectField(e,f,pf);if((*e)->ExceptionCheck(e))return 0;const char*path=(*e)->GetStringUTFChars(e,ss,0);if(path){
+#define END_PLATFORM_STRING(e,path) (*e)->ReleaseStringUTFChars(e,ss,path);}}
+'''+space+r'''
 #undef statfs
 JNIEXPORT jstring JNICALL Java_ConfigFs_canonical(JNIEnv*env,jclass cls,jstring input){(void)cls;char out[PATH_MAX];const char*p=(*env)->GetStringUTFChars(env,input,0);if(!p)return NULL;int n=JDK_Canonicalize(p,out,sizeof(out));int e=errno;(*env)->ReleaseStringUTFChars(env,input,p);if(n<0){jclass ex=(*env)->FindClass(env,"java/io/IOException");if(ex)(*env)->ThrowNew(env,ex,strerror(e));return NULL;}return (*env)->NewStringUTF(env,out);}
 JNIEXPORT void JNICALL Java_ConfigFs_modes(JNIEnv*env,jclass cls,jint a,jint b){(void)env;(void)cls;mode=a;statmode=b;statcalls=0;}
@@ -40,7 +49,7 @@ JNIEXPORT jint JNICALL Java_ConfigFs_calls(JNIEnv*env,jclass cls){(void)env;(voi
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*vm,void*reserved){(void)reserved;JNIEnv*env=0;if((*vm)->GetEnv(vm,(void**)&env,JNI_VERSION_1_8))return JNI_ERR;
  jclass attrs=(*env)->FindClass(env,"sun/nio/fs/UnixFileStoreAttributes");if(!attrs)return JNI_ERR;
  attrs_f_frsize=(*env)->GetFieldID(env,attrs,"f_frsize","J");attrs_f_blocks=(*env)->GetFieldID(env,attrs,"f_blocks","J");attrs_f_bfree=(*env)->GetFieldID(env,attrs,"f_bfree","J");attrs_f_bavail=(*env)->GetFieldID(env,attrs,"f_bavail","J");if((*env)->ExceptionCheck(env))return JNI_ERR;
- jclass io=(*env)->FindClass(env,"java/io/UnixFileSystem");if(!io)return JNI_ERR;JNINativeMethod cm={"canonicalize0","(Ljava/lang/String;)Ljava/lang/String;",(void*)Java_ConfigFs_canonical};if((*env)->RegisterNatives(env,io,&cm,1))return JNI_ERR;
+ jclass io=(*env)->FindClass(env,"java/io/UnixFileSystem");if(!io)return JNI_ERR;JNINativeMethod cm={"canonicalize0","(Ljava/lang/String;)Ljava/lang/String;",(void*)Java_ConfigFs_canonical};if((*env)->RegisterNatives(env,io,&cm,1))return JNI_ERR;JNINativeMethod sm={"getSpace0","(Ljava/io/File;I)J",(void*)Java_java_io_UnixFileSystem_getSpace0};if((*env)->RegisterNatives(env,io,&sm,1))return JNI_ERR;
  jclass dispatcher=(*env)->FindClass(env,"sun/nio/fs/UnixNativeDispatcher");if(!dispatcher)return JNI_ERR;
  JNINativeMethod m={"statvfs0","(JLsun/nio/fs/UnixFileStoreAttributes;)V",(void*)Java_sun_nio_fs_UnixNativeDispatcher_statvfs0};if((*env)->RegisterNatives(env,dispatcher,&m,1))return JNI_ERR;return JNI_VERSION_1_8;}
 '''
@@ -56,6 +65,7 @@ public class ConfigFs {
  public static void main(String[]args)throws Exception{
   System.load(args[0]);Path root=Files.createTempDirectory("ps5-config-fs-").toRealPath();Path dir=Files.createDirectory(root.resolve("dir")),file=Files.writeString(dir.resolve("a.yml"),"hello config");
   Class<?> up=Class.forName("sun.nio.fs.UnixPath"),attrs=Class.forName("sun.nio.fs.UnixFileStoreAttributes");Method get=attrs.getDeclaredMethod("get",up);get.setAccessible(true);
+  modes(0,0);long total=file.toFile().getTotalSpace(),free=file.toFile().getFreeSpace(),usable=file.toFile().getUsableSpace();if(total<=0||free<0||usable<0||free>total||usable>total)throw new AssertionError("real File space values");modes(0,2);if(file.toFile().getTotalSpace()!=0)throw new AssertionError("File stat failure");modes(0,0);
   Object value=get.invoke(null,file);if(!statsMatch(value))throw new AssertionError("real stats mismatch");
   modes(0,1);value=get.invoke(null,file);if(!statsMatch(value)||calls()!=2)throw new AssertionError("EINTR retry");
   modes(0,2);try{get.invoke(null,file);throw new AssertionError("suppressed stat error");}catch(InvocationTargetException expected){if(!expected.getCause().getClass().getName().equals("sun.nio.fs.UnixException"))throw expected;}
@@ -68,7 +78,7 @@ public class ConfigFs {
   modes(2,0);fail(file);modes(0,0);if(!canonical(link.resolve("a.yml").toString()).equals(file.toString()))throw new AssertionError("native symlink behavior");
   // Real NIO copy/replace of configuration data uses the actual hooked stat JNI.
   for(int i=0;i<20;i++){Path copy=dir.resolve("copy.yml");Files.copy(file,copy,StandardCopyOption.REPLACE_EXISTING);if(!Files.readString(copy).equals("hello config"))throw new AssertionError("copy bytes");}
-  System.out.println("PASS actual statfs JNI/real JVM fields, EINTR/error/missing paths and repeated NIO config copy; actual JDK canonicalizer+descriptor walker for EPERM existing/missing-tail/dot-parent/symlink refusal/native-links/EIO. XcheckJNI/UBSan; target behavior pending.");
+  System.out.println("PASS actual File/NIO statfs JNI/real JVM fields, EINTR/error/missing paths and repeated NIO config copy; actual JDK canonicalizer+descriptor walker for EPERM existing/missing-tail/dot-parent/symlink refusal/native-links/EIO. XcheckJNI/UBSan; target behavior pending.");
  }
 }
 ''')

@@ -445,8 +445,8 @@
   },
   "config_filesystem": {
     "patch": "0113-ps5-file-stats-and-canonical-paths.patch",
-    "scope": "PS5 pathname NIOstatvfs0 uses real SDKstatfs/block-size conversion. java.io canonicalizer reuses existing descriptor fallback for native realpath EPERM; known originalpath ELOOP rejected, existing missing suffix contract retained. Native successful link resolution/nonPS5 unchanged.",
-    "host": "PASS actual statsJNI/JDKcanonicalizer/pathcollapse/helper realJVM, four actualstatfields/EINTR/permission/missing/configNIOcopy/publicFilecanonical; EPERM existing/missing suffix/parent/symlink/native-link/EIO controls XcheckJNI/UBSan. Existing NIO/ZipFS/descriptor ASanUBSan tests and targetjava.base-libs/exactpatch PASS.",
+    "scope": "PS5 pathname File.getSpace0/NIOstatvfs0 uses real SDKstatfs/block-size conversion. java.io canonicalizer reuses existing descriptor fallback for native realpath EPERM; known originalpath ELOOP rejected, existing missing suffix contract retained. Native successful link resolution/nonPS5 unchanged.",
+    "host": "PASS actual statsJNI/JDKcanonicalizer/pathcollapse/helper realJVM, four actualstatfields/EINTR/permission/missing/configNIOcopy/publicFilespace/canonical; EPERM existing/missing suffix/parent/symlink/native-link/EIO controls XcheckJNI/UBSan. Existing NIO/ZipFS/descriptor ASanUBSan tests and targetjava.base-libs/exactpatch PASS.",
     "console": "103 reaches configuration startup; native SIGSEGV through statvfs0 whilecopying config; targetstatvfs import unresolved. java.io configcanonicalize EPERM errors.0113 actualPS5 pending. OptionaldirectI/O fstatvfs remains unported."
   }
 }
