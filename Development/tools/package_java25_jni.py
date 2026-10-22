@@ -29,6 +29,7 @@ if external:
     for key in ("source","param","asset_dir"):
         if not Path(external[key]).exists():parser.error("External probe input missing: "+key)
     if "menu_audio" in external and type(external["menu_audio"]) is not bool:parser.error("External menu_audio must be a boolean")
+    if not isinstance(external.get("resident_libraries",[]),list):parser.error("External resident_libraries must be a list")
     compile_classpath=external.get("java_compile_classpath",[])
     if not isinstance(compile_classpath,list) or not all(isinstance(p,str) and Path(p).is_file() for p in compile_classpath):
         parser.error("External java_compile_classpath must list existing JARs")
@@ -161,7 +162,12 @@ if args.startup:
     management=bool(external and "java.management" in external.get("modules",[]))
     if management:
         subprocess.run(["gmake","-C",str(ROOT/".tools/java25/openjdk"),"CONF=ps5-bootstrap","java.management-libs"],env=env,check=True)
-    subprocess.run(["python3",str(ROOT/"tools/java25_builtin_runtime.py"),*(["--jni-fixture"] if args.dependencies else []),*(["--management"] if management else [])],check=True)
+    resident_options=[]
+    if external and external.get("resident_libraries"):
+        resident_manifest=WORK/"external-resident-libraries.json"
+        resident_manifest.write_text(json.dumps(external["resident_libraries"],indent=2)+"\n")
+        resident_options=["--external-libraries",str(resident_manifest)]
+    subprocess.run(["python3",str(ROOT/"tools/java25_builtin_runtime.py"),*(["--jni-fixture"] if args.dependencies else []),*(["--management"] if management else []),*resident_options],check=True)
     extra_objects=json.loads((WORK/"builtin-link-inputs.json").read_text())
     absent_callbacks=[name for name in absent_callbacks if not name.startswith("__dl")]
     if external:shutil.rmtree(WORK/"external-assets",ignore_errors=True)
@@ -196,6 +202,7 @@ if args.startup:
         (assets/"probe.properties").write_text("lan.host="+args.lan_host+"\nlan.port="+str(args.lan_port)+"\n")
     if external:
         shutil.copytree(Path(external['asset_dir'])/'java25',assets,dirs_exist_ok=True)
+        if resident_options:shutil.copyfile(WORK/"builtin-resident-audit.json",assets/"resident-libraries-audit.json")
         subprocess.run(["/opt/homebrew/opt/openjdk@25/bin/javac","--release","25","-d",str(assets/"classes"),*(["-classpath",os.pathsep.join(compile_classpath)] if compile_classpath else []),*external['java_sources']],check=True)
     if args.dependencies:
         subprocess.run(["/opt/homebrew/opt/openjdk@25/bin/javac","--release","25","-d",str(assets/"classes"),*[str(ROOT/"java25/tests"/(name+".java")) for name in ("MultiJar25","SystemClasspath25","NativeDeps25")]],check=True)

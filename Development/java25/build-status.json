@@ -472,5 +472,11 @@
     "scope": "PS5 futimens via resident futimes; AT_FDCWD/flags0 utimensat via resident utimes. Floor nanoseconds to microseconds; normalize negatives, retry EINTR, preserve errors. Other dirfd/flags ENOTSUP before path access. Other platforms unchanged.",
     "host": "PASS actual JNI real files/faults/precision/unlinked inode/negative+extreme conversion ASan/UBSan; actual JNI registration in JVM with FileTime and20 COPY_ATTRIBUTES timestamp assertions XcheckJNI/UBSan; target libnio and exact patch.",
     "console": "107 trace advances past xattrs to futimens0, user reports crash; session RUN/no fatal report. Exact mechanism unresolved. New resident API calls/configuration completion and application stability pending."
+  },
+  "external_resident_jni_libraries": {
+    "scope": "External probe-spec resident_libraries: named consumer-owned target ELF relocatable groups, scoped JNI entries/real export registry/standard builtin JNI discovery; constructor-bearing groups rejected. No arbitrary ELF loading/HotSpot source change.",
+    "host": "PASS actual target object input and schema/name/path/duplicate/ELF controls; full generator actual constructor-section rejection. Consumer actual JVM native library/symbol/function lifecycle/error controls XcheckJNI/UBSan. PASS target registry/app build, generated builtin/JNI/export symbols, packaged object-hash audit, exact original runtime/code-image/client artifact bytes and frozen baseline package.",
+    "console": "pending external consumer library System.loadLibrary/JNI lookup and scoped symbol invocation; older passing snapshots retained.",
+    "documentation": "docs/java25-external-resident-libraries.md"
   }
 }

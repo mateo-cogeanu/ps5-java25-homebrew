@@ -8,6 +8,8 @@ import json
 import subprocess
 import re
 import argparse
+import hashlib
+from java25_resident_libraries import read_libraries
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / '.tools/java25/openjdk/build/ps5-bootstrap'
@@ -21,7 +23,9 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--management",action="store_true",help="Embed the target java.management native library")
     parser.add_argument("--jni-fixture",action="store_true",help="Include real dependency-probe JNI test library")
+    parser.add_argument("--external-libraries",type=Path,help="Consumer-owned named ELF object groups to embed; no arbitrary ELF loading")
     args=parser.parse_args()
+    external=read_libraries(args.external_libraries,LIBRARIES+["jvm","management","ps5probe"]) if args.external_libraries else []
     declarations=[]; tables=[]; mapped=[]; links=[]; alias_index=0; builtin_loaders=[]
     libraries=[('jvm',WORK/'embedded-jvm.o')]
     resident=LIBRARIES+(['management'] if args.management else [])
@@ -61,6 +65,22 @@ def main():
             '-DPS5_EMBEDDED_FIXTURE','-fvisibility-nodllstorageclass=default','-isysroot',str(SDK),
             '-I'+str(headers),'-I'+str(headers/'freebsd'),'-c',str(ROOT/'java25/probe/dependency_jni.cpp'),'-o',str(fixture)],check=True)
         libraries.append(('ps5probe',fixture));links.append(str(fixture))
+    external_names=set();external_audit=[]
+    for name,objects in external:
+        merged=WORK/('embedded-'+name+'.o')
+        rsp=WORK/(name+'-objects.rsp');rsp.write_text('\n'.join(json.dumps(str(p))for p in objects)+'\n')
+        subprocess.run([str(LLD),'-r','@'+str(rsp),'-o',str(merged)],check=True)
+        sections=subprocess.check_output([str(LLVM/'llvm-readelf'),'-SW',str(merged)],text=True)
+        if re.search(r'\]\s+\.(?:init_array|ctors)(?:\s|\.)',sections):
+            raise SystemExit('External resident library constructors require an explicit lifecycle port: '+name)
+        symbols=subprocess.check_output([str(LLVM/'llvm-nm'),'--defined-only','--extern-only',str(merged)],text=True)
+        renames=[]
+        for entry in ['JNI_OnLoad','JNI_OnUnload']:
+            if re.search(r'\b'+entry+r'$',symbols,re.M):
+                renames+=['--redefine-sym',entry+'=ps5_'+name+'_'+entry]
+        if renames:subprocess.run([str(LLVM/'llvm-objcopy'),*renames,str(merged)],check=True)
+        libraries.append((name,merged));links.append(str(merged));external_names.add(name)
+        external_audit.append({'name':name,'objects_sha256':[hashlib.sha256(p.read_bytes()).hexdigest()for p in objects],'constructors':'none; nontrivial constructors rejected'})
     for name, merged in libraries:
         symbols=subprocess.check_output([str(LLVM/'llvm-nm'),'--defined-only','--extern-only',str(merged)],text=True)
         entries=[]
@@ -77,7 +97,7 @@ def main():
             alias='embedded_symbol_'+str(alias_index);alias_index+=1
             declarations.append('extern "C" void '+alias+'() __asm__("'+symbol+'");')
             entries.append('{"'+display+'", reinterpret_cast<void *>(&'+alias+')}')
-        if name in resident or name=='ps5probe':
+        if name in resident or name=='ps5probe' or name in external_names:
             # Advertise known resident libraries through OpenJDK's standard
             # JNI_OnLoad_<name> discovery. This avoids File.exists/canonical
             # path checks before their filesystem natives are registered.
@@ -144,6 +164,7 @@ extern "C" int __dladdr(const void *address,Dl_info *info) {
         '-c',str(target),'-o',str(obj)],check=True)
     links.append(str(obj))
     (WORK/'builtin-link-inputs.json').write_text(json.dumps(links,indent=2)+'\n')
+    (WORK/'builtin-resident-audit.json').write_text(json.dumps({'external_resident_libraries':external_audit,'scope':'Build-time resident objects only; no arbitrary ELF loader'},indent=2)+'\n')
     print('Generated embedded lookup table:',alias_index,'real function addresses')
 
 if __name__=='__main__':main()

@@ -89,6 +89,8 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 
 **Reusable consumer tooling:** the runtime builder supports external probe specifications and optional target-built Java modules. Application-specific work remains in its own repository. Existing passing snapshots stay frozen; additional-module console coverage is pending.
 
+External specifications also support [consumer-owned resident JNI object groups](docs/java25-external-resident-libraries.md), with named export tables and standard Java library discovery. Target packaging and host checks pass; the new external-library integration still needs console validation.
+
 ## Explore the source
 
 [Development](Development/) contains the current probe apps, Java fixtures, packaging tools and patches against a pinned FreeBSD OpenJDK source revision. The native UI grew out of a controller tester and Interface Lab prototype.
