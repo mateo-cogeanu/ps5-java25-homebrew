@@ -1,0 +1,34 @@
+--- a/src/java.base/unix/native/libnet/Inet4AddressImpl.c
++++ b/src/java.base/unix/native/libnet/Inet4AddressImpl.c
+@@ -77,6 +77,14 @@
+     } else {
+         // make sure string is null-terminated
+         hostname[NI_MAXHOST] = '\0';
++#ifdef __PROSPERO__
++        // A PS5 title may have no configured local host name even when the
++        // native call succeeds. Use the same fallback as a failed call;
++        // InetAddress.getLocalHost handles localhost without external DNS.
++        if (hostname[0] == '\0') {
++            strcpy(hostname, "localhost");
++        }
++#endif
+     }
+     return (*env)->NewStringUTF(env, hostname);
+ }
+--- a/src/java.base/unix/native/libnet/Inet6AddressImpl.c
++++ b/src/java.base/unix/native/libnet/Inet6AddressImpl.c
+@@ -78,6 +78,14 @@
+     } else {
+         // make sure string is null-terminated
+         hostname[NI_MAXHOST] = '\0';
++#ifdef __PROSPERO__
++        // A PS5 title may have no configured local host name even when the
++        // native call succeeds. Use the same fallback as a failed call;
++        // InetAddress.getLocalHost handles localhost without external DNS.
++        if (hostname[0] == '\0') {
++            strcpy(hostname, "localhost");
++        }
++#endif
+     }
+     return (*env)->NewStringUTF(env, hostname);
+ }

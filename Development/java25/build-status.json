@@ -436,5 +436,11 @@
     "scope": "At most3 completed default-parameter synchronous attempts for neterrno226 only; same lease; nondefault calls unchanged; final errors preserved. No cached answers or security changes.",
     "host": "PASS actual adapter+SHA-pinned SDK lookup/conversion/cleanup ASan/UBSan transient success2/3, persistent exact3, permanent error/no retry, explicit timeout/flags pass-through, errno/failed-answer isolation and existing400-threaded-query controls.",
     "console": "102PS5 observes exactly3 completed timeout226 queries, retryattempt2/3 diagnostics and lease cleanup, then actual failure propagates; no timeout recovery or application readiness established. Direct kernel/policy counters zero in current run. Resolver service availability investigation pending; raw logs local."
+  },
+  "empty_local_hostname": {
+    "patch": "0112-ps5-empty-local-hostname.patch",
+    "scope": "PS5 IPv4/IPv6 successful empty gethostname output uses existing localhost fallback. Valid names/nonPS5/null termination/externalDNS unchanged; actual Java loopback shortcut retained.",
+    "host": "PASS actual JNI bodies/real JVM registration empty/error/named/unterminated boundaries, PS5/nonPS5 and IPv4/IPv6 preferences; InetAddress.getLocalHost real loopback shortcut; XcheckJNI/UBSan, target java.base-libs/exact patch.",
+    "console": "Current102 reports empty-name UnknownHostException during logging initialization. Newfallback pendingPS5; separate discovery lookup returns ENODNS225, not fixed by this patch."
   }
 }
