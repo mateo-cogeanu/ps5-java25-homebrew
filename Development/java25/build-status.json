@@ -454,5 +454,11 @@
     "scope": "PS5 NIOpathname capacity throwsENOSYS; File space queriesreturn existingunavailable0. OriginalJava copybuffer fallback/actualfileIO retained; no rawstatfs/statvfs calls there. NonPS5unchanged; realcapacity ABI/directIO stillpending.",
     "host": "PASS actualFile/NIOJNI/realJVM exactENOSYS/zeroFilevalues/zerostatfsinvocations/repeatedbytecorrectNIOcopy/originalmissing-source+parent failures, existingcanonicalcontrols XcheckJNI/UBSan; targetlibs/exactpatch.",
     "console": "105pending;104runtimeexitlasttrace statsJNI andnocurrentfatalreport. No definitekernel/layout/allocatorcause claimed."
+  },
+  "ownership_capability": {
+    "patch": "0115-ps5-ownership-change-capability.patch",
+    "scope": "PS5 chown0/lchown0/fchown0 throwEPERM without nativeownershipcall; explicitrequests fail, originalJava optionalPOSIXcopy handling retained; nonPS5 unchanged. Permissions/timestamps not gated.",
+    "host": "PASS actual3JNI/realJVM exactEPERM,20COPY_ATTRIBUTES copies exercisingdenials, explicitFile.setOwner IOException/unchangeddata, existingcapacity/canonical/source-parenterrors; XcheckJNI/UBSan,targetlibnio/exactpatch.",
+    "console": "105trace ends atfchown0 afterbufferedcopy; userreportscrash, nofatal/abortreport; exactnativemechanism unresolved.106pendingownershiperror propagation/copycontinuation/permission+timestamp/appreadiness."
   }
 }
