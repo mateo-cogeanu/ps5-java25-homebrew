@@ -460,5 +460,11 @@
     "scope": "PS5 chown0/lchown0/fchown0 throwEPERM without nativeownershipcall; explicitrequests fail, originalJava optionalPOSIXcopy handling retained; nonPS5 unchanged. Permissions/timestamps not gated.",
     "host": "PASS actual3JNI/realJVM exactEPERM,20COPY_ATTRIBUTES copies exercisingdenials, explicitFile.setOwner IOException/unchangeddata, existingcapacity/canonical/source-parenterrors; XcheckJNI/UBSan,targetlibnio/exactpatch.",
     "console": "105trace ends atfchown0 afterbufferedcopy; userreportscrash, nofatal/abortreport; exactnativemechanism unresolved.106pendingownershiperror propagation/copycontinuation/permission+timestamp/appreadiness."
+  },
+  "extended_attribute_capability": {
+    "patch": "0116-ps5-extended-attribute-capability.patch",
+    "scope": "PS5 nativeXattrcap masked,4JNI entrypoints ENOTSUP/no rawcalls; BSD filesystem userview absent/typed+named null/optionalcopy skipped. Nativeguards protectdirect/staleviewcalls; otherplatform Javaadvertisements retained.",
+    "host": "PASS actualBSDfilesystem/provider/userattrclasses patchmodule andactualJNI/realJVM desktop+PS5name controls;20COPY_ATTRIBUTES copies, PS5zeroxattrcalls/desktopENOTSUPhandling;exact4JNIerrno;explicitwrite/staleview/error/ownership/capacity/canonicalcontrols XcheckJNI/UBSan; targetjava.base-java/libs/exactpatch.",
+    "console": "106ownershipmarker reached thenlasttraceflistxattr; consoleterminationreported/no fatalreport. Exactnativecause unresolved;107 config/metadata/readiness/persistencepending."
   }
 }

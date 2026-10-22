@@ -8,6 +8,11 @@ s=(src/'libnio/fs/UnixNativeDispatcher.c').read_text();a=s.index('JNIEXPORT void
 owners=''
 for name in ['chown0','lchown0','fchown0']:
  a=s.index('JNIEXPORT void JNICALL\nJava_sun_nio_fs_UnixNativeDispatcher_'+name);b=s.index('\nJNIEXPORT',a);owners+=s[a:b]+'\n'
+xattrs=''
+for name,kind in [('fgetxattr0','jint'),('fsetxattr0','void'),('fremovexattr0','void'),('flistxattr','jint')]:
+ a=s.index('JNIEXPORT '+kind+' JNICALL\nJava_sun_nio_fs_UnixNativeDispatcher_'+name);b=s.find('\nJNIEXPORT',a)
+ if b<0:b=len(s)
+ xattrs+=s[a:b]+'\n'
 s=(src/'libjava/UnixFileSystem_md.c').read_text();a=s.index('JNIEXPORT jlong JNICALL\nJava_java_io_UnixFileSystem_getSpace0');b=s.index('\nJNIEXPORT',a);space=s[a:b]
 s=(src/'libjava/canonicalize_md.c').read_text();a=s.index('static char *ps5_canonical_realpath');b=s.index('\n#endif',a);wrapper=s[a:b].replace('= realpath(path, resolved)', '= selected_realpath(path, resolved)',1);a=s.index('JNIEXPORT int\nJDK_Canonicalize');canonical=s[a:]
 c=r'''
@@ -23,9 +28,9 @@ c=r'''
 #include <sys/mount.h>
 #include "ps5Realpath.h"
 #include "path_util.h"
-static int mode=0,statmode=0,statcalls=0,ownership_denials=0;
+static int mode=0,statmode=0,statcalls=0,ownership_denials=0,xattr_denials=0;
 #undef PS5_REALPATH_NOTE
-#define PS5_REALPATH_NOTE(phase,path) do{(void)path;if(strstr(phase,"ownership"))ownership_denials++;}while(0)
+#define PS5_REALPATH_NOTE(phase,path) do{(void)path;if(strstr(phase,"ownership"))ownership_denials++;if(strstr(phase,"extended attributes"))xattr_denials++;}while(0)
 static struct statfs laststat;
 static char* selected_realpath(const char*p,char*out){if(mode){errno=mode==1?EPERM:EIO;return NULL;}return realpath(p,out);}
 static int selected_statfs(const char*p,struct statfs*out){++statcalls;if(statmode==1){statmode=0;errno=EINTR;return -1;}if(statmode==2){errno=EACCES;return -1;}int n=statfs(p,out);if(!n)laststat=*out;return n;}
@@ -38,7 +43,7 @@ static void throwUnixException(JNIEnv*env,int error){jclass c=(*env)->FindClass(
 #define long_to_jlong(n) ((jlong)(n))
 #define RESTARTABLE(cmd,result) do{result=(cmd);}while(result==-1&&errno==EINTR)
 #define statfs(...) selected_statfs(__VA_ARGS__)
-'''+stats+owners+r'''
+'''+stats+owners+xattrs+r'''
 #define jlong_mul(a,b) ((jlong)((uint64_t)(a)*(uint64_t)(b)))
 #define java_io_FileSystem_SPACE_TOTAL 0
 #define java_io_FileSystem_SPACE_FREE 1
@@ -51,6 +56,8 @@ JNIEXPORT jstring JNICALL Java_ConfigFs_canonical(JNIEnv*env,jclass cls,jstring 
 JNIEXPORT void JNICALL Java_ConfigFs_modes(JNIEnv*env,jclass cls,jint a,jint b){(void)env;(void)cls;mode=a;statmode=b;statcalls=0;}
 JNIEXPORT jboolean JNICALL Java_ConfigFs_statsMatch(JNIEnv*env,jclass cls,jobject obj){(void)cls;return statcalls>0&&(*env)->GetLongField(env,obj,attrs_f_frsize)==laststat.f_bsize&&(*env)->GetLongField(env,obj,attrs_f_blocks)==(jlong)laststat.f_blocks&&(*env)->GetLongField(env,obj,attrs_f_bfree)==(jlong)laststat.f_bfree&&(*env)->GetLongField(env,obj,attrs_f_bavail)==(jlong)laststat.f_bavail;}
 JNIEXPORT jint JNICALL Java_ConfigFs_unavailableError(JNIEnv*env,jclass cls){(void)env;(void)cls;return ENOSYS;}
+JNIEXPORT jint JNICALL Java_ConfigFs_xattrError(JNIEnv*env,jclass cls){(void)env;(void)cls;return ENOTSUP;}
+JNIEXPORT jint JNICALL Java_ConfigFs_xattrDenials(JNIEnv*env,jclass cls){(void)env;(void)cls;return xattr_denials;}
 JNIEXPORT jint JNICALL Java_ConfigFs_deniedError(JNIEnv*env,jclass cls){(void)env;(void)cls;return EPERM;}
 JNIEXPORT jint JNICALL Java_ConfigFs_denials(JNIEnv*env,jclass cls){(void)env;(void)cls;return ownership_denials;}
 JNIEXPORT jint JNICALL Java_ConfigFs_calls(JNIEnv*env,jclass cls){(void)env;(void)cls;return statcalls;}
@@ -64,7 +71,13 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*vm,void*reserved){(void)reserved;JNIEnv
  {"chown0","(JII)V",(void*)Java_sun_nio_fs_UnixNativeDispatcher_chown0},
  {"lchown0","(JII)V",(void*)Java_sun_nio_fs_UnixNativeDispatcher_lchown0},
  {"fchown0","(III)V",(void*)Java_sun_nio_fs_UnixNativeDispatcher_fchown0}};
- if((*env)->RegisterNatives(env,dispatcher,owners,3))return JNI_ERR;return JNI_VERSION_1_8;}
+ if((*env)->RegisterNatives(env,dispatcher,owners,3))return JNI_ERR;
+ JNINativeMethod xattrs[]={
+ {"fgetxattr0","(IJJI)I",(void*)Java_sun_nio_fs_UnixNativeDispatcher_fgetxattr0},
+ {"fsetxattr0","(IJJI)V",(void*)Java_sun_nio_fs_UnixNativeDispatcher_fsetxattr0},
+ {"fremovexattr0","(IJ)V",(void*)Java_sun_nio_fs_UnixNativeDispatcher_fremovexattr0},
+ {"flistxattr","(IJI)I",(void*)Java_sun_nio_fs_UnixNativeDispatcher_flistxattr}};
+ if((*env)->RegisterNatives(env,dispatcher,xattrs,4))return JNI_ERR;return JNI_VERSION_1_8;}
 '''
 (w/'test.c').write_text(c)
 (w/'ConfigFs.java').write_text(r'''
@@ -76,16 +89,27 @@ public class ConfigFs {
  static native int calls();
  static native int denials();
  static native int deniedError();
+ static native int xattrError();
+ static native int xattrDenials();
  static native int unavailableError();
  static void fail(Path p)throws Exception{try{canonical(p.toString());throw new AssertionError("accepted "+p);}catch(IOException expected){}}
  public static void main(String[]args)throws Exception{
-  System.load(args[0]);Path root=Files.createTempDirectory("ps5-config-fs-").toRealPath();Path dir=Files.createDirectory(root.resolve("dir")),file=Files.writeString(dir.resolve("a.yml"),"hello config");
+  System.load(args[0]);boolean ps5=args.length>1&&args[1].equals("ps5");
+  Path nativeRoot=Files.createTempDirectory("ps5-config-fs-").toRealPath();
+  if(ps5)System.setProperty("os.name","PS5");
+  var ctor=Class.forName("sun.nio.fs.BsdFileSystemProvider").getDeclaredConstructor();ctor.setAccessible(true);
+  var provider=(java.nio.file.spi.FileSystemProvider)ctor.newInstance();var fs=provider.getFileSystem(java.net.URI.create("file:///"));
+  Path root=fs.getPath(nativeRoot.toString()).toRealPath();
+  if(fs.supportedFileAttributeViews().contains("user")==ps5)throw new AssertionError("BSD user-view advertisement");
+  if((provider.getFileAttributeView(root,java.nio.file.attribute.UserDefinedFileAttributeView.class)==null)!=ps5)throw new AssertionError("BSD typed-view capability");
+  Method dynamic=provider.getClass().getDeclaredMethod("getFileAttributeView",Path.class,String.class,LinkOption[].class);dynamic.setAccessible(true);
+  if((dynamic.invoke(provider,root,"user",new LinkOption[0])==null)!=ps5)throw new AssertionError("BSD dynamic-view capability");Path dir=Files.createDirectory(root.resolve("dir")),file=Files.writeString(dir.resolve("a.yml"),"hello config");
   Class<?> up=Class.forName("sun.nio.fs.UnixPath"),attrs=Class.forName("sun.nio.fs.UnixFileStoreAttributes");Method get=attrs.getDeclaredMethod("get",up);get.setAccessible(true);
-  modes(0,0);if(file.toFile().getTotalSpace()!=0||file.toFile().getFreeSpace()!=0||file.toFile().getUsableSpace()!=0||calls()!=0)throw new AssertionError("unavailable File capacity must not call native statfs");
+  modes(0,0);if((new File(file.toString())).getTotalSpace()!=0||(new File(file.toString())).getFreeSpace()!=0||(new File(file.toString())).getUsableSpace()!=0||calls()!=0)throw new AssertionError("unavailable File capacity must not call native statfs");
   for(Path probe:new Path[]{file,root.resolve("missing")})try{get.invoke(null,probe);throw new AssertionError("NIO capacity must report unavailable");}catch(InvocationTargetException expected){if(!expected.getCause().getClass().getName().equals("sun.nio.fs.UnixException"))throw expected;Method errno=expected.getCause().getClass().getDeclaredMethod("errno");errno.setAccessible(true);if(((Integer)errno.invoke(expected.getCause()))!=unavailableError())throw new AssertionError("wrong unavailable error");}
   if(calls()!=0)throw new AssertionError("unsupported NIO stats invoked native statfs");
   modes(1,0);if(!canonical(file.toString()).equals(file.toString()))throw new AssertionError("file fallback");
-  Path missing=dir.resolve("new/config.yml");if(!missing.toFile().getCanonicalPath().equals(missing.toString()))throw new AssertionError("File canonical API");if(!canonical(missing.toString()).equals(missing.toString()))throw new AssertionError("missing config tail");
+  Path missing=dir.resolve("new/config.yml");if(!(new File(missing.toString())).getCanonicalPath().equals(missing.toString()))throw new AssertionError("File canonical API");if(!canonical(missing.toString()).equals(missing.toString()))throw new AssertionError("missing config tail");
   if(!canonical(dir.resolve("../dir/a.yml").toString()).equals(file.toString()))throw new AssertionError("parent walk");
   Path link=Files.createSymbolicLink(root.resolve("link"),dir);fail(link.resolve("a.yml"));fail(root.resolve("broken-link"));
   Files.createSymbolicLink(root.resolve("broken-link"),root.resolve("absent"));fail(root.resolve("broken-link"));
@@ -101,11 +125,21 @@ public class ConfigFs {
    try{change.invoke(null,first,0,0);throw new AssertionError("false ownership success");}catch(InvocationTargetException expected){Method errno=expected.getCause().getClass().getDeclaredMethod("errno");errno.setAccessible(true);if(((Integer)errno.invoke(expected.getCause()))!=deniedError())throw new AssertionError("ownership error differs fromEPERM");}
   }
 
+  if(ps5?xattrDenials()!=0:xattrDenials()<20)throw new AssertionError("BSD extended-attribute copy capability, ps5="+ps5+" denials="+xattrDenials());
+  for(String name:new String[]{"fgetxattr0","fsetxattr0","fremovexattr0","flistxattr"}){
+   Class<?>[] types=name.equals("fremovexattr0")?new Class<?>[]{int.class,long.class}:name.equals("flistxattr")?new Class<?>[]{int.class,long.class,int.class}:new Class<?>[]{int.class,long.class,long.class,int.class};
+   Object[] values=name.equals("fremovexattr0")?new Object[]{-1,0L}:name.equals("flistxattr")?new Object[]{-1,0L,0}:new Object[]{-1,0L,0L,0};
+   Method action=dispatcher.getDeclaredMethod(name,types);action.setAccessible(true);
+   try{action.invoke(null,values);throw new AssertionError("false xattr success");}catch(InvocationTargetException expected){Method errno=expected.getCause().getClass().getDeclaredMethod("errno");errno.setAccessible(true);if(((Integer)errno.invoke(expected.getCause()))!=xattrError())throw new AssertionError("xattr error differs fromENOTSUP");}
+  }
+  var userView=Files.getFileAttributeView(file,java.nio.file.attribute.UserDefinedFileAttributeView.class);
+  if(userView!=null)try{userView.list();throw new AssertionError("xattrs falsely reported empty");}catch(IOException expected){}
+  if(ps5)try{Files.setAttribute(file,"user:probe",new byte[]{1});throw new AssertionError("unsupported user write falsely succeeded");}catch(UnsupportedOperationException expected){}
   try{Files.setOwner(file,Files.getOwner(file));throw new AssertionError("explicit ownership operation falsely succeeded");}catch(IOException expected){}
   if(!Files.readString(file).equals("hello config"))throw new AssertionError("ownership operation changed data");
   try{Files.copy(root.resolve("absent-source"),root.resolve("bad-copy"));throw new AssertionError("missing source accepted");}catch(NoSuchFileException expected){}
   try{Files.copy(file,root.resolve("missing-parent/bad-copy"));throw new AssertionError("missing parent accepted");}catch(NoSuchFileException expected){}
-  System.out.println("PASS actual unavailable File/NIO capacity JNI in real JVM, zero native statfs calls and COPY_ATTRIBUTES config copies with actual EPERM ownership and existing Java buffer fallback; explicit ownership IOException; actual JDK canonicalizer+descriptor walker for EPERM existing/missing-tail/dot-parent/symlink refusal/native-links/EIO. XcheckJNI/UBSan; target behavior pending.");
+  System.out.println("PASS actual unavailable File/NIO capacity JNI in real JVM, zero native statfs calls and COPY_ATTRIBUTES config copies with actual EPERM ownership and existing Java buffer fallback; explicit ownership IOException;4xattr ENOTSUP entries/optionalcopy/no fake empty-list; actual JDK canonicalizer+descriptor walker for EPERM existing/missing-tail/dot-parent/symlink refusal/native-links/EIO. XcheckJNI/UBSan; target behavior pending.");
  }
 }
 ''')
@@ -113,5 +147,13 @@ public class ConfigFs {
 p=w/'ConfigFs.java';s=p.read_text().replace('fail(link.resolve("a.yml"));fail(root.resolve("broken-link"));','fail(link.resolve("a.yml"));');p.write_text(s)
 lib=w/'libtest.dylib'
 subprocess.run(['clang','-dynamiclib','-O1','-g','-fsanitize=undefined','-I'+str(jdk/'include'),'-I'+str(jdk/'include/darwin'),'-I'+str(src/'libnio/fs'),'-I'+str(src/'libjava'),str(w/'test.c'),str(src/'libjava/path_util.c'),'-o',str(lib)],check=True)
+patchsrc=w/'bsd-src/sun/nio/fs';patchsrc.mkdir(parents=True,exist_ok=True)
+for name in ['BsdFileSystem.java','BsdFileSystemProvider.java']:
+ (patchsrc/name).write_text((r/'.tools/java25/openjdk/src/java.base/bsd/classes/sun/nio/fs'/name).read_text())
+(patchsrc/'UnixUserDefinedFileAttributeView.java').write_text((r/'.tools/java25/openjdk/src/java.base/unix/classes/sun/nio/fs/UnixUserDefinedFileAttributeView.java').read_text())
+(patchsrc/'BsdUserDefinedFileAttributeView.java').write_text((r/'.tools/java25/openjdk/src/java.base/bsd/classes/sun/nio/fs/BsdUserDefinedFileAttributeView.java').read_text())
+patchclasses=w/'bsd-classes';patchclasses.mkdir(exist_ok=True)
+subprocess.run([str(jdk/'bin/javac'),'--patch-module','java.base='+str(w/'bsd-src'),'-d',str(patchclasses),*[str(patchsrc/name) for name in ['BsdFileSystem.java','BsdFileSystemProvider.java','UnixUserDefinedFileAttributeView.java','BsdUserDefinedFileAttributeView.java']]],check=True)
 subprocess.run([str(jdk/'bin/javac'),str(w/'ConfigFs.java')],check=True)
-subprocess.run([str(jdk/'bin/java'),'-Xcheck:jni','--enable-native-access=ALL-UNNAMED','--add-opens=java.base/sun.nio.fs=ALL-UNNAMED','-cp',str(w),'ConfigFs',str(lib)],check=True,timeout=60)
+for mode in ['control','ps5']:
+ subprocess.run([str(jdk/'bin/java'),'--patch-module','java.base='+str(patchclasses),*(['-Dos.name=PS5'] if mode=='ps5' else []),'-Xcheck:jni','--enable-native-access=ALL-UNNAMED','--add-opens=java.base/sun.nio.fs=ALL-UNNAMED','-cp',str(w),'ConfigFs',str(lib),mode],check=True,timeout=60)

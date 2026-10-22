@@ -1,0 +1,139 @@
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -414,7 +414,7 @@
+ 
+     /* supports extended attributes */
+ 
+-#if defined(_SYS_XATTR_H) || defined(_SYS_XATTR_H_) || defined(_AIX)
++#if !defined(__PROSPERO__) && (defined(_SYS_XATTR_H) || defined(_SYS_XATTR_H_) || defined(_AIX))
+     capabilities |= sun_nio_fs_UnixNativeDispatcher_SUPPORTS_XATTR;
+ #endif
+ 
+@@ -1556,6 +1556,12 @@
+ Java_sun_nio_fs_UnixNativeDispatcher_fgetxattr0(JNIEnv* env, jclass clazz,
+     jint fd, jlong nameAddress, jlong valueAddress, jint valueLen)
+ {
++#ifdef __PROSPERO__
++    (void)clazz; (void)fd; (void)nameAddress; (void)valueAddress; (void)valueLen;
++    PS5_REALPATH_NOTE("extended attributes unavailable ENOTSUP", "");
++    throwUnixException(env, ENOTSUP);
++    return -1;
++#else
+     ssize_t res = -1;
+     const char* name = jlong_to_ptr(nameAddress);
+     void* value = jlong_to_ptr(valueAddress);
+@@ -1575,12 +1581,19 @@
+     if (res == (ssize_t)-1)
+         throwUnixException(env, errno);
+     return (jint)res;
++#endif
+ }
+ 
+ JNIEXPORT void JNICALL
+ Java_sun_nio_fs_UnixNativeDispatcher_fsetxattr0(JNIEnv* env, jclass clazz,
+     jint fd, jlong nameAddress, jlong valueAddress, jint valueLen)
+ {
++#ifdef __PROSPERO__
++    (void)clazz; (void)fd; (void)nameAddress; (void)valueAddress; (void)valueLen;
++    PS5_REALPATH_NOTE("extended attributes unavailable ENOTSUP", "");
++    throwUnixException(env, ENOTSUP);
++    return;
++#else
+     int res = -1;
+     const char* name = jlong_to_ptr(nameAddress);
+     void* value = jlong_to_ptr(valueAddress);
+@@ -1599,12 +1612,19 @@
+ 
+     if (res == -1)
+         throwUnixException(env, errno);
++#endif
+ }
+ 
+ JNIEXPORT void JNICALL
+ Java_sun_nio_fs_UnixNativeDispatcher_fremovexattr0(JNIEnv* env, jclass clazz,
+     jint fd, jlong nameAddress)
+ {
++#ifdef __PROSPERO__
++    (void)clazz; (void)fd; (void)nameAddress;
++    PS5_REALPATH_NOTE("extended attributes unavailable ENOTSUP", "");
++    throwUnixException(env, ENOTSUP);
++    return;
++#else
+     int res = -1;
+     const char* name = jlong_to_ptr(nameAddress);
+ 
+@@ -1622,12 +1642,19 @@
+ 
+     if (res == -1)
+         throwUnixException(env, errno);
++#endif
+ }
+ 
+ JNIEXPORT jint JNICALL
+ Java_sun_nio_fs_UnixNativeDispatcher_flistxattr(JNIEnv* env, jclass clazz,
+     jint fd, jlong listAddress, jint size)
+ {
++#ifdef __PROSPERO__
++    (void)clazz; (void)fd; (void)listAddress; (void)size;
++    PS5_REALPATH_NOTE("extended attributes unavailable ENOTSUP", "");
++    throwUnixException(env, ENOTSUP);
++    return -1;
++#else
+     ssize_t res = -1;
+     char* list = jlong_to_ptr(listAddress);
+ 
+@@ -1646,4 +1673,5 @@
+     if (res == (ssize_t)-1)
+         throwUnixException(env, errno);
+     return (jint)res;
+-}
++#endif
++}
+--- a/src/java.base/bsd/classes/sun/nio/fs/BsdFileSystem.java
++++ b/src/java.base/bsd/classes/sun/nio/fs/BsdFileSystem.java
+@@ -47,6 +47,10 @@
+         return new PollingWatchService();
+     }
+ 
++    static boolean supportsUserDefinedAttributes() {
++        return !"PS5".equals(System.getProperty("os.name"));
++    }
++
+     // lazy initialization of the list of supported attribute views
+     private static class SupportedFileFileAttributeViewsHolder {
+         static final Set<String> supportedFileAttributeViews =
+@@ -55,7 +59,7 @@
+             Set<String> result = new HashSet<String>();
+             result.addAll(standardFileAttributeViews());
+             // additional BSD-specific views
+-            result.add("user");
++            if (supportsUserDefinedAttributes()) result.add("user");
+             return Collections.unmodifiableSet(result);
+         }
+     }
+@@ -67,6 +71,7 @@
+ 
+     @Override
+     void copyNonPosixAttributes(int ofd, int nfd) {
++        if (!supportsUserDefinedAttributes()) return;
+         UnixUserDefinedFileAttributeView.copyExtendedAttributes(ofd, nfd, UnixUserDefinedFileAttributeView.FileAttributeType.BSD);
+     }
+ 
+--- a/src/java.base/bsd/classes/sun/nio/fs/BsdFileSystemProvider.java
++++ b/src/java.base/bsd/classes/sun/nio/fs/BsdFileSystemProvider.java
+@@ -55,6 +55,7 @@
+                                                                 LinkOption... options)
+     {
+         if (type == UserDefinedFileAttributeView.class) {
++            if (!BsdFileSystem.supportsUserDefinedAttributes()) return null;
+             return (V) new BsdUserDefinedFileAttributeView(UnixPath.toUnixPath(obj),
+                     Util.followLinks(options));
+         }
+@@ -67,6 +68,7 @@
+                                                          LinkOption... options)
+     {
+         if (name.equals("user")) {
++            if (!BsdFileSystem.supportsUserDefinedAttributes()) return null;
+             return new BsdUserDefinedFileAttributeView(UnixPath.toUnixPath(obj),
+                     Util.followLinks(options));
+         }
