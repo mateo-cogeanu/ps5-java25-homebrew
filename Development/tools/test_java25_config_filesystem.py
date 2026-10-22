@@ -45,6 +45,7 @@ static void throwUnixException(JNIEnv*env,int error){jclass c=(*env)->FindClass(
 JNIEXPORT jstring JNICALL Java_ConfigFs_canonical(JNIEnv*env,jclass cls,jstring input){(void)cls;char out[PATH_MAX];const char*p=(*env)->GetStringUTFChars(env,input,0);if(!p)return NULL;int n=JDK_Canonicalize(p,out,sizeof(out));int e=errno;(*env)->ReleaseStringUTFChars(env,input,p);if(n<0){jclass ex=(*env)->FindClass(env,"java/io/IOException");if(ex)(*env)->ThrowNew(env,ex,strerror(e));return NULL;}return (*env)->NewStringUTF(env,out);}
 JNIEXPORT void JNICALL Java_ConfigFs_modes(JNIEnv*env,jclass cls,jint a,jint b){(void)env;(void)cls;mode=a;statmode=b;statcalls=0;}
 JNIEXPORT jboolean JNICALL Java_ConfigFs_statsMatch(JNIEnv*env,jclass cls,jobject obj){(void)cls;return statcalls>0&&(*env)->GetLongField(env,obj,attrs_f_frsize)==laststat.f_bsize&&(*env)->GetLongField(env,obj,attrs_f_blocks)==(jlong)laststat.f_blocks&&(*env)->GetLongField(env,obj,attrs_f_bfree)==(jlong)laststat.f_bfree&&(*env)->GetLongField(env,obj,attrs_f_bavail)==(jlong)laststat.f_bavail;}
+JNIEXPORT jint JNICALL Java_ConfigFs_unavailableError(JNIEnv*env,jclass cls){(void)env;(void)cls;return ENOSYS;}
 JNIEXPORT jint JNICALL Java_ConfigFs_calls(JNIEnv*env,jclass cls){(void)env;(void)cls;return statcalls;}
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*vm,void*reserved){(void)reserved;JNIEnv*env=0;if((*vm)->GetEnv(vm,(void**)&env,JNI_VERSION_1_8))return JNI_ERR;
  jclass attrs=(*env)->FindClass(env,"sun/nio/fs/UnixFileStoreAttributes");if(!attrs)return JNI_ERR;
@@ -61,15 +62,14 @@ public class ConfigFs {
  static native void modes(int realpath,int stat);
  static native boolean statsMatch(Object attrs);
  static native int calls();
+ static native int unavailableError();
  static void fail(Path p)throws Exception{try{canonical(p.toString());throw new AssertionError("accepted "+p);}catch(IOException expected){}}
  public static void main(String[]args)throws Exception{
   System.load(args[0]);Path root=Files.createTempDirectory("ps5-config-fs-").toRealPath();Path dir=Files.createDirectory(root.resolve("dir")),file=Files.writeString(dir.resolve("a.yml"),"hello config");
   Class<?> up=Class.forName("sun.nio.fs.UnixPath"),attrs=Class.forName("sun.nio.fs.UnixFileStoreAttributes");Method get=attrs.getDeclaredMethod("get",up);get.setAccessible(true);
-  modes(0,0);long total=file.toFile().getTotalSpace(),free=file.toFile().getFreeSpace(),usable=file.toFile().getUsableSpace();if(total<=0||free<0||usable<0||free>total||usable>total)throw new AssertionError("real File space values");modes(0,2);if(file.toFile().getTotalSpace()!=0)throw new AssertionError("File stat failure");modes(0,0);
-  Object value=get.invoke(null,file);if(!statsMatch(value))throw new AssertionError("real stats mismatch");
-  modes(0,1);value=get.invoke(null,file);if(!statsMatch(value)||calls()!=2)throw new AssertionError("EINTR retry");
-  modes(0,2);try{get.invoke(null,file);throw new AssertionError("suppressed stat error");}catch(InvocationTargetException expected){if(!expected.getCause().getClass().getName().equals("sun.nio.fs.UnixException"))throw expected;}
-  modes(0,0);try{get.invoke(null,root.resolve("missing"));throw new AssertionError("missing stat accepted");}catch(InvocationTargetException expected){}
+  modes(0,0);if(file.toFile().getTotalSpace()!=0||file.toFile().getFreeSpace()!=0||file.toFile().getUsableSpace()!=0||calls()!=0)throw new AssertionError("unavailable File capacity must not call native statfs");
+  for(Path probe:new Path[]{file,root.resolve("missing")})try{get.invoke(null,probe);throw new AssertionError("NIO capacity must report unavailable");}catch(InvocationTargetException expected){if(!expected.getCause().getClass().getName().equals("sun.nio.fs.UnixException"))throw expected;Method errno=expected.getCause().getClass().getDeclaredMethod("errno");errno.setAccessible(true);if(((Integer)errno.invoke(expected.getCause()))!=unavailableError())throw new AssertionError("wrong unavailable error");}
+  if(calls()!=0)throw new AssertionError("unsupported NIO stats invoked native statfs");
   modes(1,0);if(!canonical(file.toString()).equals(file.toString()))throw new AssertionError("file fallback");
   Path missing=dir.resolve("new/config.yml");if(!missing.toFile().getCanonicalPath().equals(missing.toString()))throw new AssertionError("File canonical API");if(!canonical(missing.toString()).equals(missing.toString()))throw new AssertionError("missing config tail");
   if(!canonical(dir.resolve("../dir/a.yml").toString()).equals(file.toString()))throw new AssertionError("parent walk");
@@ -78,7 +78,10 @@ public class ConfigFs {
   modes(2,0);fail(file);modes(0,0);if(!canonical(link.resolve("a.yml").toString()).equals(file.toString()))throw new AssertionError("native symlink behavior");
   // Real NIO copy/replace of configuration data uses the actual hooked stat JNI.
   for(int i=0;i<20;i++){Path copy=dir.resolve("copy.yml");Files.copy(file,copy,StandardCopyOption.REPLACE_EXISTING);if(!Files.readString(copy).equals("hello config"))throw new AssertionError("copy bytes");}
-  System.out.println("PASS actual File/NIO statfs JNI/real JVM fields, EINTR/error/missing paths and repeated NIO config copy; actual JDK canonicalizer+descriptor walker for EPERM existing/missing-tail/dot-parent/symlink refusal/native-links/EIO. XcheckJNI/UBSan; target behavior pending.");
+  if(calls()!=0)throw new AssertionError("NIO copies queried raw statfs");
+  try{Files.copy(root.resolve("absent-source"),root.resolve("bad-copy"));throw new AssertionError("missing source accepted");}catch(NoSuchFileException expected){}
+  try{Files.copy(file,root.resolve("missing-parent/bad-copy"));throw new AssertionError("missing parent accepted");}catch(NoSuchFileException expected){}
+  System.out.println("PASS actual unavailable File/NIO capacity JNI in real JVM, zero native statfs calls and repeated NIO config copy via existing Java buffer fallback; actual JDK canonicalizer+descriptor walker for EPERM existing/missing-tail/dot-parent/symlink refusal/native-links/EIO. XcheckJNI/UBSan; target behavior pending.");
  }
 }
 ''')

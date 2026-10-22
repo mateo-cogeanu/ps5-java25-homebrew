@@ -1,0 +1,49 @@
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -1283,6 +1283,14 @@
+ Java_sun_nio_fs_UnixNativeDispatcher_statvfs0(JNIEnv* env, jclass this,
+     jlong pathAddress, jobject attrs)
+ {
++#ifdef __PROSPERO__
++    // The SDK raw statfs path is not validated for a title sandbox.
++    // Report unavailable capacity rather than invoking it or inventing data.
++    (void)this; (void)pathAddress; (void)attrs;
++    PS5_REALPATH_NOTE("capacity unavailable ENOSYS", "");
++    throwUnixException(env, ENOSYS);
++    return;
++#else
+     int err;
+ #if defined(MACOSX) || defined(__PROSPERO__)
+     struct statfs buf;
+@@ -1320,6 +1328,7 @@
+         (*env)->SetLongField(env, attrs, attrs_f_bfree,  long_to_jlong(buf.f_bfree));
+         (*env)->SetLongField(env, attrs, attrs_f_bavail, long_to_jlong(buf.f_bavail));
+     }
++#endif
+ }
+ 
+ JNIEXPORT void JNICALL
+--- a/src/java.base/unix/native/libjava/UnixFileSystem_md.c
++++ b/src/java.base/unix/native/libjava/UnixFileSystem_md.c
+@@ -519,6 +519,13 @@
+ Java_java_io_UnixFileSystem_getSpace0(JNIEnv *env, jobject this,
+                                       jobject file, jint t)
+ {
++#ifdef __PROSPERO__
++    // The SDK raw statfs path is not validated for a title sandbox.
++    // Report unavailable capacity rather than invoking it or inventing data.
++    (void)env; (void)this; (void)file; (void)t;
++    // File space queries return zero when the OS query is unavailable.
++    return 0L;
++#else
+     jlong rv = 0L;
+ 
+     WITH_FIELD_PLATFORM_STRING(env, file, ids.path, path) {
+@@ -571,6 +578,7 @@
+ #endif
+     } END_PLATFORM_STRING(env, path);
+     return rv;
++#endif
+ }
+ 
+ JNIEXPORT jlong JNICALL
