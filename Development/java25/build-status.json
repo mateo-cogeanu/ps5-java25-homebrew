@@ -476,7 +476,7 @@
   "external_resident_jni_libraries": {
     "scope": "External probe-spec resident_libraries: named consumer-owned target ELF relocatable groups, scoped JNI entries/real export registry/standard builtin JNI discovery; constructor-bearing groups rejected. No arbitrary ELF loading/HotSpot source change.",
     "host": "PASS actual target object input and schema/name/path/duplicate/ELF controls; full generator actual constructor-section rejection. Consumer actual JVM native library/symbol/function lifecycle/error controls XcheckJNI/UBSan. PASS target registry/app build, generated builtin/JNI/export symbols, packaged object-hash audit, exact original runtime/code-image/client artifact bytes and frozen baseline package.",
-    "console": "pending external consumer library System.loadLibrary/JNI lookup and scoped symbol invocation; older passing snapshots retained.",
+    "console": "ALL PASS reported on2026-10-22 for the exact external consumer001 seven-row probe: real System.loadLibrary/JNI_OnLoad once, JNI symbol lookup and scoped real-function invocation/error controls. General third-party library/constructor support and arbitrary ELF loading remain unvalidated.",
     "documentation": "docs/java25-external-resident-libraries.md"
   }
 }

@@ -89,7 +89,7 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 
 **Reusable consumer tooling:** the runtime builder supports external probe specifications and optional target-built Java modules. Application-specific work remains in its own repository. Existing passing snapshots stay frozen; additional-module console coverage is pending.
 
-External specifications also support [consumer-owned resident JNI object groups](docs/java25-external-resident-libraries.md), with named export tables and standard Java library discovery. Target packaging and host checks pass; the new external-library integration still needs console validation.
+External specifications also support [consumer-owned resident JNI object groups](docs/java25-external-resident-libraries.md), with named export tables and standard Java library discovery. Target packaging and host checks pass, and the exact external-consumer JNI loading/function-lookup probe is now reported ALL PASS on PS5. General third-party native-library compatibility remains unvalidated.
 
 ## Explore the source
 
