@@ -2041,3 +2041,20 @@ hostactualadapter/SDKallocation/concurrency/prepareASanUBSan checks pass.
 PS5earlyavailability andlaterDNS/TLS/nativepressure remain pending.
 
 Patch0111 increases the shared on-demand native direct ledger ceiling to256MiB and reports policy refusals separately from kernel errors. See [headroom and validation limits](../docs/java25-native-direct-headroom.md). Console validation is pending; frozen snapshots remain unchanged.
+
+### Opt-in diagnostic history retention (2026-10-24)
+
+`probe/log_retention.hpp` provides a caller-selected `retain_tail` helper for
+closed diagnostic files. A consumer probe reported ENOSPC before JVM entry;
+its shared startup history was58,035,442bytes. The helper reads the requested
+tail before truncating the same inode, freeing old blocks before rewriting
+without requiring space for a temporary rotated copy. It uses caller-provided
+scratch storage and reports IO errors. A write failure after truncation can
+leave a partial tail; callers must stop and report it. Archive important
+reports before explicitly beginning another run. Do not use it on saves or
+user data. No probe enables retention implicitly; frozen snapshots are unchanged.
+
+`python3 tools/test_log_retention.py` passes real-file tail/inode/idempotence/
+small/missing/invalid-input checks under ASan/UBSan. Console storage recovery
+remains pending in the separate consumer probe. This does not change JVM or
+SDK implementation, establish a console pass or complete endurance testing.
