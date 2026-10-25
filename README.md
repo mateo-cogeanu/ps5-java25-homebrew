@@ -87,6 +87,11 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 
 **Latest passing dependency probe:** [Dependency_Probe](Dependency_Probe/), `PPSA99873` version `01.000.001`. Run all six rows in order. The controlled application and its dependencies exist only in JARs; the JNI fixture is target-compiled and embedded. Arbitrary external native ELF loading and real application compatibility remain unverified. Longer network endurance is deferred until there is a useful application to exercise.
 
+Native diagnostic capture is available through the opt-in
+[native stderr helper](docs/native-stderr-capture.md). Current/previous native
+stderr files have fixed read-only download routes and are included by the log
+collector. Host checks pass;actual console descriptor routing remains pending.
+
 **Reusable consumer tooling:** the runtime builder supports external probe specifications and optional target-built Java modules. Application-specific work remains in its own repository. Existing passing snapshots stay frozen; additional-module console coverage is pending.
 
 External specifications also support [consumer-owned resident JNI object groups](docs/java25-external-resident-libraries.md), with named export tables and standard Java library discovery. Target packaging and host checks pass, and the exact external-consumer JNI loading/function-lookup probe is now reported ALL PASS on PS5. General third-party native-library compatibility remains unvalidated.
