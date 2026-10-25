@@ -3,17 +3,24 @@
 `java25/probe/native_stderr.hpp` supplies `ps5::native_stderr::begin(path)` for a
 consumer that needs actual native-library messages,including stderr writes that
 Java System.setErr does not intercept. Call once before native services start.
-It opens the caller-supplied path for append,duplicates its descriptor onto2,
-and makes the existing stderr stream unbuffered. stdout and Java streams are
-unchanged. No remote address or client filter is embedded. This is a title-lifetime
-redirect;it does not automatically restore descriptor2.
+It opens the caller-supplied path for append,creates a FILE with fdopen,and
+configures it as unbuffered before publishing it as stderr. It never calls dup2:
+an actual PS5 title refused that call with EPERM during client048 diagnostic
+setup. An inspected upstream SDK uses the same stream-replacement workaround:
+[platform/src/klog.c at7a82030](https://github.com/mihawk-99/PS5_PayloadSDK/blob/7a82030dcff6457936d75be97f52aa509b770e1f/platform/src/klog.c).
+That source is reference evidence,not a dependency upgrade.
 
-Success returns0 and preserves errno. Open/dup errors are returned truthfully;
-failed open/dup preserves descriptor2. A setvbuf error returnsEIO after descriptor2
-has been redirected;the caller should report setup failure rather than claim
-complete capture. When open returns descriptor2 itself,it remains open. Open and
-dup retry EINTR. The helper does not promise crash recovery,complete logs after
-system termination,or capture of all kernel/GPU diagnostics.
+Success returns0 and preserves errno. Open/fdopen/setvbuf errors are returned
+truthfully;any unpublished stream/descriptor is closed and the previous stderr
+pointer is retained. It does not close descriptor2 or its previous FILE. This is
+a title-lifetime stream redirect with no automatic restoration;call once before
+concurrent native use. stdout is unchanged. Raw write(2,...) output is **not**
+captured. Native fprintf(stderr,...) and equivalent FILE users are captured,
+which includes the driver diagnostics motivating this helper. A library that
+cached the original FILE before replacement may still write to that original
+stream. Consumers should record setup failure and continue when capture is
+optional;diagnostic setup must not prevent useful application startup.
+The helper does not guarantee logs after system termination or crash recovery.
 
 For the standard report routes,after begin_session use write_note to create
 `/download0/probe-native-stderr.log` with build/run identity,then pass that path
@@ -33,7 +40,7 @@ python3 tools/test_probe_report_writer.py
 ```
 
 The helper test uses actual native stdio and raw descriptor2 writes in host
-children,exiting with _exit to bypass stdio cleanup. It checks append,stdout and
+children,exiting with _exit to bypass stdio cleanup. It checks stdio capture/append,raw descriptor2/stdout unchanged,
 errno preservation,and failed-open behavior under ASan/UBSan. Report-server tests
 check both endpoints in the ZIP collector and native-report session archiving,
 plus existing allowlist/large binary/disconnect behavior. Actual PS5 descriptor

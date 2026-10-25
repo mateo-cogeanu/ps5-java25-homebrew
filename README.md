@@ -90,7 +90,7 @@ If a test fails, report the **app version**, **test row** and **full exception/c
 Native diagnostic capture is available through the opt-in
 [native stderr helper](docs/native-stderr-capture.md). Current/previous native
 stderr files have fixed read-only download routes and are included by the log
-collector. Host checks pass;actual console descriptor routing remains pending.
+collector. Host checks pass;actual console native FILE stream capture remains pending.
 
 **Reusable consumer tooling:** the runtime builder supports external probe specifications and optional target-built Java modules. Application-specific work remains in its own repository. Existing passing snapshots stay frozen; additional-module console coverage is pending.
 
