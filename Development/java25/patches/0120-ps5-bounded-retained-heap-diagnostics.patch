@@ -1,0 +1,43 @@
+--- a/src/hotspot/share/gc/shared/collectedHeap.cpp
++++ b/src/hotspot/share/gc/shared/collectedHeap.cpp
+@@ -575,6 +575,16 @@
+ 
+   LogTarget(Trace, gc, classhisto) lt;
+   if (lt.is_enabled()) {
++#ifdef __PROSPERO__
++    // Opt-in retained-heap diagnosis: no extra collection. Sample only after
++    // existing full GC with >=512MiB retained, at most3samples16GCs apart.
++    static unsigned ps5_histogram_eligible = 0;
++    static unsigned ps5_histogram_printed = 0;
++    if (before || used() < 512 * M || ps5_histogram_printed >= 3) return;
++    if ((ps5_histogram_eligible++ % 16) != 0) return;
++    ++ps5_histogram_printed;
++    log_trace(gc, classhisto)("PS5 retained histogram sample=%u max=3 stride=16 min_retained_bytes=%zu", ps5_histogram_printed, (size_t)(512 * M));
++#endif
+     GCTraceTime(Trace, gc, classhisto) tm(before ? "Class Histogram (before full gc)" : "Class Histogram (after full gc)", timer);
+     LogStream ls(lt);
+     VM_GC_HeapInspection inspector(&ls, false /* ! full gc */);
+--- a/src/hotspot/share/memory/heapInspection.cpp
++++ b/src/hotspot/share/memory/heapInspection.cpp
+@@ -298,11 +298,21 @@
+   int64_t total = 0;
+   uint64_t totalw = 0;
+   for(int i=0; i < elements()->length(); i++) {
++#ifdef __PROSPERO__
++    // Bound PS5 diagnostic output while retaining totals over all classes.
++    if (i < 40) {
++#endif
+     st->print("%4d: ", i+1);
+     elements()->at(i)->print_on(st);
++#ifdef __PROSPERO__
++    }
++#endif
+     total += elements()->at(i)->count();
+     totalw += elements()->at(i)->words();
+   }
++#ifdef __PROSPERO__
++  if (elements()->length() > 40) st->print_cr("PS5 histogram: remaining %d class rows omitted; totals include all classes", elements()->length() - 40);
++#endif
+   st->print_cr("Total " INT64_FORMAT_W(13) "  " UINT64_FORMAT_W(13),
+                total, totalw * HeapWordSize);
+ }

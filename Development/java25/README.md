@@ -2095,3 +2095,23 @@ reservation, zero/protection, uncommit/recommit and adjacent preservation,
 rollback/release failures, purpose isolation and over-budget refusal. Existing
 metadata controls also pass. Target HotSpot builds successfully. Earlier0118
 snapshots and compiled consumer packages remain preserved.
+
+## Opt-in retained heap diagnostics (patch0120)
+
+A consumer still experiences repeated full GC after increasing heap headroom.
+Patch0120 bounds the existing PS5 `gc+classhisto=trace` path: only after naturally
+occurring full GC, only with at least512MiB retained, at most3histograms with
+16eligible fullGCs between samples. It requests no extra collection. The existing
+upstream heap-inspection implementation walks/sorts class counts; PS5 output shows
+the largest40class rows, with totals still including every class and an explicit
+omitted-row count. Other platforms retain upstream behavior. This cap also applies
+to other PS5 histogram output; it does not affect Java objects or GC liveness.
+
+The diagnostic is opt-in and adds native table allocation/heap-walk/sort/output
+time inside sampled fullGC pauses; it is not a performance fix. Default logging
+and release behavior do not enable it. A live histogram reveals shallow class
+counts/bytes, not retaining paths or a proof of a leak. Table allocation failure
+uses the existing upstream diagnostic error path. Host ASan/UBSan fixtures compile
+the actual gate/output loop and verify threshold/before rejection,stride/cap,
+top40and all-class totals. Target HotSpot builds. Actual PS5 inspection and
+native-memory headroom remain pending; preserve earlier accepted binaries.
