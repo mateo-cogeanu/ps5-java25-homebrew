@@ -22,4 +22,4 @@ PS5 VideoOut teardown, direct-memory release or the following GPU/SDL handoff.
 Those require a console run. No frozen runtime milestone is changed.
 
 Minecraft-specific launcher UI, Microsoft public application ID and authentication
-belong in [ps5-minecraft-java](https://github.com/mateo-cogeanu/ps5-minecraft-java).
+belong in [ProsperoCraft](https://github.com/mateo-cogeanu/ProsperoCraft).

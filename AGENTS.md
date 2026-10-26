@@ -26,7 +26,7 @@ The workspace `README.md` is the canonical public project README; its banner
 is `docs/readme-banner.svg`. The sync script publishes both at repository root.
 Keep the milestone table and release links current when freezing a milestone.
 This repository's branding and roadmap cover the Java runtime only. Link to
-`mateo-cogeanu/ps5-minecraft-java` for Minecraft-specific goals; do not add game,
+`mateo-cogeanu/ProsperoCraft` for Minecraft-specific goals; do not add game,
 graphics or mod-loader roadmaps here. Preserve frozen validation snapshots.
 New inbound test apps must not contain preset device IP addresses or client-IP
 filters. Listen on available interfaces; pass the target address to external
@@ -66,7 +66,7 @@ create a background file watcher or automatic uploads while no agent is working.
 ## Separate consumer repositories
 
 Minecraft-specific source, artifact pins, harnesses and validation belong
-in https://github.com/mateo-cogeanu/ps5-minecraft-java and must be committed
+in https://github.com/mateo-cogeanu/ProsperoCraft and must be committed
 and pushed there. Reusable Java runtime fixes, patches and packaging/image
 tools belong here and are published through tools/sync_github.py. Do not
 copy consumer game code or downloaded game JARs into this repository.

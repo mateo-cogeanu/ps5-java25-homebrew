@@ -5,7 +5,7 @@ acceptance probes. VM startup, Java file I/O and ZIP/JAR loading have passing
 console milestones on firmware 13.60. Networking 01.000.001 awaits its test.
 The sections below retain the port's build and diagnostic history.
 
-Related application project: [ps5-minecraft-java](https://github.com/mateo-cogeanu/ps5-minecraft-java).
+Related application project: [ProsperoCraft](https://github.com/mateo-cogeanu/ProsperoCraft).
 
 ## Current deliverable
 
@@ -1034,7 +1034,7 @@ override, with no descriptor or echo-worker leaks. The actual native trace
 callback and five JNI checkpoints pass on the host. PS5 validation is pending.
 
 Minecraft work has a separate public repository,
-https://github.com/mateo-cogeanu/ps5-minecraft-java, intentionally empty for
+https://github.com/mateo-cogeanu/ProsperoCraft, intentionally empty for
 now. Its description links to this runtime port; Java development remains
 in ps5-java25-homebrew.
 
@@ -1586,7 +1586,7 @@ reusable native runtime/image tooling. All required paths must exist.
 The native builder accepts additional include directories. External asset
 staging is fresh for each build, and real module names are retained in
 the release metadata. Related application work lives in
-https://github.com/mateo-cogeanu/ps5-minecraft-java.
+https://github.com/mateo-cogeanu/ProsperoCraft.
 
 java25_boot_image.py --modules accepts optional target-built Java modules,
 builds their Java targets, creates classes/config-only JMODs and uses jlink

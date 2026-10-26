@@ -71,7 +71,7 @@ asset preflight, real server readiness, clean stop/thread exit, nonempty saved
 world metadata and VM destruction. The matching runtime pin is
 `aab0d2fa8ad58ba8ceb58561a33a9a5fe50fd583`. Consumer source/package hashes and
 release are frozen in the separate
-[Server_Start validation](https://github.com/mateo-cogeanu/ps5-minecraft-java/tree/main/Server_Start).
+[Server_Start validation](https://github.com/mateo-cogeanu/ProsperoCraft/tree/main/Server_Start).
 This supersedes the058 pending result above for those rows. It does not turn
 unimplemented mount enumeration/capacity into a supported API or establish DNS,
 reload, player joins, performance or endurance. No runtime binary rebuild was
