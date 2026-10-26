@@ -83,6 +83,11 @@ int sceKernelMapDirectMemory(void **address, std::size_t length, int, int,
   *address = frame_memory;
   return frame_memory ? 0 : -1;
 }
+int sceKernelMunmap(void *, std::size_t) { return 0; }
+int sceKernelReleaseDirectMemory(std::int64_t, std::size_t) {
+  std::free(frame_memory); frame_memory = nullptr; return 0;
+}
+int sceVideoOutClose(std::int32_t) { return 0; }
 int sceKernelSendNotificationRequest(std::uint32_t, void *, std::size_t, int) {
   return 0;
 }

@@ -25,6 +25,7 @@ enum class Color : std::uint32_t
 };
 
 class Canvas;
+using StopScene = bool (*)() noexcept;
 using DrawScene = void (*)(Canvas &) noexcept;
 using UpdateScene = bool (*)() noexcept;
 // Draws the scene once and keeps it on screen.
@@ -36,8 +37,14 @@ using UpdateScene = bool (*)() noexcept;
 [[noreturn]] void run_ui(DrawScene draw, UpdateScene update,
                         std::string_view ready_message) noexcept;
 
+// Returning UI session: closes VideoOut before releasing its mapped buffers.
+// False means cleanup failed; callers must not start another display owner.
+bool run_ui_until(DrawScene draw, UpdateScene update, StopScene stop,
+                  std::string_view ready_message) noexcept;
+
 namespace detail
 {
+bool present_session(DrawScene draw, std::string_view ready_message, bool every_frame, UpdateScene update, StopScene stop) noexcept;
 [[noreturn]] void present(DrawScene draw, std::string_view ready_message,
                           bool every_frame, UpdateScene update = nullptr) noexcept;
 }
@@ -67,6 +74,7 @@ class Canvas final
 
     std::uint32_t *pixels_;
 
+    friend bool detail::present_session(DrawScene draw, std::string_view ready_message, bool every_frame, UpdateScene update, StopScene stop) noexcept;
     friend void detail::present(DrawScene draw, std::string_view ready_message,
                                 bool every_frame, UpdateScene update) noexcept;
 };

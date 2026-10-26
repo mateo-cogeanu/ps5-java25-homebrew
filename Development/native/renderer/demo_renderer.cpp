@@ -37,6 +37,9 @@ extern "C"
     int close(int descriptor);
     int sceVideoOutOpen(std::int32_t user_id, std::int32_t bus_type, std::int32_t index,
                         const void *param);
+    int sceVideoOutClose(std::int32_t handle);
+    int sceKernelMunmap(void* address, std::size_t size);
+    int sceKernelReleaseDirectMemory(std::int64_t address, std::size_t size);
     int sceVideoOutSetFlipRate(std::int32_t handle, std::int32_t rate);
     int sceVideoOutSubmitFlip(std::int32_t handle, std::int32_t buffer_index,
                               std::uint32_t flip_mode, std::int64_t flip_argument);
@@ -482,8 +485,17 @@ void read_asset_text(const char *path, std::span<char> destination,
     detail::present(draw, ready_message, true, update);
 }
 
+bool run_ui_until(DrawScene draw, UpdateScene update, StopScene stop, std::string_view ready_message) noexcept {
+    if (!stop) return false;
+    return detail::present_session(draw, ready_message, true, update, stop);
+}
 [[noreturn]] void detail::present(DrawScene draw, std::string_view ready_message,
-                                  bool every_frame, UpdateScene update) noexcept
+                                  bool every_frame, UpdateScene update) noexcept {
+    (void)detail::present_session(draw, ready_message, every_frame, update, nullptr);
+    halt("Unexpected return from persistent display");
+}
+bool detail::present_session(DrawScene draw, std::string_view ready_message,
+                            bool every_frame, UpdateScene update, StopScene stop) noexcept
 {
     if (!verify_unique_ownership())
         halt("Hello World: unique ownership failed");
@@ -543,6 +555,7 @@ void read_asset_text(const char *path, std::span<char> destination,
     if (every_frame)
         for (std::int64_t frame = 2;; ++frame)
         {
+            if (stop && stop()) break;
             if (update && !update()) {
                 (void)sceKernelUsleep(4000);
                 --frame;
@@ -556,6 +569,14 @@ void read_asset_text(const char *path, std::span<char> destination,
             (void)sceVideoOutWaitVblank(video);
         }
 
+    if (stop) {
+        // Close relinquishes display/buffer ownership before unmapping backing.
+        // On failure retain remaining ownership and forbid a display handoff.
+        if (sceVideoOutClose(video) < 0) return false;
+        if (sceKernelMunmap(mapped, memory_bytes) < 0) return false;
+        if (sceKernelReleaseDirectMemory(physical_address, memory_bytes) < 0) return false;
+        return true;
+    }
     // Returning from main or calling exit crashes this launch context.
     for (;;)
         (void)sceKernelUsleep(1000000);
