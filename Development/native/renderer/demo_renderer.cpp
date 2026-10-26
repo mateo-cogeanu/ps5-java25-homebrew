@@ -549,7 +549,7 @@ bool detail::present_session(DrawScene draw, std::string_view ready_message,
         halt("Hello World: initial flip failed");
 
     (void)sceVideoOutWaitVblank(video);
-    notify(ready_message);
+    if (!ready_message.empty()) notify(ready_message);
 
     // Each frame is drawn whole into the buffer that isn't on screen, then shown.
     if (every_frame)
