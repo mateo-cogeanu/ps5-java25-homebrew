@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-26",
+  "patch": "0118-ps5-uncompressed-direct-heap.patch",
+  "reason": "Consumer VM384MiBanonymousreservation402653184bytesfailsENOMEM12beforeMain;prior256MiBworldgenerationJavaheapOOM.",
+  "scope": "Onlynonexec,unhintedmtJavaHeap,UseCompressedOopsfalse,ordinaryENOMEMfallback.512MiBseparatephysicalheapbudget;native/metadata256MiBbudgetunchanged.",
+  "semantics": "ZeroentirebackingthenPROT_NONE;NMTreservation;existingmprotectcommit;ownedsubrangezero+PROT_NONEuncommit;exactwholemappingrelease;interior/shortreleaseblocked;failedcleanupretainsownership/budget. No executable/fixed/file/compressedheap fallback.",
+  "checks": {
+    "direct-heap-test.log": {
+      "sha256": "6d91dd3f4c4e226d9ac1738ad206d5da9ec6076422e2ab4943529d31a74d71bf",
+      "bytes": 527,
+      "result": "PASS"
+    },
+    "direct-heap-hotspot-build.log": {
+      "sha256": "fe81bdb54fe2764b58d56e9dd022a9b0256befb8dae55c3b5d88270a698938a4",
+      "bytes": 1893,
+      "result": "PASS"
+    },
+    "test_java25_native_direct.py.log": {
+      "sha256": "2e1f6d5861fb7e4680171f0238056f56ebccc6bcc2d50e5cdfe795e22719e527",
+      "bytes": 196,
+      "result": "PASS"
+    },
+    "test_java25_direct_stacks.py.log": {
+      "sha256": "a4b8b7ab1a410c89c47f554647e425d0c0b93b83488a36dec2c653acf5d4f443",
+      "bytes": 211,
+      "result": "PASS"
+    },
+    "test_java25_direct_class_space.py.log": {
+      "sha256": "d3b9137f5066a226dd157c1f6ce060d50205236ac209fa44fe0a8ca19852b683",
+      "bytes": 419,
+      "result": "PASS"
+    }
+  },
+  "console": "PENDINGactualPS5allocation/protection/GC/worldload. HostOSfixturesarenotPS5emulation.",
+  "frozen": "All frozen runtime source/validation/packages preserved. Consumer candidate belongs separateps5-minecraft-java repository."
+}

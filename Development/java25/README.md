@@ -2058,3 +2058,24 @@ user data. No probe enables retention implicitly; frozen snapshots are unchanged
 small/missing/invalid-input checks under ASan/UBSan. Console storage recovery
 remains pending in the separate consumer probe. This does not change JVM or
 SDK implementation, establish a console pass or complete endurance testing.
+
+## Uncompressed heap direct-memory fallback (patch0118)
+
+A consumer512/384MiB Java heap can fail ordinary anonymous reservation with
+ENOMEM before VM creation. Patch0118 adds a bounded direct-memory fallback
+only for an unhinted,nonexecutable mtJavaHeap reservation afterENOMEM and only
+when UseCompressedOops is explicitly disabled. Compressed-oop/fixed/hinted/file
+heaps keep their existing paths. Direct heap allocation has its own512MiB cap;
+ordinary native data/metadata retain the separate256MiB cap. Physical backing
+is zeroed,protectedPROT_NONE,and entered in the NMT reservation and ownership
+ledger. Existingmprotectcommit enables subranges;heapuncommit zeroes unused
+ownedsubranges andprotectswithoutreplacingdirectmappings. Onlywholemapping
+releasecanunmap/releasephysicalownership;interior/shortreleaseisrejected.
+Failedcleanupretainsledger/budgetownership;noexecutablememoryorprivilegechange.
+
+HostASan/UBSanexercisestheactualreservation/ownershipfunctionswithkernel
+fixtures:320MiBalignedstorage,zero/protection,recommit,adjacentdata,ordinary/
+error/compressed/fixed/execgates,separatebudgets,rollbackandreleasefailure.
+TargetHotSpotcompiles.Consolelargerheapreservation/commit/GC/worldperformance
+remainpending.Thisdoesnotestablishadditionalphysicalmemoryavailabilityor
+afullJIT/gamepass.Frozenruntimevalidationandpreviouspackagesareunchanged.

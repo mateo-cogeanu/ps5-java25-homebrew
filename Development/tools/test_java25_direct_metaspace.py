@@ -30,6 +30,7 @@ static int checked_protect(void* p,size_t bytes,int prot){if(fail_protect){errno
 #define __PROSPERO__ 1
 #define mprotect checked_protect
 #include "runtime/ps5NativeDirectMemory.hpp"
+static bool UseCompressedOops=true;
 enum MemTag{mtMetaspace,mtClass,mtJavaHeap,mtCode};
 static constexpr int CALLER_PC=0;
 struct ReservedSpace{char* p=nullptr;size_t bytes=0;ReservedSpace()=default;ReservedSpace(char* a,size_t b,size_t alignment,size_t,bool exec,bool special):p(a),bytes(b){assert((uintptr_t)a%alignment==0&&!exec&&!special);}bool is_reserved(){return p!=nullptr;}};
