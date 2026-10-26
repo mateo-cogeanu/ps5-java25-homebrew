@@ -7,13 +7,15 @@ f=runpy.run_path(str(r/'tools/test_java25_direct_metaspace.py'))
 w=r/'build/java25/direct-heap-test';(w/'runtime').mkdir(parents=True,exist_ok=True)
 (w/'runtime/ps5StartupTrace.hpp').write_text('#pragma once\ninline void ps5_vm_trace_values(const char*,unsigned long long,const char*,unsigned long long,const char*,unsigned long long){}\n')
 source=f['source'].replace('tag==mtMetaspace','tag==mtJavaHeap')
+# Kernel fixture advertises enough synthetic capacity for the tested reservation.
+source=source.replace('return 1024ULL*1024*1024;', 'return 2048ULL*1024*1024;')
 source=source.replace('struct os{static bool pd_release_memory(char*,size_t);};','struct os{static bool pd_release_memory(char*,size_t);static bool pd_uncommit_memory(char*,size_t,bool);};')
 s=(r/'.tools/java25/openjdk/src/hotspot/os/bsd/os_bsd.cpp').read_text();uncommit=s[s.index('bool os::pd_uncommit_memory('):s.index('\nbool os::pd_create_stack_guard_pages(')]
 # Keep the actual PS5 ownership dispatch,stub only ordinary fallback branches.
 uncommit=uncommit[:uncommit.index('  if (exec)')]+ '  return false;\n}\n'
 suffix=f['suffix'];suffix=suffix[:suffix.index('int main()')]+r'''
 int main(){
- constexpr size_t size=768*1024*1024,alignment=4*1024*1024,page=16384;size_t before=calls;
+ constexpr size_t size=1536ULL*1024*1024,alignment=4*1024*1024,page=16384;size_t before=calls;
  auto reserve=[](size_t n){return MemoryReserver::reserve_memory(nullptr,n,alignment,page,false,mtJavaHeap);};
  assert(!reserve(size).is_reserved()&&calls==before);UseCompressedOops=false;
  assert(!MemoryReserver::reserve_memory((char*)0x4000000,size,alignment,page,false,mtJavaHeap).is_reserved());
@@ -44,7 +46,7 @@ int main(){
  rs=reserve(alignment);fail_release=true;assert(!os::pd_release_memory(rs.p,alignment)&&live==1&&direct::state().heap_held==alignment);fail_release=false;
  direct::lock();for(unsigned i=0;i<direct::entry_count;i++)if(direct::state().entries[i].occupied){assert(!sceKernelReleaseDirectMemory(0,alignment));direct::abandon(i);}direct::unlock();
  assert(!live&&!direct::state().heap_held&&!direct::state().held);
- puts("PASS actual uncompressed heap reservation:768MiB/alignment,zero/PROT_NONE/subrange uncommit+recommit,adjacent preservation,whole/interior release guards,NMT,compressed/fixed/exec/error gates,ordinary success,rollback and cleanup retention,separate768MiBheap/256MiBnative budgets;ASan/UBSan OS fixtures,not PS5 acceptance");
+ puts("PASS actual uncompressed heap reservation:1536MiB/alignment,zero/PROT_NONE/subrange uncommit+recommit,adjacent preservation,whole/interior release guards,NMT,compressed/fixed/exec/error gates,ordinary success,rollback and cleanup retention,separate1536MiBheap/256MiBnative budgets;ASan/UBSan OS fixtures,not PS5 acceptance");
 }
 '''
 (w/'test.cpp').write_text('#include <initializer_list>\n#include <cstdio>\n'+source+f['reserve']+f['release']+uncommit+suffix)

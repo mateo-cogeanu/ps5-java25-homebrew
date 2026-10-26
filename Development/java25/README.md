@@ -2115,3 +2115,20 @@ uses the existing upstream diagnostic error path. Host ASan/UBSan fixtures compi
 the actual gate/output loop and verify threshold/before rejection,stride/cap,
 top40and all-class totals. Target HotSpot builds. Actual PS5 inspection and
 native-memory headroom remain pending; preserve earlier accepted binaries.
+
+## Measured world workload heap ceiling (patch0121)
+
+Actual consumer classhistograms establish retained chunk-container/long-array
+world data growing beyond576MiB; a768MiBSerialGC split repeatedly fills its old
+generation. Patch0121 raises only the separate explicitly uncompressed direct
+heap ceiling to1536MiB for a consumer G1experiment. The256MiBnative-data budget,
+reservation/error/nonexec/unhinted gates and ownership rules remain unchanged.
+This ceiling does not establish physical availability or allocate automatically.
+
+Actual helper/reservation ASan/UBSan fixtures now exercise1536MiBalignedstorage
+with a synthetic2GiBkernelpool, zero/protection/subrangecommit/adjacentdata,
+rollback/failureownership/whole/interiorrelease/separatebudgets/overbudget refusal.
+TargetHotSpot builds with G1already enabled; this patch does not reimplement G1.
+Actual PS5 G1auxiliarymappings/workers/physicalbacking/nativeheadroom and pause
+behavior remain pending. Consumer flag/workload tests and game settings are in
+the separate Minecraft repository. Preserve frozen passing runtime packages.
