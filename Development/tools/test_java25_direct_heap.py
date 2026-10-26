@@ -13,7 +13,7 @@ s=(r/'.tools/java25/openjdk/src/hotspot/os/bsd/os_bsd.cpp').read_text();uncommit
 uncommit=uncommit[:uncommit.index('  if (exec)')]+ '  return false;\n}\n'
 suffix=f['suffix'];suffix=suffix[:suffix.index('int main()')]+r'''
 int main(){
- constexpr size_t size=320*1024*1024,alignment=4*1024*1024,page=16384;size_t before=calls;
+ constexpr size_t size=768*1024*1024,alignment=4*1024*1024,page=16384;size_t before=calls;
  auto reserve=[](size_t n){return MemoryReserver::reserve_memory(nullptr,n,alignment,page,false,mtJavaHeap);};
  assert(!reserve(size).is_reserved()&&calls==before);UseCompressedOops=false;
  assert(!MemoryReserver::reserve_memory((char*)0x4000000,size,alignment,page,false,mtJavaHeap).is_reserved());
@@ -44,7 +44,7 @@ int main(){
  rs=reserve(alignment);fail_release=true;assert(!os::pd_release_memory(rs.p,alignment)&&live==1&&direct::state().heap_held==alignment);fail_release=false;
  direct::lock();for(unsigned i=0;i<direct::entry_count;i++)if(direct::state().entries[i].occupied){assert(!sceKernelReleaseDirectMemory(0,alignment));direct::abandon(i);}direct::unlock();
  assert(!live&&!direct::state().heap_held&&!direct::state().held);
- puts("PASS actual uncompressed heap reservation:320MiB/alignment,zero/PROT_NONE/subrange uncommit+recommit,adjacent preservation,whole/interior release guards,NMT,compressed/fixed/exec/error gates,ordinary success,rollback and cleanup retention,separate512MiBheap/256MiBnative budgets;ASan/UBSan OS fixtures,not PS5 acceptance");
+ puts("PASS actual uncompressed heap reservation:768MiB/alignment,zero/PROT_NONE/subrange uncommit+recommit,adjacent preservation,whole/interior release guards,NMT,compressed/fixed/exec/error gates,ordinary success,rollback and cleanup retention,separate768MiBheap/256MiBnative budgets;ASan/UBSan OS fixtures,not PS5 acceptance");
 }
 '''
 (w/'test.cpp').write_text('#include <initializer_list>\n#include <cstdio>\n'+source+f['reserve']+f['release']+uncommit+suffix)

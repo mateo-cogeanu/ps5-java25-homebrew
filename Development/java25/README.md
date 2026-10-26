@@ -2079,3 +2079,19 @@ error/compressed/fixed/execgates,separatebudgets,rollbackandreleasefailure.
 TargetHotSpotcompiles.Consolelargerheapreservation/commit/GC/worldperformance
 remainpending.Thisdoesnotestablishadditionalphysicalmemoryavailabilityor
 afullJIT/gamepass.Frozenruntimevalidationandpreviouspackagesareunchanged.
+
+## Bounded direct heap headroom (patch0119)
+
+A consumer reports repeated full GC followed by Java heap exhaustion at512MiB.
+Patch0119 raises only the separate uncompressed Java-heap fallback ceiling to
+768MiB. It does not allocate that amount automatically or change the256MiB native
+data/metadata budget. Existing ENOMEM/unhinted/nonexecutable/uncompressed gates,
+ledger ownership, zero/protection/NMT, subrange uncommit and whole-release rules
+are unchanged. Physical availability and consumer pause behavior require exact
+PS5 validation; no new runtime passing milestone is established.
+
+The actual reservation/helper ASan/UBSan fixture now exercises a768MiB aligned
+reservation, zero/protection, uncommit/recommit and adjacent preservation,
+rollback/release failures, purpose isolation and over-budget refusal. Existing
+metadata controls also pass. Target HotSpot builds successfully. Earlier0118
+snapshots and compiled consumer packages remain preserved.

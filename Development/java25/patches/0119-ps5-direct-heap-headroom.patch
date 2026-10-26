@@ -1,0 +1,17 @@
+--- a/src/hotspot/share/runtime/ps5NativeDirectMemory.hpp
++++ b/src/hotspot/share/runtime/ps5NativeDirectMemory.hpp
+@@ -17,12 +17,12 @@
+ 
+ // Shared bounded native-data pool. Metadata reservations may use it only
+ // after ordinary allocation fails. Compact class space has its separate gated
+-// fallback. Uncompressed Java heaps have a separate512MiB budget and purpose;
++// fallback. Uncompressed Java heaps have a separate768MiB budget and purpose;
+ // executable mappings remain excluded.
+ namespace ps5_native_direct {
+ constexpr size_t page_bytes = 16384;
+ constexpr size_t budget_bytes = 256 * 1024 * 1024;
+-constexpr size_t heap_budget_bytes = 512 * 1024 * 1024;
++constexpr size_t heap_budget_bytes = 768 * 1024 * 1024;
+ constexpr unsigned entry_count = 2048;
+ struct Entry { void* address; int64_t physical; size_t bytes; bool occupied; bool metadata; bool stack; bool heap; };
+ struct State { unsigned mutex; size_t heap_held; size_t held, mappings, releases, failures, policy_rejections; int last_result; Entry entries[entry_count]; };
