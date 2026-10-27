@@ -1,0 +1,17 @@
+diff --git a/src/java.base/unix/classes/sun/nio/fs/UnixFileSystem.java b/src/java.base/unix/classes/sun/nio/fs/UnixFileSystem.java
+--- a/src/java.base/unix/classes/sun/nio/fs/UnixFileSystem.java
++++ b/src/java.base/unix/classes/sun/nio/fs/UnixFileSystem.java
+@@ -832,8 +832,11 @@
+         // get attributes of source file (don't follow links)
+         try {
+             sourceAttrs = UnixFileAttributes.get(source, false);
+-            if (sourceAttrs.isDirectory()) {
+-                // ensure source can be moved
++            if (sourceAttrs.isDirectory()
++                    && !Boolean.getBoolean("sun.nio.fs.ps5Sandbox")) {
++                // PS5 access(W_OK) falls back to opening the path for writing,
++                // which rejects directories with EISDIR. Let rename enforce
++                // directory/parent permissions on that target instead.
+                 int errno = access(source, W_OK);
+                 if (errno != 0)
+                     new UnixException(errno).rethrowAsIOException(source);

@@ -2132,3 +2132,13 @@ TargetHotSpot builds with G1already enabled; this patch does not reimplement G1.
 Actual PS5 G1auxiliarymappings/workers/physicalbacking/nativeheadroom and pause
 behavior remain pending. Consumer flag/workload tests and game settings are in
 the separate Minecraft repository. Preserve frozen passing runtime packages.
+
+## Directory move permission preflight (patch0122)
+
+[Patch0122](../docs/java25-directory-move-permissions.md) omits the redundant
+Unix directory access(W_OK) preflight only in PS5 sandbox mode. The existing
+PS5 descriptor access fallback opens write probes with O_WRONLY, which rejects
+directories with EISDIR before rename can run. Actual rename continues to enforce
+permissions; metadata, conflict, link and cross-device semantics are retained.
+The real-class host regression and target java.base build pass. Physical PS5
+move/restore validation remains pending; frozen milestones are unchanged.
