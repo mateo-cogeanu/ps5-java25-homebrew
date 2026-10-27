@@ -107,3 +107,16 @@ code, launcher work, JVM launch-policy configuration and game validation belong
 in ProsperoCraft. Publish the relevant changes to both repositories when a Java
 fix requires consumer integration. Preserve frozen passing snapshots and the
 existing release/Store hold until the user confirms the stutter fix.
+
+
+## Optional ImageIO raster integration — 2026-10-27
+
+The Java development runtime now offers tools/java25_imageio.py and opt-in
+java25_builtin_runtime.py --imageio: genuine pinned OpenJDK Disposer/raster IDs,
+Unix ID initializers/Trace and bundled LCMS. Do not advertise complete AWT,
+GUI/fonts/printing/JPEG support. Preserve default core library behavior and frozen
+milestones. Host PNG/ICC tests force our native subset and verify no stock fallback;
+consumer104 PS5 image use and rendering remain pending. See
+ docs/java25-imageio-raster.md and matching Java validation. Reusable native build
+and packaging tools live here; game integration/GC policy/UI and logs remain in
+ProsperoCraft. No official game/mod JARs or raw consumer logs enter this repository.

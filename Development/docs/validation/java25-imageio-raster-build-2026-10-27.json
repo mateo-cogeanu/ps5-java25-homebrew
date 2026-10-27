@@ -1,0 +1,99 @@
+{
+  "date": "2026-10-27",
+  "feature": "Opt-in genuine OpenJDK ImageIO raster/Disposer and LCMS resident natives",
+  "target_audit": {
+    "scope": "Genuine upstream image raster IDs/Disposer and bundled LCMS only;no display/toolkit/fonts/printing/JPEG",
+    "upstream": {
+      "project": "native PS5 OpenJDK 25 runtime port",
+      "repository": "https://github.com/freebsd/openjdk.git",
+      "tag": "jdk-25.0.4+7-freebsd-1",
+      "commit": "b219cdec88ca2e165711f63b8158ab78303facc8",
+      "cache": ".tools/java25/openjdk",
+      "target": "x86_64-sie-ps5",
+      "bootstrap_vm_candidate": "HotSpot server; first console startup with -Xint pending native loader adaptation",
+      "build_status": "HotSpot and java.base classes/native libraries build successfully; console JVM startup not tested",
+      "production_vm_goal": "HotSpot server with JIT, JNI and java.base",
+      "license": "GPL-2.0 with Classpath Exception where specified upstream"
+    },
+    "host": false,
+    "groups": {
+      "awt": {
+        "sources_sha256": {
+          "src/java.desktop/share/native/libawt/java2d/Disposer.c": "4bbb14373065ab1734b18e0ece8817e02357858d4532dd39a0e94b3ab36b2571",
+          "src/java.desktop/share/native/libawt/java2d/Trace.c": "169cd4a0ae236b9f02b0e8c8407a1bb29eff4927442c3991ec3210259a3df02d",
+          "src/java.desktop/share/native/libawt/awt/image/imageInitIDs.c": "69c49ed9cd71488931fcadcbc365100c90a7ede37207c0bc2d065bd9d4075a7d",
+          "src/java.desktop/unix/native/libawt/awt/initIDs.c": "6c3c8384b05fd89c75414dd1f4e26141db3bdbe7b735846f7c59ce5711a71938"
+        },
+        "output_sha256": "960423859d785ed2174a386cecc7e047fcbc75648a742d7b5076a48ba52fce7d",
+        "compile_units": 4
+      },
+      "lcms": {
+        "sources_sha256": {
+          "src/java.desktop/share/native/liblcms/LCMS.c": "0f200b323b6fd431793528a7b5f95d890338a8dcea7963a9c15256d091d64214",
+          "src/java.desktop/share/native/liblcms/cmsalpha.c": "b653493f5c2281a8cf452a4af1fa45bd41bcf16a4222a2fa887514c3dbf7da0d",
+          "src/java.desktop/share/native/liblcms/cmscam02.c": "4b2beb48ba6e1882cb2b3ce37fb661ec85a94c77428caf28bfe5f1fac913afe8",
+          "src/java.desktop/share/native/liblcms/cmscgats.c": "4fb0b59845d836258c1409c983ddf35f277518beb0ba93db88f5955c43f7c287",
+          "src/java.desktop/share/native/liblcms/cmscnvrt.c": "95496df81b78915498dd001a786df95a0a1bac3d7ea2270144123960de6a3f3e",
+          "src/java.desktop/share/native/liblcms/cmserr.c": "7df7ba5c7bfb43ee51205ac033311c7fa34a6724a4a5043edc27b72fe579b996",
+          "src/java.desktop/share/native/liblcms/cmsgamma.c": "0f5a93054e06e5862441f7f1ca455371933c5d25dc42bf22173ec304015717fd",
+          "src/java.desktop/share/native/liblcms/cmsgmt.c": "ecf3263166b1f0cd1b5570f5ce4c17c1326747fd0ef3231b36feed55a73775c2",
+          "src/java.desktop/share/native/liblcms/cmshalf.c": "9a57f96a521fa3381d48ed69db3f422583ae638ae173956e79ad070829859859",
+          "src/java.desktop/share/native/liblcms/cmsintrp.c": "e684e57aec3e0033a7d23f940c19499e66a807b8adacf41d065da976dfdf77c9",
+          "src/java.desktop/share/native/liblcms/cmsio0.c": "1314741dfd9718456211891c25d847d5ddab26b51be1a7e2f502e5a3c3049872",
+          "src/java.desktop/share/native/liblcms/cmsio1.c": "d9b34eb9d182ebdd4f64b802ed1d7c103b6811319dde2d29035771daa4756b17",
+          "src/java.desktop/share/native/liblcms/cmslut.c": "a54cadeab925a7f13292cb492e97730bd5ceba9b9d3b9f720c7693fb68fba953",
+          "src/java.desktop/share/native/liblcms/cmsmd5.c": "3cf78535201338f74dbb5e91183c142bc8b44cde374c732b0ce11b076992beaa",
+          "src/java.desktop/share/native/liblcms/cmsmtrx.c": "b93190359300d9839480453e2aed2ac0a5acc53e07bc4e434d98c7d2284af3ff",
+          "src/java.desktop/share/native/liblcms/cmsnamed.c": "83d95c246090ebf0483357deb7ae2bc8c19239880d7a9a2b9e60f0e7e2cfe4c1",
+          "src/java.desktop/share/native/liblcms/cmsopt.c": "43b304a61f0ab8bf16774eb1a2bb9520dace0a573d799900e1df899ffc110908",
+          "src/java.desktop/share/native/liblcms/cmspack.c": "06bd0b714089fb4f7a80ae8df2f8891b78700ab3e386949269fae5fe6a9b3fa8",
+          "src/java.desktop/share/native/liblcms/cmspcs.c": "103ae4c4e5dd96f919c67834c099d3e118e144c34b261f9776ba1508c438ca92",
+          "src/java.desktop/share/native/liblcms/cmsplugin.c": "0aeb2f67812c472c2aba98ed301d89d79d0536caec615cb31bf57df803a3d10a",
+          "src/java.desktop/share/native/liblcms/cmsps2.c": "47579aa4d670656a04f98b0c842128d9b0a2b0779a4cd2d3898b34bdf7ff8f99",
+          "src/java.desktop/share/native/liblcms/cmssamp.c": "88286ca8acd1bf47aa699c5b42a1d116605376a4511c794eb502d3a72177c042",
+          "src/java.desktop/share/native/liblcms/cmssm.c": "7802f05cf6c0a8e8e90411a134012c850ff4378c0b6822f373d090d594c57661",
+          "src/java.desktop/share/native/liblcms/cmstypes.c": "bdd2a6ca4ed9ea05e3ba6a3606ef3ce3936e74411cf9c2be0e6dc6ce501e1542",
+          "src/java.desktop/share/native/liblcms/cmsvirt.c": "fa9b8f8a4ca51f1da6414f302dbca9bb84882fd7731f9f9d1364b0358e0ca8e8",
+          "src/java.desktop/share/native/liblcms/cmswtpnt.c": "104092f8caff09f9e3f90cee9ff9acd7d94d921ee58f9bffd13db8d4258bb774",
+          "src/java.desktop/share/native/liblcms/cmsxform.c": "72a342312a2bd977bc557616fc2e6a443c8104e4bea811a554203d0c34b6902b"
+        },
+        "output_sha256": "31c6927bed0acbc83176d214fae52e8816a9083be7ba8150d1bc7dd420833fbd",
+        "compile_units": 27
+      }
+    }
+  },
+  "target_images_sha256": {
+    "libawt.o": "960423859d785ed2174a386cecc7e047fcbc75648a742d7b5076a48ba52fce7d",
+    "liblcms.o": "31c6927bed0acbc83176d214fae52e8816a9083be7ba8150d1bc7dd420833fbd",
+    "libawt.so": "95883e52ee4f964ca0db38bdb0126d25a584669731bc7d851854df73e354ea43",
+    "liblcms.so": "baf13ade679c8297d338c879856150faf3484cf1adbfe7007690c07e107c1f17"
+  },
+  "tests": {
+    "target_compile": "PASS genuine pinned source, no automatic constructors",
+    "host_png_and_ICC": "PASS RGBA/P/L/RGB memory input/Disposer/raster/getRGB, three cycles, all pixels match stock JDK,ICC roundtrip/color conversion/malformed rejection",
+    "native_isolation": "PASS actual bootstrap search redirected in host test only;load trace proves our libawt/liblcms and no stock fallback",
+    "default_builtin_lookup": "PASS original core discovery/hooks/JNI versions/library scopes"
+  },
+  "console": "PENDING PS5 image decoding/consumer use/resource lifecycle",
+  "excluded": [
+    "GUI/toolkit",
+    "fonts/printing",
+    "Java2D rendering",
+    "JPEG/arbitrary codecs"
+  ],
+  "evidence": {
+    "imageio-target-build.log": {
+      "sha256": "d7e7c23096ee2d787ee79f9da9ac80488cbc4489bb26edc216d07819f9ffa16d",
+      "bytes": 38027
+    },
+    "imageio-test.log": {
+      "sha256": "0f25116f6b2ee580d96acce66c1a302cd8b98e0111477c81c5765081e9ff4a11",
+      "bytes": 1223
+    },
+    "imageio-builtin-regression.log": {
+      "sha256": "7919539f5a7a791df54fc91324354bbc80bbb3fa7a0ed56a0aefaeda612af276",
+      "bytes": 89
+    }
+  },
+  "build_followup": "Added intact upstream Trace.c after final consumer link exposed J2dTraceImpl; target relink succeeds. Host LCMS links to the test subset awt explicitly. Full desktop build still blocked on CUPS, outside this scope."
+}

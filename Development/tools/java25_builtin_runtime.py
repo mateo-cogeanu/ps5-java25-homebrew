@@ -24,14 +24,18 @@ def main():
     parser.add_argument("--management",action="store_true",help="Embed the target java.management native library")
     parser.add_argument("--jni-fixture",action="store_true",help="Include real dependency-probe JNI test library")
     parser.add_argument("--external-libraries",type=Path,help="Consumer-owned named ELF object groups to embed; no arbitrary ELF loading")
+    parser.add_argument("--imageio",action="store_true",help="Embed genuine headless ImageIO raster/Disposer and LCMS subset")
     args=parser.parse_args()
-    external=read_libraries(args.external_libraries,LIBRARIES+["jvm","management","ps5probe"]) if args.external_libraries else []
+    if args.imageio:
+        from java25_imageio import build
+        build()
+    external=read_libraries(args.external_libraries,LIBRARIES+["jvm","management","ps5probe","awt","lcms"]) if args.external_libraries else []
     declarations=[]; tables=[]; mapped=[]; links=[]; alias_index=0; builtin_loaders=[]
     libraries=[('jvm',WORK/'embedded-jvm.o')]
-    resident=LIBRARIES+(['management'] if args.management else [])
+    resident=LIBRARIES+(['management'] if args.management else [])+(['awt','lcms'] if args.imageio else [])
     for name in resident:
         module='java.management' if name=='management' else 'java.base'
-        objects=sorted((BUILD/'support/native'/module/('lib'+name)).glob('*.o'))
+        objects=[WORK/'imageio-target'/('lib'+name+'.o')] if name in ('awt','lcms') else sorted((BUILD/'support/native'/module/('lib'+name)).glob('*.o'))
         if not objects: raise SystemExit('Missing built native objects: '+name)
         rsp=WORK/(name+'-objects.rsp')
         rsp.write_text('\n'.join(json.dumps(str(p)) for p in objects)+'\n')

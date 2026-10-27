@@ -25,6 +25,7 @@ parser.add_argument("--dependencies",action="store_true",help="Package multi-JAR
 parser.add_argument("--probe-spec",type=Path,help="External consumer probe JSON; source and assets stay in their own project")
 args = parser.parse_args()
 external=json.loads(args.probe_spec.read_text()) if args.probe_spec else None
+if external and "headless_imageio" in external and type(external["headless_imageio"]) is not bool:parser.error("External headless_imageio must be boolean")
 if external:
     for key in ("source","param","asset_dir"):
         if not Path(external[key]).exists():parser.error("External probe input missing: "+key)
@@ -162,11 +163,13 @@ if args.startup:
     management=bool(external and "java.management" in external.get("modules",[]))
     if management:
         subprocess.run(["gmake","-C",str(ROOT/".tools/java25/openjdk"),"CONF=ps5-bootstrap","java.management-libs"],env=env,check=True)
-    resident_options=[]
+    imageio=bool(external and external.get("headless_imageio",False))
+    if imageio and "java.desktop" not in external.get("modules",[]):raise ValueError("ImageIO requires target java.desktop classes")
+    resident_options=["--imageio"] if imageio else []
     if external and external.get("resident_libraries"):
         resident_manifest=WORK/"external-resident-libraries.json"
         resident_manifest.write_text(json.dumps(external["resident_libraries"],indent=2)+"\n")
-        resident_options=["--external-libraries",str(resident_manifest)]
+        resident_options += ["--external-libraries",str(resident_manifest)]
     subprocess.run(["python3",str(ROOT/"tools/java25_builtin_runtime.py"),*(["--jni-fixture"] if args.dependencies else []),*(["--management"] if management else []),*resident_options],check=True)
     extra_objects=json.loads((WORK/"builtin-link-inputs.json").read_text())
     absent_callbacks=[name for name in absent_callbacks if not name.startswith("__dl")]
@@ -184,6 +187,11 @@ if args.startup:
         shutil.copy2(native_libs/("lib"+name+".so"),assets/"lib"/("lib"+name+".so"))
     if management:
         shutil.copy2(native_libs.parent/"java.management/libmanagement.so",assets/"lib/libmanagement.so")
+    if imageio:
+        imageio_dir=WORK/"imageio-target"
+        for name in ("awt","lcms"):shutil.copy2(imageio_dir/("lib"+name+".so"),assets/"lib"/("lib"+name+".so"))
+        shutil.copy2(imageio_dir/"audit.json",assets/"imageio-native-audit.json")
+        shutil.copytree(ROOT/".tools/java25/openjdk/src/java.desktop/share/legal",assets/"legal/java.desktop",dirs_exist_ok=True)
     module_names=re.search(r'^MODULES="([^"]+)"',(WORK/"boot-image/release").read_text(),re.M).group(1)
     (assets/"release").write_text('JAVA_VERSION="25.0.4"\nMODULES="'+module_names+'"\nOS_NAME="FreeBSD"\nOS_ARCH="amd64"\nIMPLEMENTOR="Experimental PS5 port"\n')
     (assets/"classes").mkdir(exist_ok=True)
