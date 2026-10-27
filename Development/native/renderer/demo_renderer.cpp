@@ -354,6 +354,16 @@ void Canvas::clear(Color color) noexcept
     fill_rect(pixels_, 0, 0, frame_width, frame_height, color);
 }
 
+bool Canvas::blit_rgba(std::span<const std::uint32_t> pixels, unsigned row_pitch) noexcept {
+    if (row_pitch < frame_width || pixels.size() < frame_width ||
+        (pixels.size() - frame_width) / (frame_height - 1) < row_pitch)
+        return false;
+    for (unsigned y = 0; y < frame_height; ++y)
+        for (unsigned x = 0; x < frame_width; ++x)
+            put_pixel_unchecked(pixels_, x, y, static_cast<Color>(pixels[std::size_t(y) * row_pitch + x]));
+    return true;
+}
+
 void Canvas::rectangle(unsigned x, unsigned y, unsigned width, unsigned height,
                        Color color) noexcept
 {

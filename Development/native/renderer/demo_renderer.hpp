@@ -65,6 +65,9 @@ class Canvas final
     void disc(int x, int y, unsigned radius, std::uint32_t color) noexcept;
     void label(int x, int y, std::string_view value, unsigned size,
                std::uint32_t color) noexcept;
+    // Publish a complete top-row-first RGBA8 frame into the tiled canvas.
+    // Invalid/short input leaves the destination unchanged.
+    bool blit_rgba(std::span<const std::uint32_t> pixels, unsigned row_pitch = 1920) noexcept;
     static unsigned text_width(std::string_view value, unsigned size) noexcept;
 
   private:
