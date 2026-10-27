@@ -2142,3 +2142,9 @@ directories with EISDIR before rename can run. Actual rename continues to enforc
 permissions; metadata, conflict, link and cross-device semantics are retained.
 The real-class host regression and target java.base build pass. Physical PS5
 move/restore validation remains pending; frozen milestones are unchanged.
+
+Development patch0123 provides [optional bounded socket failure diagnostics](../docs/java25-bounded-socket-failure-trace.md).
+Both PS5 sandbox and explicit tracing properties are required. It preserves I/O
+semantics and logs only fixed categories/class-method frames for native socket
+creation/bind/listen failures. Host collision/gating/cap checks and target Java
+compilation pass; actual PS5 failure diagnosis and hosting remain pending.

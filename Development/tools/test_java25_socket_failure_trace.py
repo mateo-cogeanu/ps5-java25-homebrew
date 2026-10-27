@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+"""Actual IOException tracing is bounded, gated, redacted and non-semantic."""
+from pathlib import Path
+import subprocess,tempfile
+R=Path(__file__).resolve().parents[1];J=Path('/Library/Java/JavaVirtualMachines/openjdk-25.jdk/Contents/Home/bin')
+with tempfile.TemporaryDirectory(prefix='ps5-socket-trace-')as folder:
+ w=Path(folder);p=w/'src/java/io/IOException.java';p.parent.mkdir(parents=True);p.write_text((R/'.tools/java25/openjdk/src/java.base/share/classes/java/io/IOException.java').read_text());subprocess.run([str(J/'javac'),'--patch-module','java.base='+str(w/'src'),'-d',str(w/'patch'),str(p)],check=True)
+ main=w/'TraceCheck.java';main.write_text('''import java.io.*;import java.net.*;public class TraceCheck{public static void main(String[]a)throws Exception{var bytes=new ByteArrayOutputStream();var old=System.err;System.setErr(new PrintStream(bytes));try{new IOException("SECRET_TOKEN");try(var owner=new ServerSocket(0)){for(int i=0;i<40;i++){try(var conflicting=new ServerSocket(owner.getLocalPort())){throw new AssertionError("bind succeeded");}catch(BindException expected){if(expected.getMessage()==null||expected.getStackTrace().length==0)throw new AssertionError("changed exception");}}}String out=bytes.toString();boolean enabled=Boolean.getBoolean("sun.nio.fs.ps5Sandbox")&&Boolean.getBoolean("ps5.net.traceBindFailures");if(out.contains("SECRET_TOKEN")||enabled&&(!out.contains("category=ADDRESS_IN_USE")||out.split("PS5_HOST_IO event=",-1).length!=33)||!enabled&&!out.isEmpty())throw new AssertionError("gate/cap/redaction "+out);}finally{System.setErr(old);}System.out.println("PASS actual IOException with40real socket bind collisions: scope/gate32event cap/redaction and unchanged exceptions");}}''')
+ subprocess.run([str(J/'javac'),'-d',str(w),str(main)],check=True)
+ for ps5,enabled in [('false','true'),('true','false'),('true','true')]:subprocess.run([str(J/'java'),'--patch-module','java.base='+str(w/'patch'),'-Dsun.nio.fs.ps5Sandbox='+ps5,'-Dps5.net.traceBindFailures='+enabled,'-cp',str(w),'TraceCheck'],check=True)
