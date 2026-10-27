@@ -120,3 +120,14 @@ consumer104 PS5 image use and rendering remain pending. See
  docs/java25-imageio-raster.md and matching Java validation. Reusable native build
 and packaging tools live here; game integration/GC policy/UI and logs remain in
 ProsperoCraft. No official game/mod JARs or raw consumer logs enter this repository.
+
+
+## Explicit resident aliases — 2026-10-27
+
+The reusable runtime registry supports opt-in --library-alias alias=existing_group.
+Aliases share symbols/JNI initializer and resident lifetime;no arbitrary loader,
+platform spoofing or new native implementation. Defaults stay unchanged. Consumer
+106uses SDL3=ps5sdl for Controlify's missing-library error;consumer integration,
+HID/audio/UI and validation belong inProsperoCraft. Actual PS5 FFM/Controlify
+behavior remains pending;an alias does not establish mod compatibility. See
+ docs/java25-external-resident-libraries.md. Preserve frozen runtime milestones.

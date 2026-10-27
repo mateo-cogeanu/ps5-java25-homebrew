@@ -4,7 +4,7 @@ from pathlib import Path
 import json
 import subprocess
 import tempfile
-from java25_resident_libraries import read_libraries
+from java25_resident_libraries import read_libraries, read_aliases
 
 ROOT=Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory(prefix='resident-inputs-')as folder:
@@ -33,3 +33,9 @@ with tempfile.TemporaryDirectory(prefix='resident-inputs-')as folder:
  rejected=subprocess.run(['python3',str(ROOT/'tools/java25_builtin_runtime.py'),'--external-libraries',str(manifest)],capture_output=True,text=True)
  assert rejected.returncode!=0 and 'constructors require an explicit lifecycle port' in rejected.stderr,(rejected.stdout,rejected.stderr)
  print('PASS actual PS5 object validation, reserved/duplicate/unsafe names, absolute/nonempty/unique object paths, schema, malformed/shared ELF and real constructor-section rejection')
+
+assert read_aliases(['SDL3=consumer'],{'consumer'})=={'SDL3':'consumer'}
+for values in [['bad'],['../SDL=consumer'],['SDL3=absent'],['consumer=consumer'],['SDL3=consumer','SDL3=consumer']]:
+ try:read_aliases(values,{'consumer'});raise AssertionError('invalid alias accepted')
+ except ValueError:pass
+print('PASS explicit alias schema/known target/unique name/path rejection; no additional native objects')

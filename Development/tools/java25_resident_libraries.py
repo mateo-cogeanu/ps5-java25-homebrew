@@ -32,3 +32,17 @@ def read_libraries(path, reserved):
             checked.append(source)
         names.add(name);result.append((name, checked))
     return result
+
+
+def read_aliases(values, names):
+    """Explicit build-time aliases share a resident group's symbols and lifetime."""
+    result = {}; used = set(names)
+    for value in values:
+        pair = value.split('=')
+        if len(pair) != 2:
+            raise ValueError('Resident alias requires alias=library')
+        alias, target = pair
+        if not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,47}', alias) or alias in used or target not in names:
+            raise ValueError('Invalid, duplicate or unknown resident alias')
+        used.add(alias); result[alias] = target
+    return result

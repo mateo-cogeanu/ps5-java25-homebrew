@@ -9,7 +9,7 @@ import subprocess
 import re
 import argparse
 import hashlib
-from java25_resident_libraries import read_libraries
+from java25_resident_libraries import read_libraries, read_aliases
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / '.tools/java25/openjdk/build/ps5-bootstrap'
@@ -25,6 +25,7 @@ def main():
     parser.add_argument("--jni-fixture",action="store_true",help="Include real dependency-probe JNI test library")
     parser.add_argument("--external-libraries",type=Path,help="Consumer-owned named ELF object groups to embed; no arbitrary ELF loading")
     parser.add_argument("--imageio",action="store_true",help="Embed genuine headless ImageIO raster/Disposer and LCMS subset")
+    parser.add_argument("--library-alias",action="append",default=[],help="Explicit resident alias=library; same symbols and ownership, no new loader")
     args=parser.parse_args()
     if args.imageio:
         from java25_imageio import build
@@ -85,6 +86,7 @@ def main():
         if renames:subprocess.run([str(LLVM/'llvm-objcopy'),*renames,str(merged)],check=True)
         libraries.append((name,merged));links.append(str(merged));external_names.add(name)
         external_audit.append({'name':name,'objects_sha256':[hashlib.sha256(p.read_bytes()).hexdigest()for p in objects],'constructors':'none; nontrivial constructors rejected'})
+    aliases=read_aliases(args.library_alias,{name for name,_ in libraries})
     for name, merged in libraries:
         symbols=subprocess.check_output([str(LLVM/'llvm-nm'),'--defined-only','--extern-only',str(merged)],text=True)
         entries=[]
@@ -115,8 +117,12 @@ def main():
                 'int version='+call+'; return version < 0 ? version : '
                 '(version < 0x00010008 ? 0x00010008 : version); }')
             entries.append('{"JNI_OnLoad_'+name+'", reinterpret_cast<void *>(&'+loader+')}')
+            for alias,target in aliases.items():
+                if target==name:entries.append('{"JNI_OnLoad_'+alias+'", reinterpret_cast<void *>(&'+loader+')}')
         tables.append('static const Symbol symbols_'+name+'[]={\n'+',\n'.join(entries)+'\n};')
         mapped.append('{"lib'+name+'.so", symbols_'+name+', sizeof(symbols_'+name+')/sizeof(Symbol)}')
+        for alias,target in aliases.items():
+            if target==name:mapped.append('{"lib'+alias+'.so", symbols_'+name+', sizeof(symbols_'+name+')/sizeof(Symbol)}')
     output='''/* Generated from real target native symbols; do not edit. */
 #include <cstddef>
 #include <cstring>
@@ -168,7 +174,7 @@ extern "C" int __dladdr(const void *address,Dl_info *info) {
         '-c',str(target),'-o',str(obj)],check=True)
     links.append(str(obj))
     (WORK/'builtin-link-inputs.json').write_text(json.dumps(links,indent=2)+'\n')
-    (WORK/'builtin-resident-audit.json').write_text(json.dumps({'external_resident_libraries':external_audit,'scope':'Build-time resident objects only; no arbitrary ELF loader'},indent=2)+'\n')
+    (WORK/'builtin-resident-audit.json').write_text(json.dumps({'external_resident_libraries':external_audit,'library_aliases':aliases,'scope':'Build-time resident objects only; no arbitrary ELF loader'},indent=2)+'\n')
     print('Generated embedded lookup table:',alias_index,'real function addresses')
 
 if __name__=='__main__':main()
