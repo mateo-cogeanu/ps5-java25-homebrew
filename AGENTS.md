@@ -94,3 +94,16 @@ Minecraft policy where possible. Do not silently remove required workarounds
 or claim an unmodified server while a derivative is still executed. Record
 each remaining transformation and console validation needed for its removal.
 Preserve frozen passing snapshots; migrate development only.
+
+
+## Repository ownership reminder — 2026-10-27
+
+Java runtime fixes belong in mateo-cogeanu/ps5-java25-homebrew; publish them
+through tools/sync_github.py from the runtime workspace. Carry the corresponding
+runtime integration, build references and validation into mateo-cogeanu/ProsperoCraft
+so the Minecraft app actually receives the fix. Keep reusable runtime source in
+the Java repository rather than duplicating it in the consumer. Minecraft-specific
+code, launcher work, JVM launch-policy configuration and game validation belong
+in ProsperoCraft. Publish the relevant changes to both repositories when a Java
+fix requires consumer integration. Preserve frozen passing snapshots and the
+existing release/Store hold until the user confirms the stutter fix.
