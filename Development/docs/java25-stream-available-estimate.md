@@ -29,3 +29,8 @@ libnio are rebuilt by the incremental target. Frozen passing snapshots remain
 untouched. Actual PS5 skin/TCP/HTTP/error behavior still requires console tests.
 ProsperoCraft101 integrates the rebuilt native runtime and owns the launcher,
 controls and game validation; no Minecraft JAR is modified.
+
+Console follow-up: the tester confirms all requested ProsperoCraft101functions
+work and requests release, including the owned-player skin repair. This is scoped
+human acceptance of the consumer integration, without new per-call console logs
+or exhaustive errno/protocol coverage. See the matching console acceptance JSON.

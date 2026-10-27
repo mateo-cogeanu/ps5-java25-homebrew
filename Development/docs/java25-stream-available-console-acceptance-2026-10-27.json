@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-27",
+  "runtime_patch": "0124-ps5-stream-available-estimate.patch",
+  "consumer_repository": "https://github.com/mateo-cogeanu/ProsperoCraft",
+  "consumer_version": "01.000.101",
+  "title_id": "PPSA99874",
+  "package_sha256": "c784e08043314b02ff49cc9bb2a7c1643f558b35b1cee23ba278091a5d05e131",
+  "human_report": "All functional;requestsProsperoStore release after receiving exact101candidate withruntime0124.",
+  "accepted_scope": "Requested101functionality includesownedplayerskin loading;scopedhumanacceptance ofskin-download repair integration.",
+  "limits": [
+    "No newcurrent-runlogs orper-callFIONREADtrace retrieved",
+    "Not independentconsolecoverage ofeveryerrno/descriptor/protocol/errorpath",
+    "Not a newJava acceptanceprobe ALLPASS orreplacementforfrozenruntime snapshots"
+  ],
+  "ownership": "Java source/patch here;consumerlauncher/integration/acceptance/release inProsperoCraft. OriginalgameJARunchanged."
+}
