@@ -1,0 +1,26 @@
+--- a/src/java.base/unix/native/libnio/ch/Net.c
++++ b/src/java.base/unix/native/libnio/ch/Net.c
+@@ -899,6 +899,23 @@
+     int result;
+     RESTARTABLE(ioctl(fdval(env, fdo), FIONREAD, &count), result);
+ 
++#ifdef __PROSPERO__
++    // available() is an estimate, not a read. Some sandboxed TCP descriptors
++    // reject FIONREAD even though normal recv works. Return a conservative
++    // zero only after confirming a stream socket; leave real read/EOF errors
++    // to the read itself, without consuming data or changing blocking mode.
++    if (result != 0 && (errno == EPERM || errno == EACCES ||
++                        errno == ENOTTY || errno == EOPNOTSUPP)) {
++        int saved_error = errno;
++        int type = 0;
++        socklen_t length = sizeof(type);
++        int rc = getsockopt(fdval(env, fdo), SOL_SOCKET, SO_TYPE, &type, &length);
++        errno = saved_error;
++        if (rc == 0 && length == sizeof(type) && type == SOCK_STREAM) {
++            return 0;
++        }
++    }
++#endif
+     if (result != 0) {
+         handleSocketError(env, errno);
+         return IOS_THROWN;

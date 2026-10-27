@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-27",
+  "patch": "0124-ps5-stream-available-estimate.patch",
+  "scope": "PS5-only conservative zero available estimate for confirmedTCPstream afterunsupported/deniedFIONREAD;realreads/counts/errorsanddesktopbehaviorpreserved.",
+  "evidence": {
+    "java25/patches/0124-ps5-stream-available-estimate.patch": {
+      "sha256": "9a661bd9ab6099c3e8bc70c9fa78f0448b016527d461a876b68dabb34cacf0e1",
+      "bytes": 1095
+    },
+    "tools/test_java25_stream_available.py": {
+      "sha256": "926f1964089adb5404b642762d571a4fb804693a83fa0543276a8c84ac06eddc",
+      "bytes": 5712
+    },
+    "build/java25/stream-available-host-test.log": {
+      "sha256": "0f296ef71b56534f07cff9465e5a9fe5b593f9d42cf1b2ef3aa84480ffcb5eb9",
+      "bytes": 4821
+    },
+    "build/java25/stream-available-target-incremental-build.log": {
+      "sha256": "05bcbfdc1bbf8a6f2cbd879f922f1693eda649fb0b960b48810ef5fe60a26122",
+      "bytes": 240
+    },
+    ".tools/java25/openjdk/build/ps5-bootstrap/support/native/java.base/libnio/Net.o": {
+      "sha256": "fdb3d51756301a6f33a0b1c65e36029d92cf7a6fdd0dfa0d0acfa321e7cafe4c",
+      "bytes": 27096
+    }
+  },
+  "host": "PASS actualJNIrealJVM/TCP/HTTPfragmentedbytes/error/type/desktop controls withUBSan/XcheckJNI",
+  "target": "PASS cachedincrementaljava.base-java/java.base-libs;Net.o/libnio rebuilt",
+  "known_build_limitation": "Fullpatch-replaywrapperstopsatpre-existing0009apply/reversecheck;no cleanreplayclaim.0124reversescleanlyagainstcachedsource.",
+  "console": "PENDING actualPS5skin/HTTP/TCP;consumer101integration",
+  "frozen": "Frozenpassingruntimeandconsumerpackagesunchanged."
+}
