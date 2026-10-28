@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-28",
+  "patch": "0125-ps5-descriptor-first-realpath.patch",
+  "host": "PASS actual JNI/ZipFS/native-link/error checks;4096 no-desktop calls;ASan/UBSan64-fd stress",
+  "target": "PASS cached java.base-libs rebuild and consumer113 package/signature/CRC/core integration",
+  "diagnostics": "PASS native HTTP EMFILE handling and bounded concurrent file accounting",
+  "console": "112 EMFILE reproduced;113 pending;leak owner unproven",
+  "source_sha256": {
+    "java25/patches/0125-ps5-descriptor-first-realpath.patch": "ea4b87719b3ec25d0d40ad773bb1f539496a411e58ec9021166fceccaec394c8",
+    "java25/probe/file_limits.hpp": "11b4c469cf938bbd1139d9a5215c5c47fe67a5286dc356e5459b81b5a16fa1a1",
+    "java25/probe/file_activity.hpp": "de8da0e95c23295016cbbaad913f5d27bfc552caf8c2ef7043f3d74c05e302ac",
+    "tools/test_java25_realpath_fallback.py": "4d5a514d15a70af4c4cd6b493d895a5ca71644d67ee911b34495d090285ce877",
+    "tools/test_file_limits.py": "f226a6e4b43cd481170b744cf518740a270bc981d5ee7a28cc6216f79a694876",
+    "tools/test_file_activity.py": "479d40e7605a6b27e5a275d293be86418da8cbc8c3f0b1e2463ec087e5fb66f9"
+  }
+}

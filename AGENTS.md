@@ -131,3 +131,7 @@ platform spoofing or new native implementation. Defaults stay unchanged. Consume
 HID/audio/UI and validation belong inProsperoCraft. Actual PS5 FFM/Controlify
 behavior remains pending;an alias does not establish mod compatibility. See
  docs/java25-external-resident-libraries.md. Preserve frozen runtime milestones.
+
+## Descriptor-first paths and diagnostics — 2026-10-28
+
+Runtime0125 uses checked descriptor-first canonicalization on PS5; native symlink/relative resolution and other platforms remain.112 reproduced EMFILE, so soft-limit adjustment alone is insufficient and the leaking owner is unproven. File diagnostics use sceKernelFstat, with opt-in PS5_TRACK_FILE_ACTIVITY accounting. Keep raw paths/reports local and physical console save validation explicit. See docs/java25-descriptor-first-paths.md. Consumer rumble, mode arbitration and113 integration belong in ProsperoCraft. Preserve frozen milestones and Store108.

@@ -24,6 +24,11 @@ int main(){errno=EBUSY;auto r=ps5::file_limits::prepare(8192);assert(r.before==6
 '''
 with tempfile.TemporaryDirectory(prefix='fd-limit-')as folder:
  w=Path(folder);(w/'test.cpp').write_text(source);subprocess.run(['clang++','-std=c++17','-fsanitize=address,undefined','-I'+str(ROOT/'java25/probe'),str(w/'test.cpp'),'-o',str(w/'test')],check=True);subprocess.run([str(w/'test')],check=True)
+ native=source.replace('#include "file_limits.hpp"','''#include <sys/stat.h>
+extern "C" int sceKernelFstat(int fd,struct stat*s){if(fd<3){s->st_mode=fd==0?S_IFREG:fd==1?S_IFDIR:S_IFSOCK;return 0;}return (int)(0x80020000u|(fd==3?EPERM:EBADF));}
+#include "file_limits.hpp"''').replace('assert(errno==EBUSY);\n puts(', 'assert(errno==EBUSY);assert(strstr(text,"open=3")&&strstr(text,"unknown=1")&&strstr(text,"regular=1 directory=1 socket=1 probe_errno=1"));\n puts(')
+ native='#include <cstring>\n'+native;(w/'native.cpp').write_text(native)
+ subprocess.run(['clang++','-std=c++17','-D__PROSPERO__','-fsanitize=address,undefined','-I'+str(ROOT/'java25/probe'),str(w/'native.cpp'),'-o',str(w/'native')],check=True);subprocess.run([str(w/'native')],check=True)
  (w/'real.cpp').write_text(r'''#include "file_limits.hpp"
 #include <cassert>
 #include <cstdio>

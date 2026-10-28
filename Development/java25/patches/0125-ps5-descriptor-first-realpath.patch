@@ -1,0 +1,39 @@
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -1291,21 +1291,21 @@
+     char resolved[PATH_MAX+1];
+     const char* path = (const char*)jlong_to_ptr(pathAddress);
+ 
+-    /* EINTR not listed as a possible error */
+-#ifdef __PROSPERO__
+-    PS5_REALPATH_NOTE("native enter",path);
+-#endif
+-    char *canonical = realpath(path, resolved);
+-#ifdef __PROSPERO__
+-    PS5_REALPATH_NOTE(canonical==NULL?"native refused":"native complete",path);
+-#endif
+-#ifdef __PROSPERO__
+-    if (canonical == NULL && errno == EPERM && ps5_descriptor_realpath(path, resolved) == 0) {
+-        canonical = resolved;
+-    }
+-#endif
+-#ifdef __PROSPERO__
+-    PS5_REALPATH_NOTE(canonical==NULL?"fallback failed":"canonical complete",path);
++    /* On PS5 use the checked descriptor walk before the desktop realpath ABI.
++     * Repeated sandbox-denied native calls add no useful path information.
++     * A link/relative path still uses native canonicalization; there is no
++     * lexical existence bypass and no cache of previous path observations. */
++    char *canonical;
++#ifdef __PROSPERO__
++    if (path[0]=='/') {
++        int walked=ps5_descriptor_realpath(path,resolved);
++        int walk_error=errno;
++        if (walked==0) canonical=resolved;
++        else if (walk_error==ELOOP) canonical=realpath(path,resolved);
++        else {canonical=NULL;errno=walk_error;}
++    } else canonical=realpath(path,resolved);
++#else
++    canonical=realpath(path,resolved);
+ #endif
+     if (canonical == NULL) {
+         throwUnixException(env, errno);

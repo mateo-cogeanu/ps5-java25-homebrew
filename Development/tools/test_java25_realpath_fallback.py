@@ -12,8 +12,8 @@ p=w/'native.c';p.write_text(r'''
 #include <unistd.h>
 #include <errno.h>
 #include "ps5Realpath.h"
-static int mode=1;
-static char* selected_realpath(const char*p,char*out){if(mode){errno=mode==1?EPERM:EACCES;return NULL;}return realpath(p,out);}
+static int mode=1,native_calls;
+static char* selected_realpath(const char*p,char*out){native_calls++;if(mode){errno=mode==1?EPERM:EACCES;return NULL;}return realpath(p,out);}
 static void throwUnixException(JNIEnv*env,int error){jclass c=(*env)->FindClass(env,"sun/nio/fs/UnixException");jmethodID m=(*env)->GetMethodID(env,c,"<init>","(I)V");jobject e=(*env)->NewObject(env,c,m,error);(*env)->Throw(env,(jthrowable)e);}
 #define jlong_to_ptr(n) ((void*)(intptr_t)(n))
 #define __PROSPERO__ 1
@@ -25,6 +25,7 @@ JNIEXPORT void JNICALL Java_RealpathTest_install(JNIEnv*env,jclass c){
  JNINativeMethod hook={"realpath0","(J)[B",(void*)Java_sun_nio_fs_UnixNativeDispatcher_realpath0};
  if((*env)->RegisterNatives(env,type,&hook,1))abort();
 }
+JNIEXPORT jint JNICALL Java_RealpathTest_calls(JNIEnv*env,jclass c){return native_calls;}
 JNIEXPORT void JNICALL Java_RealpathTest_mode(JNIEnv*env,jclass c,jint value){mode=value;}
 ''')
 p.write_text(p.read_text().replace('#include <jni.h>','#include <jni.h>\n#include <stdint.h>'))
@@ -32,7 +33,7 @@ subprocess.run(['/usr/bin/clang','-std=c11','-O1','-g','-dynamiclib','-undefined
 p=w/'RealpathTest.java';p.write_text(r'''
 import java.nio.file.*;import java.util.*;import java.io.*;
 public class RealpathTest {
- static native void install();static native void mode(int value);
+ static native void install();static native void mode(int value);static native int calls();
  public static void main(String[]args)throws Exception {
   System.load(args[0]);Path root=Files.createTempDirectory("ps5-realpath-").toRealPath();Path file=Files.writeString(root.resolve("file"),"hello");Files.createDirectory(root.resolve("dir"));Files.createSymbolicLink(root.resolve("link"),Path.of("dir"));Files.createSymbolicLink(root.resolve("broken"),Path.of("missing"));
   install();
@@ -43,10 +44,10 @@ public class RealpathTest {
    }
    Path jar=root.resolve("assets.zip");try(var fs=FileSystems.newFileSystem(jar,Map.of("create","true"))){Files.writeString(fs.getPath("/asset"),"zip-ok");}
    try(var fs=FileSystems.newFileSystem(jar,Map.of())){if(!Files.readString(fs.getPath("/asset")).equals("zip-ok"))throw new AssertionError("ZipFS data");}
-   for(int i=0;i<512;i++)if(!file.toRealPath().equals(file))throw new AssertionError("repeated lookup");
-   mode(2);try{file.toRealPath();throw new AssertionError("non-EPERM error ignored");}catch(AccessDeniedException expected){}
+   int previous=calls();for(int i=0;i<4096;i++)if(!file.toRealPath().equals(file))throw new AssertionError("repeated lookup");if(calls()!=previous)throw new AssertionError("ordinary path reached unsupported native realpath");
+   mode(2);try{root.resolve("link").toRealPath();throw new AssertionError("native link error ignored");}catch(AccessDeniedException expected){}
    mode(0);if(!root.resolve("link").toRealPath().equals(root.resolve("dir")))throw new AssertionError("native link resolution altered");
-   System.out.println("PASS: actual JNI realpath in host JVM; descriptor canonicalization, dot/parent, missing components, file/parent, symlink refusal, native links unchanged, repeated lookup and real ZipFS mount/read");
+   System.out.println("PASS: actual JNI realpath in host JVM; descriptor canonicalization, dot/parent, missing components, file/parent, symlink refusal, native links unchanged, 4096 lookups avoid desktop ABI and real ZipFS mount/read");
   }finally{mode(0);try(var paths=Files.walk(root)){for(Path path:paths.sorted(Comparator.reverseOrder()).toList())Files.delete(path);}}
  }
 }''');subprocess.run([str(jdk/'bin/javac'),'-d',str(w),str(p)],check=True);subprocess.run([str(jdk/'bin/java'),'-Xint','--enable-native-access=ALL-UNNAMED','-cp',str(w),'RealpathTest',str(w/'libtest.dylib')],check=True)

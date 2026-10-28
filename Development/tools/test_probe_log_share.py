@@ -11,6 +11,7 @@ with tempfile.TemporaryDirectory() as directory:
     root=Path(directory);payload=b'full console\n'+bytes(range(256))*8192
     (root/'data').write_bytes(payload)
     (root/'server.cpp').write_text(r'''
+#define PS5_TRACK_FILE_ACTIVITY 1
 #include "log_share.hpp"
 #include <sys/resource.h>
 static bool fail_limits=false;
@@ -80,6 +81,7 @@ int main(int argc,char **argv){
                     result+=chunk
                 return result
         live=request(b'GET /resource-status.txt HTTP/1.1\r\n\r\n');assert b'200 OK' in live and b'nofile_query=0' in live and b'open=' in live
+        activity=request(b'GET /file-activity.txt HTTP/1.1\r\n\r\n');assert b'200 OK' in activity and b'wrapped_open=' in activity and b'tracked_live=' in activity
         pressure=request(b'GET /exhausted.log HTTP/1.1\r\n\r\n');assert b'503 Service Unavailable' in pressure and b'open errno=24' in pressure and b'open=' in pressure
         response=request(b'GET /startup.log HTTP/1.1\r\nHost: test\r\n\r\n');headers,body=response.split(b'\r\n\r\n',1)
         assert b'200 OK' in headers and body==payload

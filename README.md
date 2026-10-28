@@ -21,7 +21,7 @@ This repository contains the **Java runtime port, platform adaptations and accep
 
 Development is testing a [shared native direct-memory fallback](Development/docs/java25-zip-image-direct-memory.md) for raw allocations, ZIP compression and image buffers. Raw mapping/release is observed on PS5; the ZIP/image extension passes host checks and target builds, with console validation pending.
 
-Development also provides opt-in [native compression/database builds and descriptor diagnostics](Development/docs/java25-native-storage.md). Host checks and consumer target packaging pass; actual console integration remains pending. Core defaults and frozen milestones are unchanged.
+Development also provides opt-in [native compression/database builds and descriptor diagnostics](Development/docs/java25-native-storage.md). Host checks and consumer target packaging pass; actual console integration remains pending. Core defaults and frozen milestones are unchanged. The [descriptor-first PS5 path update](Development/docs/java25-descriptor-first-paths.md) also removes repeated unsupported canonicalization calls and improves handle diagnostics; console save validation remains pending.
 
 ## Milestones
 
