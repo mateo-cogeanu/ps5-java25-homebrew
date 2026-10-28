@@ -139,3 +139,8 @@ Runtime0125 uses checked descriptor-first canonicalization on PS5; native symlin
 ## Optional ZIP descriptor budget — 2026-10-28
 
 Runtime0126 adds opt-in ps5.zip.maxOpenFiles (8–128) for immutable ZipFile sources. Defaults remain unchanged; OPEN_DELETE stays pinned. Do not claim preservation of an unlinked/replaced inode after eviction or a universal file-descriptor cap. Consumer114 enables64 after113 shows241regular files and EMFILE on deep world walks. Exact title quota and PS5 lifecycle remain pending; user reports113 haptics working. See docs/java25-bounded-zip-handles.md. Preserve frozen snapshots/Store108 and keep consumer source/raw reports separate.
+
+
+## Optional genuine JNA dispatch — 2026-10-28
+
+Runtime-owned tools/java25_jna.py builds pinned JNA5.19.1 dispatch/callback JNI (nativeABI7.0.4from common.xml, not stale Makefile defaults). Caller supplies compatible libffi/resident jnidispatch group. No default library/image changes or arbitrary loader added. Genuine host native sizes/error/memory/ffi tests force our library; target initialization/calls/callbacks remain pending. JAWT/signal protection not enabled; no broad JNA compatibility claim. Consumer launcher properties and original-game integration belong in ProsperoCraft. See docs/java25-jna-dispatch.md. Preserve frozen milestones.

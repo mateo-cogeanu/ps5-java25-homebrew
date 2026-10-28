@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-28",
+  "scope": "Opt-in genuine JNA native dispatch build; default runtime unchanged",
+  "source_commit": "1a91122853f6ab6f1fb2a4a284a6cf2ed8af0a4d",
+  "target_object_sha256": "880a3f7000f5d6bbc53e2047e57734f026a704c9f72fde78f3c8c6cf0bf7716c",
+  "host_object_sha256": "45764f2456763bc79cc6df2e10fe052076185e487f7896a9ef552cbdc9856cdc",
+  "native_version": "7.0.4",
+  "jni_exports": 69,
+  "checks": [
+    "target dispatch/callback compile and relocatable link",
+    "no automatic constructor sections",
+    "publisher JNA Java artifact pinned and unchanged",
+    "forced freshly built host native; classpath native fallback forbidden",
+    "native ABI sizes and last-error",
+    "native memory/string round trips",
+    "host libffi strlen/abs invocation"
+  ],
+  "console": "Pending PS5 init/memory/calls/callbacks; no new ALL PASS milestone",
+  "compatibility_limits": [
+    "JAWT absent",
+    "optional signal protection absent",
+    "target requires explicit compatible resident libffi",
+    "no new arbitrary ELF loading or general JNA compatibility claim"
+  ]
+}
