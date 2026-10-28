@@ -42,7 +42,7 @@ def read_aliases(values, names):
         if len(pair) != 2:
             raise ValueError('Resident alias requires alias=library')
         alias, target = pair
-        if not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,47}', alias) or alias in used or target not in names:
+        if len(alias)>96 or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*', alias) or alias in used or target not in names:
             raise ValueError('Invalid, duplicate or unknown resident alias')
         used.add(alias); result[alias] = target
     return result

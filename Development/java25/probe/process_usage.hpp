@@ -17,9 +17,9 @@ inline bool append(const char* path,long long elapsed) {
  // Limits describe process policy, not currently available physical/flexible memory.
  // Sample at startup and once per minute; never change a limit from diagnostics.
  if(length>0&&(size_t)length<sizeof(line)&&elapsed%60==0) {
-  const int resources[]={RLIMIT_DATA,RLIMIT_AS,RLIMIT_RSS};
-  const char* names[]={"data","as","rss"};
-  for(unsigned i=0;i<3;++i) {
+  const int resources[]={RLIMIT_DATA,RLIMIT_AS,RLIMIT_RSS,RLIMIT_NOFILE};
+  const char* names[]={"data","as","rss","nofile"};
+  for(unsigned i=0;i<4;++i) {
    struct rlimit limits{};errno=0;
    int rc=getrlimit(resources[i],&limits),limit_error=rc?errno:0;
    int added=std::snprintf(line+length,sizeof(line)-(size_t)length,

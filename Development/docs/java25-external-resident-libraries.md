@@ -22,3 +22,5 @@ native implementation is added. Omit the option to preserve default behavior.
 Consumer106 uses this for Controlify's FFM SDL system-library lookup. Actual
 PS5 foreign calls, gamepad discovery and Controlify behavior require console
 validation; a library-name alias alone does not establish compatibility.
+
+Versioned aliases and optional genuine compression/database builds are documented in [native storage](java25-native-storage.md). Target and host checks do not establish PS5 mod compatibility.

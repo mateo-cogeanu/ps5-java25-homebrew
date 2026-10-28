@@ -35,7 +35,8 @@ with tempfile.TemporaryDirectory(prefix='resident-inputs-')as folder:
  print('PASS actual PS5 object validation, reserved/duplicate/unsafe names, absolute/nonempty/unique object paths, schema, malformed/shared ELF and real constructor-section rejection')
 
 assert read_aliases(['SDL3=consumer'],{'consumer'})=={'SDL3':'consumer'}
-for values in [['bad'],['../SDL=consumer'],['SDL3=absent'],['consumer=consumer'],['SDL3=consumer','SDL3=consumer']]:
+assert read_aliases(['zstd-jni_dh-1.5.7-12=consumer'],{'consumer'})=={'zstd-jni_dh-1.5.7-12':'consumer'}
+for values in [['dot..name=consumer'],['quote\"=consumer'],['bad'],['../SDL=consumer'],['SDL3=absent'],['consumer=consumer'],['SDL3=consumer','SDL3=consumer']]:
  try:read_aliases(values,{'consumer'});raise AssertionError('invalid alias accepted')
  except ValueError:pass
 print('PASS explicit alias schema/known target/unique name/path rejection; no additional native objects')

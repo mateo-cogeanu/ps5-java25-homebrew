@@ -26,3 +26,7 @@ https://github.com/blackbearreloaded/ps5-native-gamepad-input-research
 The local controller-tester sources are licensed GPL-3.0-or-later. The host
 converter links the system zlib library (zlib license); that host library is
 not included in the console package. No vendor runtime modules are bundled.
+
+## Optional native storage build tools
+
+The opt-in builder retrieves pinned Zstd JNI (BSD-2-Clause), Zstandard (BSD-3-Clause or GPL-2.0), SQLite JDBC (Apache-2.0; bundled Zentus notice) and SQLite (public domain). Sources are not vendored here. Generated source trees retain upstream notices; consumers must ship the corresponding LICENSE/NOTICE files with embedded libraries. See docs/java25-native-storage.md for pins and restrictions.

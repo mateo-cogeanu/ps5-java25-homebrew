@@ -30,8 +30,14 @@ int main(int argc,char **argv){
  int listener=socket(AF_INET,SOCK_STREAM,0);sockaddr_in a{};a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
  if(bind(listener,(sockaddr*)&a,sizeof(a))||listen(listener,8))return 3;
  socklen_t length=sizeof(a);getsockname(listener,(sockaddr*)&a,&length);printf("%u\n",ntohs(a.sin_port));fflush(stdout);
- ps5::log_share::Entry entries[]={{"/verification-exception.txt",argv[8]},{"/server-exception.txt",argv[9]},{"/startup-tail.log",argv[1]},{"/startup.log",argv[1]},{"/server.log",argv[1]},{"/build.txt",argv[3]},{"/session.txt",argv[4]},{"/hs-error.log",argv[6]},{"/class-load.log",argv[1]},{"/process-usage.log",argv[7]},{"/gc.log",argv[1]},{"/gc-rotated.log",argv[1]},{"/previous-gc.log",argv[1]},{"/previous-gc-rotated.log",argv[1]},{"/jit.log",argv[1]},{"/exceptions.log",argv[1]},{"/exceptions-rotated.log",argv[1]},{"/native-stderr.log",argv[1]},{"/previous-native-stderr.log",argv[1]}};
- for(;;){int client=accept(listener,nullptr,nullptr);if(client<0)break;ps5::log_share::serve(client,entries,sizeof(entries)/sizeof(entries[0]));close(client);}
+ ps5::log_share::Entry entries[]={{"/exhausted.log",argv[1]},{"/verification-exception.txt",argv[8]},{"/server-exception.txt",argv[9]},{"/startup-tail.log",argv[1]},{"/startup.log",argv[1]},{"/server.log",argv[1]},{"/build.txt",argv[3]},{"/session.txt",argv[4]},{"/hs-error.log",argv[6]},{"/class-load.log",argv[1]},{"/process-usage.log",argv[7]},{"/gc.log",argv[1]},{"/gc-rotated.log",argv[1]},{"/previous-gc.log",argv[1]},{"/previous-gc-rotated.log",argv[1]},{"/jit.log",argv[1]},{"/exceptions.log",argv[1]},{"/exceptions-rotated.log",argv[1]},{"/native-stderr.log",argv[1]},{"/previous-native-stderr.log",argv[1]}};
+ for(;;){int client=accept(listener,nullptr,nullptr);if(client<0)break;
+ char peek[512]{};recv(client,peek,sizeof(peek)-1,MSG_PEEK);int filled[128],count=0;struct rlimit original{};
+ bool exhaust=std::strstr(peek,"/exhausted.log")!=nullptr;
+ if(exhaust){assert(getrlimit(RLIMIT_NOFILE,&original)==0);rlimit limited=original;if(limited.rlim_cur>128)limited.rlim_cur=128;assert(setrlimit(RLIMIT_NOFILE,&limited)==0);while(count<128){int n=open("/dev/null",O_RDONLY);if(n<0){assert(errno==EMFILE);break;}filled[count++]=n;}}
+ ps5::log_share::serve(client,entries,sizeof(entries)/sizeof(entries[0]));
+ if(exhaust){while(count)close(filled[--count]);assert(setrlimit(RLIMIT_NOFILE,&original)==0);}close(client);}
+
 }
 ''')
     subprocess.run(['clang++','-std=c++17','-pthread','-fsanitize=address,undefined','-I'+str(ROOT/'java25/probe'),str(root/'server.cpp'),'-o',str(root/'server')],check=True)
@@ -58,7 +64,7 @@ int main(int argc,char **argv){
         for name in ['java25-class-load.log','process-usage.log','java25-jit.log','java25-exceptions.log','java25-exceptions.log.0','probe-native-stderr.log','java25-gc.log','java25-gc.log.0']:assert (root/('previous-'+name)).read_text()=='prior diagnostic: '+name
         assert not (root/'java25-class-load.log').exists()
         assert 'elapsed_s=17 getrusage=0 maxrss_raw=' in (root/'process-usage.log').read_text()
-        for kind in ['data','as','rss']:
+        for kind in ['data','as','rss','nofile']:
             assert f'elapsed_s=0 rlimit={kind} result=0 errno=0 soft_raw=' in (root/'process-usage.log').read_text()
             assert f'elapsed_s=60 rlimit={kind} result=-1 errno=' in (root/'process-usage.log').read_text()
         assert 'test-build' in (root/'probe-session.txt').read_text()
@@ -73,6 +79,8 @@ int main(int argc,char **argv){
                     if not chunk:break
                     result+=chunk
                 return result
+        live=request(b'GET /resource-status.txt HTTP/1.1\r\n\r\n');assert b'200 OK' in live and b'nofile_query=0' in live and b'open=' in live
+        pressure=request(b'GET /exhausted.log HTTP/1.1\r\n\r\n');assert b'503 Service Unavailable' in pressure and b'open errno=24' in pressure and b'open=' in pressure
         response=request(b'GET /startup.log HTTP/1.1\r\nHost: test\r\n\r\n');headers,body=response.split(b'\r\n\r\n',1)
         assert b'200 OK' in headers and body==payload
         response=request(b'GET /startup-tail.log HTTP/1.1\r\n\r\n');headers,body=response.split(b'\r\n\r\n',1)
