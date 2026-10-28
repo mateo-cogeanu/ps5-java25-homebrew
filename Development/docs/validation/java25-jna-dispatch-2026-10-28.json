@@ -15,11 +15,17 @@
     "native memory/string round trips",
     "host libffi strlen/abs invocation"
   ],
-  "console": "Pending PS5 init/memory/calls/callbacks; no new ALL PASS milestone",
+  "console": "User reports consumer119 all good after snapshot6 JNA bootstrap repair. This confirms that consumer startup path, not standalone PS5 memory/calls/callback coverage or universal JNA compatibility.",
   "compatibility_limits": [
     "JAWT absent",
     "optional signal protection absent",
     "target requires explicit compatible resident libffi",
     "no new arbitrary ELF loading or general JNA compatibility claim"
-  ]
+  ],
+  "consumer_feedback": {
+    "build": "01.000.119",
+    "package_sha256": "de43986035602bcedc81ed904ec1db22b4148ec7b22001c95725ad2348c63c19",
+    "human_report": "all good! lets make a prosperostore release. but snapshots remain off by default",
+    "scope": "Functional consumer snapshot6 feedback after previous Native.getLastError bootstrap failure. No new frozen Java milestone."
+  }
 }
