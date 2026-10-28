@@ -135,3 +135,7 @@ behavior remains pending;an alias does not establish mod compatibility. See
 ## Descriptor-first paths and diagnostics — 2026-10-28
 
 Runtime0125 uses checked descriptor-first canonicalization on PS5; native symlink/relative resolution and other platforms remain.112 reproduced EMFILE, so soft-limit adjustment alone is insufficient and the leaking owner is unproven. File diagnostics use sceKernelFstat, with opt-in PS5_TRACK_FILE_ACTIVITY accounting. Keep raw paths/reports local and physical console save validation explicit. See docs/java25-descriptor-first-paths.md. Consumer rumble, mode arbitration and113 integration belong in ProsperoCraft. Preserve frozen milestones and Store108.
+
+## Optional ZIP descriptor budget — 2026-10-28
+
+Runtime0126 adds opt-in ps5.zip.maxOpenFiles (8–128) for immutable ZipFile sources. Defaults remain unchanged; OPEN_DELETE stays pinned. Do not claim preservation of an unlinked/replaced inode after eviction or a universal file-descriptor cap. Consumer114 enables64 after113 shows241regular files and EMFILE on deep world walks. Exact title quota and PS5 lifecycle remain pending; user reports113 haptics working. See docs/java25-bounded-zip-handles.md. Preserve frozen snapshots/Store108 and keep consumer source/raw reports separate.

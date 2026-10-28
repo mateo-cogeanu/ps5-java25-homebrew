@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "patch": "0126-opt-in-bounded-zip-handles.patch",
+  "host": "PASS actual target ZipFile under96-fd cap;omitted-option exhaustion;300 archives/16-handle bound;concurrency/stream/integrity/OPEN_DELETE/deep filesystem lifecycle",
+  "target": "PASS cached java.base-java,configured module image rebuild,and exact consumer114 package/signature/CRC/core-policy checks",
+  "console": "pending114world lifecycle and headroom;113 observed241regular files;exact native quota unproven",
+  "source_sha256": {
+    "java25/patches/0126-opt-in-bounded-zip-handles.patch": "76258c2cf8c4e8c7923429419bd5a96c4f1ad1860721a782a23c6ca18b8bae87",
+    "tools/test_java25_zip_handle_pool.py": "421117bbb4f9a811460d8d5f1949b6677d2315bd6b4d8a44508e9f031248825d"
+  },
+  "module_image_sha256": "f39a2ef7e0cb48a51613b0bdde383b793a567e6c3571fb6a09385dd93580a785"
+}

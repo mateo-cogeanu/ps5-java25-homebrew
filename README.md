@@ -23,6 +23,8 @@ Development is testing a [shared native direct-memory fallback](Development/docs
 
 Development also provides opt-in [native compression/database builds and descriptor diagnostics](Development/docs/java25-native-storage.md). Host checks and consumer target packaging pass; actual console integration remains pending. Core defaults and frozen milestones are unchanged. The [descriptor-first PS5 path update](Development/docs/java25-descriptor-first-paths.md) also removes repeated unsupported canonicalization calls and improves handle diagnostics; console save validation remains pending.
 
+Development0126 adds an opt-in [bounded ZIP/JAR handle pool](Development/docs/java25-bounded-zip-handles.md) for immutable archives. Low-descriptor host tests and target builds pass; console integration is pending.
+
 ## Milestones
 
 Each milestone is a **frozen source snapshot** of a build that received **ALL PASS on the PS5**. Its release includes the matching app ZIP, SHA-256 checksum and console validation record.

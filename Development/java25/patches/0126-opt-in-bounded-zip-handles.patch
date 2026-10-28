@@ -1,0 +1,142 @@
+--- a/src/java.base/share/classes/java/util/zip/ZipFile.java
++++ b/src/java.base/share/classes/java/util/zip/ZipFile.java
+@@ -1159,6 +1159,70 @@
+         private int refs = 1;
+ 
+         private RandomAccessFile zfile;      // zfile of the underlying ZIP file
++        // Explicit opt-in for applications with immutable ZIP/JAR inputs and
++        // a smaller title filesystem handle budget than RLIMIT_NOFILE reports.
++        private static final int PS5_OPEN_LIMIT = ps5OpenLimit();
++        private static final LinkedHashMap<Source, Boolean> ps5OpenFiles =
++                new LinkedHashMap<>(16, 0.75f, true);
++        private final boolean ps5Pooled;
++        private boolean ps5Closed;
++
++        private static int ps5OpenLimit() {
++            String value = jdk.internal.misc.VM.getSavedProperty("ps5.zip.maxOpenFiles");
++            if (value != null) {
++                try {
++                    int limit = Integer.parseInt(value);
++                    if (limit >= 8 && limit <= 128) return limit;
++                } catch (NumberFormatException ignored) {}
++            }
++            return 0;
++        }
++
++        // All pooled I/O and eviction share one lock, so a handle cannot be
++        // evicted between seek and read, even with concurrent entry streams.
++        private static void ps5MakeRoom() throws IOException {
++            while (ps5OpenFiles.size() >= PS5_OPEN_LIMIT) {
++                var iterator = ps5OpenFiles.keySet().iterator();
++                Source idle = iterator.next();
++                idle.zfile.close();
++                idle.zfile = null;
++                iterator.remove();
++            }
++        }
++
++        private void ps5CheckIdentity() throws IOException {
++            BasicFileAttributes observed = Files.readAttributes(
++                    builtInFS.getPath(key.file.getPath()), BasicFileAttributes.class);
++            if (!observed.isRegularFile() || observed.size() != key.attrs.size()
++                    || !observed.lastModifiedTime().equals(key.attrs.lastModifiedTime())
++                    || !Objects.equals(observed.fileKey(), key.attrs.fileKey())) {
++                throw new ZipException("ZIP changed while its descriptor was released: " + key.file);
++            }
++        }
++
++        private RandomAccessFile ps5File() throws IOException {
++            assert Thread.holdsLock(ps5OpenFiles);
++            if (ps5Closed) throw new ZipException("ZIP source closed");
++            if (zfile == null) {
++                ps5CheckIdentity();
++                ps5MakeRoom();
++                RandomAccessFile opened = new RandomAccessFile(key.file, "r");
++                try { ps5CheckIdentity(); }
++                catch (IOException failure) { opened.close(); throw failure; }
++                zfile = opened;
++                ps5OpenFiles.put(this, Boolean.TRUE);
++            } else {
++                ps5OpenFiles.get(this); // update least-recently-used order
++            }
++            return zfile;
++        }
++
++        private long fileLength() throws IOException {
++            if (ps5Pooled) {
++                synchronized (ps5OpenFiles) { return ps5File().length(); }
++            }
++            return zfile.length();
++        }
+         private byte[] cen;                  // CEN
+         private long locpos;                 // position of first LOC header (usually 0)
+         private byte[] comment;              // ZIP file comment
+@@ -1527,7 +1591,10 @@
+ 
+         private Source(Key key, boolean toDelete, ZipCoder zipCoder) throws IOException {
+             this.key = key;
+-            if (toDelete) {
++            this.ps5Pooled = PS5_OPEN_LIMIT > 0 && !toDelete && key.attrs.isRegularFile();
++            if (ps5Pooled) {
++                synchronized (ps5OpenFiles) { ps5File(); }
++            } else if (toDelete) {
+                 if (OperatingSystem.isWindows()) {
+                     this.zfile = SharedSecrets.getJavaIORandomAccessFileAccess()
+                                               .openAndDelete(key.file, "r");
+@@ -1545,15 +1612,24 @@
+                 this.startsWithLoc = (LOCSIG(buf) == LOCSIG);
+             } catch (IOException x) {
+                 try {
+-                    this.zfile.close();
++                    close();
+                 } catch (IOException xx) {}
+                 throw x;
+             }
+         }
+ 
+         private void close() throws IOException {
+-            zfile.close();
+-            zfile = null;
++            if (ps5Pooled) {
++                synchronized (ps5OpenFiles) {
++                    ps5Closed = true;
++                    ps5OpenFiles.remove(this);
++                    if (zfile != null) zfile.close();
++                    zfile = null;
++                }
++            } else {
++                zfile.close();
++                zfile = null;
++            }
+             cen = null;
+             entries = null;
+             table = null;
+@@ -1567,7 +1643,8 @@
+         private final int readFullyAt(byte[] buf, int off, int len, long pos)
+             throws IOException
+         {
+-            synchronized (zfile) {
++            synchronized (ps5Pooled ? ps5OpenFiles : zfile) {
++                if (ps5Pooled) ps5File();
+                 zfile.seek(pos);
+                 int N = len;
+                 while (N > 0) {
+@@ -1583,7 +1660,8 @@
+         private final int readAt(byte[] buf, int off, int len, long pos)
+             throws IOException
+         {
+-            synchronized (zfile) {
++            synchronized (ps5Pooled ? ps5OpenFiles : zfile) {
++                if (ps5Pooled) ps5File();
+                 zfile.seek(pos);
+                 return zfile.read(buf, off, len);
+             }
+@@ -1604,7 +1682,7 @@
+          * was not found or an error occurred.
+          */
+         private End findEND() throws IOException {
+-            long ziplen = zfile.length();
++            long ziplen = fileLength();
+             if (ziplen <= 0)
+                 zerror("zip file is empty");
+             End end = new End();
