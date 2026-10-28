@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-28",
+  "runtime_patch": "0126-opt-in-bounded-zip-handles.patch",
+  "runtime_implementation_commit": "ce7599d81f140aa7169c55e43558d0efe05a563b",
+  "consumer": "mateo-cogeanu/ProsperoCraft",
+  "consumer_source_commit": "f33e3a584094dcc4f7d46e34efa0415ccea9f0f2",
+  "title_id": "PPSA99874",
+  "version": "01.000.114",
+  "package_sha256": "b732e92965c5c1681e95ece23eb8399ee89dd2d7e500eb453f27713e63f58411",
+  "human_report": "playing in that world rn! works like a charm!! reloeaded it no problem!",
+  "accepted_scope": "Observed world play and reopen on actual PS5 after enabling64 pooled ZIP handles",
+  "pending": [
+    "World deletion not explicitly reported",
+    "Extended save/load and endurance",
+    "Full compatibility/performance and non-ZipFile descriptor usage"
+  ],
+  "milestone": "No new ALL PASS/frozen milestone;preserve prior validation snapshots"
+}
