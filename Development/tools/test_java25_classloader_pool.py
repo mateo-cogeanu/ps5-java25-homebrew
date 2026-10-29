@@ -4,6 +4,14 @@ from pathlib import Path
 import subprocess
 r=Path(__file__).resolve().parents[1];w=r/'build/java25/classloader-pool-test';w.mkdir(parents=True,exist_ok=True)
 s=(r/'.tools/java25/openjdk/src/java.base/share/native/libjava/ClassLoader.c').read_text();body=s[s.index('/* Temporary class-file'):s.index('static JNINativeMethod methods[]')]
+body='''
+int JNU_PS5DirectScratchEnabled(void){return 0;}
+size_t sceKernelGetDirectMemorySize(void){return 0;}
+int sceKernelAllocateDirectMemory(int64_t a,int64_t b,size_t c,size_t d,int e,int64_t*f){return -1;}
+int sceKernelMapDirectMemory(void**a,size_t b,int c,int d,int64_t e,size_t f){return -1;}
+int sceKernelMunmap(void*a,size_t b){return -1;}
+int sceKernelReleaseDirectMemory(int64_t a,size_t b){return -1;}
+''' + (r/'.tools/java25/openjdk/src/java.base/share/native/libjava/ps5_core_direct_scratch.h').read_text()+body
 p=w/'test.cpp';p.write_text(r'''
 #include <cstddef>
 #include <cstdint>

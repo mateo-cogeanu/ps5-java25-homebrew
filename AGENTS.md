@@ -144,3 +144,15 @@ Runtime0126 adds opt-in ps5.zip.maxOpenFiles (8–128) for immutable ZipFile sou
 ## Optional genuine JNA dispatch — 2026-10-28
 
 Runtime-owned tools/java25_jna.py builds pinned JNA5.19.1 dispatch/callback JNI (nativeABI7.0.4from common.xml, not stale Makefile defaults). Caller supplies compatible libffi/resident jnidispatch group. No default library/image changes or arbitrary loader added. Genuine host native sizes/error/memory/ffi tests force our library; target initialization/calls/callbacks remain pending. JAWT/signal protection not enabled; no broad JNA compatibility claim. Consumer launcher properties and original-game integration belong in ProsperoCraft. See docs/java25-jna-dispatch.md. Preserve frozen milestones.
+
+## Optional libjava direct scratch — 2026-10-29
+
+Runtime127adds default-offJNU_PS5SetDirectScratchEnabled for temporaryClassLoader/
+platform-string buffers after libc/anonymous failure. Consumer124Fabric26.2logs
+show tinystringmallocfailure+anonymousENOMEMwith lowJavaheapuse;exact nativequota/
+owner unproven. Preserve defaults; consumer125explicitly enables. EachCunit64slots/
+8MiB(16MiBtotal), noheap/metadata/driverpolicychange. Mapfailrollback,uncertain
+unmap/release retainbudget/backingownership;noorphanrecoveryclaim. Hostheader
+ASan/UBSan,actualdisabledJNIstring/ClassLoader/leaseconcurrency,targetbasebuildpass;
+PS5allocation/release/startup/world/endurancepending. See docs/java25-core-direct-scratch.md.
+Publishreusablepatch/runtimehereandconsumerintegrationseparately;frozenpreserved.

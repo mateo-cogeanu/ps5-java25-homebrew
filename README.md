@@ -119,3 +119,5 @@ Builds currently use a macOS development environment and the community PS5 Paylo
 This project builds on **OpenJDK**, the **FreeBSD OpenJDK port**, the community **PS5 Payload SDK**, and the **ps5-native-app-boilerplate**. The interface uses **Inter** typography.
 
 Sources retain their individual licenses and upstream notices. See [THIRD_PARTY_NOTICES.md](Development/THIRD_PARTY_NOTICES.md) and [embedded runtime notices](Development/java25/EMBEDDED-RUNTIME-NOTICES.md) for attribution and licensing details.
+
+Development runtime 127 adds an opt-in bounded direct-memory fallback for temporary JNI platform-string and class-loading buffers under native allocation pressure. Defaults stay unchanged; [scope and validation](docs/java25-core-direct-scratch.md). Physical PS5 validation remains pending.

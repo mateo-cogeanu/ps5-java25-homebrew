@@ -13,6 +13,14 @@ def function(name):
   c=s[pos];depth+=(c=='{')-(c=='}');pos+=1
  return s[start:pos]+'\n'
 helper=s[s.index('#ifdef __PROSPERO__\ntypedef union'):s.index('/* Due to a bug')]
+helper='''
+int JNU_PS5DirectScratchEnabled(void){return 0;}
+size_t sceKernelGetDirectMemorySize(void){return 0;}
+int sceKernelAllocateDirectMemory(int64_t a,int64_t b,size_t c,size_t d,int e,int64_t*f){return -1;}
+int sceKernelMapDirectMemory(void**a,size_t b,int c,int d,int64_t e,size_t f){return -1;}
+int sceKernelMunmap(void*a,size_t b){return -1;}
+int sceKernelReleaseDirectMemory(int64_t a,size_t b){return -1;}
+''' + (ROOT/'.tools/java25/openjdk/src/java.base/share/native/libjava/ps5_core_direct_scratch.h').read_text() + helper
 macro=s[s.index('#define MALLOC_MIN4'):s.index('\n\n/**')]
 bridge=r'''
 #include <jni.h>

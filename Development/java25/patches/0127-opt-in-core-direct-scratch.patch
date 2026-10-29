@@ -1,0 +1,139 @@
+--- /dev/null
++++ b/src/java.base/share/native/libjava/ps5_core_direct_scratch.h
+@@ -0,0 +1,72 @@
++/* SPDX-License-Identifier: GPL-2.0-only WITH Classpath-exception-2.0
++ * Opt-in final fallback for temporary libjava buffers after libc/anonymous
++ * exhaustion. Each translation unit has an independent 8MiB /64slot budget.
++ * No allocator or lazy-lock allocation. Uncertain cleanup retains ownership.
++ */
++#ifndef PS5_CORE_DIRECT_SCRATCH_H
++#define PS5_CORE_DIRECT_SCRATCH_H
++#ifdef __PROSPERO__
++#include <stdint.h>
++#include <stddef.h>
++#include <errno.h>
++#include <sys/mman.h>
++extern int JNU_PS5DirectScratchEnabled(void);
++extern size_t sceKernelGetDirectMemorySize(void);
++extern int sceKernelAllocateDirectMemory(int64_t,int64_t,size_t,size_t,int,int64_t*);
++extern int sceKernelMapDirectMemory(void**,size_t,int,int,int64_t,size_t);
++extern int sceKernelMunmap(void*,size_t);
++extern int sceKernelReleaseDirectMemory(int64_t,size_t);
++typedef struct {void* address;int64_t physical;size_t bytes;unsigned state;} Ps5ScratchEntry;
++static Ps5ScratchEntry ps5_scratch_entries[64];
++static size_t ps5_scratch_held;
++static unsigned ps5_scratch_lock;
++static void ps5_scratch_acquire(void){while(__atomic_exchange_n(&ps5_scratch_lock,1,__ATOMIC_ACQUIRE)){
++#if defined(__x86_64__)
++ __asm__ volatile("pause");
++#elif defined(__aarch64__)
++ __asm__ volatile("yield");
++#endif
++}}
++static void ps5_scratch_unlock(void){__atomic_store_n(&ps5_scratch_lock,0,__ATOMIC_RELEASE);}
++static void ps5_scratch_forget(unsigned slot){ps5_scratch_held-=ps5_scratch_entries[slot].bytes;ps5_scratch_entries[slot]=(Ps5ScratchEntry){0};}
++static void* ps5_core_scratch_map(size_t bytes){
++ int saved=errno;
++ void* memory=mmap(NULL,bytes,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
++ if(memory!=MAP_FAILED)return memory;
++ if(errno!=ENOMEM||!JNU_PS5DirectScratchEnabled())return MAP_FAILED;
++ const size_t page=16384,budget=8*1024*1024;
++ if(!bytes||bytes%page||bytes>budget){errno=ENOMEM;return MAP_FAILED;}
++ unsigned slot=64;ps5_scratch_acquire();
++ if(ps5_scratch_held<=budget-bytes)for(unsigned i=0;i<64;i++)if(!ps5_scratch_entries[i].state){slot=i;break;}
++ if(slot<64){ps5_scratch_entries[slot].state=1;ps5_scratch_entries[slot].bytes=bytes;ps5_scratch_held+=bytes;}
++ ps5_scratch_unlock();if(slot==64){errno=ENOMEM;return MAP_FAILED;}
++ size_t pool=sceKernelGetDirectMemorySize();int64_t physical=-1;
++ int rc=pool>=bytes&&pool<=INT64_MAX?sceKernelAllocateDirectMemory(0,(int64_t)pool,bytes,page,12,&physical):-1;
++ if(rc){ps5_scratch_acquire();ps5_scratch_forget(slot);ps5_scratch_unlock();errno=ENOMEM;return MAP_FAILED;}
++ void* address=(void*)(uintptr_t)0x1000000000ULL;
++ rc=sceKernelMapDirectMemory(&address,bytes,PROT_READ|PROT_WRITE,0,physical,page);
++ int unmapped=0,released=0;
++ if(rc||!address||address==MAP_FAILED||(uintptr_t)address%page){
++  if(!rc)unmapped=sceKernelMunmap(address,bytes);
++  released=unmapped==0?sceKernelReleaseDirectMemory(physical,bytes):-1;
++  ps5_scratch_acquire();ps5_scratch_entries[slot].physical=physical;
++  if(unmapped==0&&released==0)ps5_scratch_forget(slot);
++  else{ps5_scratch_entries[slot].address=rc?NULL:address;ps5_scratch_entries[slot].state=3;}
++  ps5_scratch_unlock();errno=ENOMEM;return MAP_FAILED;
++ }
++ ps5_scratch_acquire();ps5_scratch_entries[slot]=(Ps5ScratchEntry){address,physical,bytes,2};ps5_scratch_unlock();errno=saved;return address;
++}
++static int ps5_core_scratch_unmap(void* address,size_t bytes){
++ int saved=errno;unsigned slot=64;ps5_scratch_acquire();
++ for(unsigned i=0;i<64;i++)if(ps5_scratch_entries[i].state&&ps5_scratch_entries[i].address==address){slot=i;break;}
++ if(slot==64){ps5_scratch_unlock();return munmap(address,bytes);}
++ Ps5ScratchEntry entry=ps5_scratch_entries[slot];
++ if(entry.state!=2||entry.bytes!=bytes){ps5_scratch_unlock();errno=EINVAL;return -1;}
++ ps5_scratch_entries[slot].state=3;ps5_scratch_unlock();
++ int rc=sceKernelMunmap(address,bytes);
++ int released=rc==0?sceKernelReleaseDirectMemory(entry.physical,bytes):-1;
++ ps5_scratch_acquire();if(rc==0&&released==0)ps5_scratch_forget(slot);ps5_scratch_unlock();
++ if(rc||released){errno=EIO;return -1;}errno=saved;return 0;
++}
++#endif
++#endif
+--- a/src/java.base/share/native/libjava/jni_util.c
++++ b/src/java.base/share/native/libjava/jni_util.c
+@@ -38,6 +38,13 @@
+ #include "jni_util.h"
+ #include "java_lang_String.h"
+ 
++#ifdef __PROSPERO__
++static unsigned ps5_core_direct_scratch_enabled;
++int JNU_PS5DirectScratchEnabled(void){return __atomic_load_n(&ps5_core_direct_scratch_enabled,__ATOMIC_ACQUIRE)!=0;}
++void JNU_PS5SetDirectScratchEnabled(int enabled){__atomic_store_n(&ps5_core_direct_scratch_enabled,enabled!=0,__ATOMIC_RELEASE);}
++#endif
++#include "ps5_core_direct_scratch.h"
++
+ /* Platform-char buffers are released through JNU_ReleaseStringPlatformChars. */
+ #ifdef __PROSPERO__
+ typedef union {
+@@ -63,8 +70,7 @@
+         long page = sysconf(_SC_PAGESIZE);
+         if (page <= 0 || bytes > SIZE_MAX - (size_t)page) { errno = ENOMEM; return NULL; }
+         size_t mapped = ((bytes + (size_t)page - 1) / (size_t)page) * (size_t)page;
+-        void *memory = mmap(NULL, mapped, PROT_READ | PROT_WRITE,
+-                            MAP_PRIVATE | MAP_ANON, -1, 0);
++        void *memory = ps5_core_scratch_map(mapped);
+         int map_error = memory == MAP_FAILED ? errno : 0;
+         jio_fprintf(stderr, "PS5 platform string: bytes=%zu malloc_errno=%d "
+                     "mapped_bytes=%zu mmap_errno=%d\n", size, heap_error, memory == MAP_FAILED ? 0 : mapped, map_error);
+@@ -85,7 +91,7 @@
+     int saved_errno = errno;
+     if (buffer != NULL) {
+         PlatformStringHeader *header = ((PlatformStringHeader *)buffer) - 1;
+-        if (header->mapped_size != 0) munmap(header, header->mapped_size);
++        if (header->mapped_size != 0) ps5_core_scratch_unmap(header, header->mapped_size);
+         else free(header);
+     }
+     errno = saved_errno;
+--- a/src/java.base/share/native/libjava/ClassLoader.c
++++ b/src/java.base/share/native/libjava/ClassLoader.c
+@@ -40,6 +40,7 @@
+ #include "jni.h"
+ #include "jni_util.h"
+ #include "jvm.h"
++#include "ps5_core_direct_scratch.h"
+ 
+ /* Temporary class-file and UTF buffers remain local to this native file.
+  * The PS5 libc heap may refuse them while anonymous OS pages remain available.
+@@ -93,8 +94,7 @@
+         long page = sysconf(_SC_PAGESIZE);
+         if (page <= 0 || bytes > SIZE_MAX - (size_t)page) { errno = ENOMEM; return NULL; }
+         size_t mapped = ((bytes + (size_t)page - 1) / (size_t)page) * (size_t)page;
+-        void *memory = mmap(NULL, mapped, PROT_READ | PROT_WRITE,
+-                            MAP_PRIVATE | MAP_ANON, -1, 0);
++        void *memory = ps5_core_scratch_map(mapped);
+         int map_error = memory == MAP_FAILED ? errno : 0;
+         jio_fprintf(stderr, "PS5 classloader scratch: bytes=%zu malloc_errno=%d "
+                     "mapped_bytes=%zu mmap_errno=%d\n", size, heap_error, mapped, map_error);
+@@ -121,7 +121,7 @@
+                     return;
+                 }
+             }
+-        } else if (header->mapped_size != 0) munmap(header, header->mapped_size);
++        } else if (header->mapped_size != 0) ps5_core_scratch_unmap(header, header->mapped_size);
+         else free(header);
+     }
+ #else

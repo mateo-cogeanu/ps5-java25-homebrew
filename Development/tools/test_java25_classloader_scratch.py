@@ -61,6 +61,16 @@ JNIEXPORT jclass JNICALL Java_ClassLoaderMemoryCheck_hidden0(JNIEnv *env,jclass 
 JNIEXPORT jclass JNICALL Java_ClassLoaderMemoryCheck_direct0(JNIEnv *env,jobject loader,jobject data,jint size,jstring source){deny_heap=1;deny_map=0;return Java_java_lang_ClassLoader_defineClass2(env,NULL,loader,NULL,data,0,size,NULL,source);}
 JNIEXPORT jlong JNICALL Java_ClassLoaderMemoryCheck_outstanding(JNIEnv *env,jclass type){return heap_live+map_live;}
 '''
+bridge+='''
+#include <stdint.h>
+
+int JNU_PS5DirectScratchEnabled(void){return 0;}
+size_t sceKernelGetDirectMemorySize(void){return 0;}
+int sceKernelAllocateDirectMemory(int64_t a,int64_t b,size_t c,size_t d,int e,int64_t*f){return -1;}
+int sceKernelMapDirectMemory(void**a,size_t b,int c,int d,int64_t e,size_t f){return -1;}
+int sceKernelMunmap(void*a,size_t b){return -1;}
+int sceKernelReleaseDirectMemory(int64_t a,size_t b){return -1;}
+'''
 (WORK/'MediumScratchFixture.java').write_text('public class MediumScratchFixture {public static final String padding=\"' + 'm'*20000 + '\";public static int answer(){return 42;}}');
 (WORK/'SmallScratchFixture.java').write_text('public class SmallScratchFixture {public static int answer(){return 42;}}');
 (WORK/'ClassLoaderMemoryCheck.java').write_text(java);(WORK/'ClassLoaderScratchFixture.java').write_text('public class ClassLoaderScratchFixture {public static final String padding=\"' + 'x'*40000 + '\";public static int answer(){return 42;}}\n');(WORK/'bridge.c').write_text(bridge)
