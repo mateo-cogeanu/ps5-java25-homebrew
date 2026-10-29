@@ -18,10 +18,17 @@ c=w/'bridge.c';c.write_text(r'''
 #include <errno.h>
 #include <sys/mman.h>
 #include <unistd.h>
-static int mode,calls,mapcalls,heap_live,map_live,lookups;
-static void* alloc(size_t n){int call=++calls;if(mode==1||mode==2||mode==3||(mode==4&&call==2)||(mode==5&&call==1)){errno=ENOMEM;return NULL;}void*p=malloc(n);if(p)heap_live++;return p;}
+static int mode,calls,mapcalls,heap_live,map_live,lookups,direct_live;
+int JNU_PS5DirectScratchEnabled(void){return mode==7;}
+size_t sceKernelGetDirectMemorySize(void){return 1ULL<<30;}
+int sceKernelAllocateDirectMemory(int64_t a,int64_t b,size_t n,size_t align,int type,int64_t*out){(void)a;(void)b;assert(type==12&&align==16384);void*p=0;if(posix_memalign(&p,align,n))return -1;*out=(int64_t)(uintptr_t)p;direct_live++;return 0;}
+int sceKernelMapDirectMemory(void**out,size_t n,int prot,int flags,int64_t physical,size_t align){(void)n;assert(prot==3&&!flags&&align==16384);*out=(void*)(uintptr_t)physical;return 0;}
+int sceKernelMunmap(void*p,size_t n){(void)p;(void)n;return 0;}
+int sceKernelReleaseDirectMemory(int64_t p,size_t n){(void)n;free((void*)(uintptr_t)p);direct_live--;return 0;}
+
+static void* alloc(size_t n){int call=++calls;if(mode==1||mode==2||mode==3||mode==7||(mode==4&&call==2)||(mode==5&&call==1)){errno=ENOMEM;return NULL;}void*p=malloc(n);if(p)heap_live++;return p;}
 static void release(void*p){if(p){heap_live--;free(p);}}
-static void* map(void*p,size_t n,int prot,int flags,int fd,off_t off){int call=++mapcalls;if(mode==2||(mode==3&&call==2)){errno=ENOMEM;return MAP_FAILED;}p=mmap(p,n,prot,flags,fd,off);if(p!=MAP_FAILED)map_live++;return p;}
+static void* map(void*p,size_t n,int prot,int flags,int fd,off_t off){int call=++mapcalls;if(mode==2||mode==7||(mode==3&&call==2)){errno=ENOMEM;return MAP_FAILED;}p=mmap(p,n,prot,flags,fd,off);if(p!=MAP_FAILED)map_live++;return p;}
 static int unmap(void*p,size_t n){int rc=munmap(p,n);if(!rc)map_live--;return rc;}
 #define malloc alloc
 #define free release
@@ -45,8 +52,8 @@ static const char*JNU_GetStringPlatformChars(JNIEnv*e,jstring s,void*p){(void)p;
 static void JNU_ReleaseStringPlatformChars(JNIEnv*e,jstring s,const char*p){(*e)->ReleaseStringUTFChars(e,s,p);}
 static jstring JNU_NewStringPlatform(JNIEnv*e,const char*s){if(mode==6){JNU_ThrowOutOfMemoryError(e,"injected Java string failure");return NULL;}return (*e)->NewStringUTF(e,s);}
 ''' +find+'\n'+lookup+r'''
-JNIEXPORT void JNICALL Java_LibraryNameCheck_config(JNIEnv*e,jclass c,jint m){(void)e;(void)c;assert(heap_live==0&&map_live==0);mode=m;calls=mapcalls=lookups=0;}
-JNIEXPORT void JNICALL Java_LibraryNameCheck_clean(JNIEnv*e,jclass c){(void)e;(void)c;assert(heap_live==0&&map_live==0);}
+JNIEXPORT void JNICALL Java_LibraryNameCheck_config(JNIEnv*e,jclass c,jint m){(void)e;(void)c;assert(heap_live==0&&map_live==0&&direct_live==0);mode=m;calls=mapcalls=lookups=0;}
+JNIEXPORT void JNICALL Java_LibraryNameCheck_clean(JNIEnv*e,jclass c){(void)e;(void)c;assert(heap_live==0&&map_live==0&&direct_live==0);}
 JNIEXPORT void JNICALL Java_LibraryNameCheck_symbols(JNIEnv*e,jclass c){(void)c;assert(findJniFunction(e,(void*)1,"probe",JNI_FALSE)==(void*)2);if((*e)->ExceptionCheck(e))return;assert(findJniFunction(e,(void*)1,NULL,JNI_TRUE)==(void*)2);}
 JNIEXPORT jboolean JNICALL Java_LibraryNameCheck_usedMap(JNIEnv*e,jclass c){(void)e;(void)c;return mapcalls>0;}
 ''')
@@ -56,17 +63,17 @@ public class LibraryNameCheck {
  static void expect(String name,String expected){String actual=lookup(name);if(!java.util.Objects.equals(actual,expected))throw new AssertionError(name+" -> "+actual);clean();}
  public static void main(String[] args){System.load(args[0]);boolean ps5=Boolean.parseBoolean(args[1]);
   if(!ps5){config(1);try{lookup("libmanagement.so");throw new AssertionError("Desktop denial accepted");}catch(OutOfMemoryError expected){}clean();System.out.println("PASS: unchanged desktop body reproduces bare native-name OutOfMemoryError");return;}
-  for(int mode:new int[]{0,1,4,5}){config(mode);expect("libmanagement.so","management");if(mode!=0&&!usedMap())throw new AssertionError("Mapping fallback not exercised");config(mode);expect("libmissing.so",null);}
+  for(int mode:new int[]{0,1,4,5,7}){config(mode);expect("libmanagement.so","management");if(mode!=0&&!usedMap())throw new AssertionError("Mapping fallback not exercised");config(mode);expect("libmissing.so",null);}
   for(int mode:new int[]{2,3,6}){config(mode);try{lookup("libmanagement.so");throw new AssertionError("Fault accepted "+mode);}catch(OutOfMemoryError expected){}clean();}
   config(0);try{lookup(null);throw new AssertionError("Null accepted");}catch(InternalError expected){}clean();expect(".so",null);expect("lib"+"x".repeat(10000)+".so",null);
   for(int i=0;i<512;i++){config(1);expect("libmanagement.so","management");symbols();clean();}
   config(0);expect("libprobe.so","probe");
-  System.out.println("PASS: actual JNI lookup/symbol construction, libc and mapped paths, first/second allocation/map faults, Java-string failure, unknown/short/oversized/null, OnLoad/OnUnload/native names and512 repeated lifetimes without leaks; -Xcheck:jni/UBSan");
+  System.out.println("PASS: actual JNI lookup/symbol construction, libc and mapped paths, first/second allocation/map faults, Java-string failure, unknown/short/oversized/null, OnLoad/OnUnload/native names and512 repeated lifetimes without leaks plus opt-in direct names under simultaneous libc/anonymous refusal; -Xcheck:jni/UBSan");
  }
 }
 ''')
 subprocess.run([str(jdk/'bin/javac'),str(j)],check=True)
 for ps5 in [True,False]:
  lib=w/('ps5.dylib' if ps5 else 'desktop.dylib')
- subprocess.run(['clang','-std=c11','-D_DARWIN_C_SOURCE',*(['-D__PROSPERO__=1'] if ps5 else []),'-O1','-g','-fsanitize=undefined','-dynamiclib','-I'+str(jdk/'include'),'-I'+str(jdk/'include/darwin'),str(c),'-o',str(lib)],check=True)
+ subprocess.run(['clang','-std=c11','-D_DARWIN_C_SOURCE',*(['-D__PROSPERO__=1'] if ps5 else []),'-O1','-g','-fsanitize=undefined','-dynamiclib','-I'+str(r/'.tools/java25/openjdk/src/java.base/share/native/libjava'),'-I'+str(jdk/'include'),'-I'+str(jdk/'include/darwin'),str(c),'-o',str(lib)],check=True)
  subprocess.run([str(jdk/'bin/java'),'-Xmixed','-XX:TieredStopAtLevel=1','--enable-native-access=ALL-UNNAMED','-Xcheck:jni','-cp',str(w),'LibraryNameCheck',str(lib),str(ps5).lower()],check=True,env={**os.environ,'UBSAN_OPTIONS':'handle_segv=0:handle_sigbus=0:handle_sigfpe=0:halt_on_error=1'})

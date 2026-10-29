@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-29",
+  "patch": "0132-opt-in-native-library-name-scratch.patch",
+  "patch_sha256": "42e4aa63f2af0eacc53d3eaf78795a058d0da95d67499ea1e8662f0764345d9f",
+  "native_library_object_sha256": "281dc7bb10168d520c8ac2ebec9f144ad0cb5c4b5c449fe8b4084c9210801e29",
+  "libjava_sha256": "222151ba72952a5d0230f5fc29a5c242069209835cb6bd82bbe16f1f28f44397",
+  "policy": "Existing default-off core scratch policy;NativeLibraries names libc/anonymous-first then direct onENOMEM;additional64slot/8MiBledger;libjava total3units24MiB,libnetindependent",
+  "checks": [
+    "PASS actual NativeLibraries JNI lookup/symbol bodies under realhostJVM Xcheck:jni/UBSan:default-off libc/mapped/allocation/refusal/Java-string/null/unknown/OnLoad+Unload/512cleanupcycles plusopt-indirect simultaneouslibc/anonymousENOMEM",
+    "PASS unchanged nonPS5 lookup refusal reproducer",
+    "PASS actual scratch mapper budget/slots/concurrency/rollback/failedcleanupownership ASan/UBSan",
+    "PASS genuine PS5 java.base-libs,NativeLibraries.o policy/directrefs,obj/libjava hashes andpatchreversecheck"
+  ],
+  "console": "Pending PS5 Controlify loading/compression/worldcreation/save/reload/audio/regression;not aconsole pass",
+  "consumer": "143menu confirmed byuser;Controlify andDeflater fail findBuiltinLibOOM;144integration inProsperoCraft;rawreportslocal,noStore/frozenmilestone"
+}

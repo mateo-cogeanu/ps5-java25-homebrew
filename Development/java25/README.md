@@ -2163,3 +2163,10 @@ target build checks do not establish PS5 lookup/gameplay acceptance.
 resource counts and offers an explicit pre-JVM8192 mutex/relative-condition
 reserve after a consumer exhausts4096 leases. Native synchronization semantics
 and bounded failure remain; host tests do not establish PS5 priming/gameplay.
+
+## Optional library-name direct scratch (0132)
+
+[Patch0132](../docs/java25-native-library-direct-scratch.md) extends the existing
+default-off temporary scratch policy to native library/symbol names after libc
+and anonymous ENOMEM. Host actual JNI lookup tests and target builds do not
+establish PS5 Controlify, compression or world-save acceptance.

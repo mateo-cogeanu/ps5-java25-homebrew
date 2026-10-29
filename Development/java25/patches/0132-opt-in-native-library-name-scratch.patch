@@ -1,0 +1,28 @@
+--- a/src/java.base/share/native/libjava/NativeLibraries.c
++++ b/src/java.base/share/native/libjava/NativeLibraries.c
+@@ -39,6 +39,7 @@
+ #include <stdint.h>
+ #include <sys/mman.h>
+ #include <unistd.h>
++#include "ps5_core_direct_scratch.h"
+ typedef struct { size_t mapped_size; } NativeLibraryScratch;
+ #endif
+ 
+@@ -55,7 +56,7 @@
+         long page = sysconf(_SC_PAGESIZE);
+         if (page <= 0 || bytes > SIZE_MAX - (size_t)page) { errno = ENOMEM; return NULL; }
+         size_t mapped = ((bytes + (size_t)page - 1) / (size_t)page) * (size_t)page;
+-        void *memory = mmap(NULL, mapped, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
++        void *memory = ps5_core_scratch_map(mapped);
+         int map_error = memory == MAP_FAILED ? errno : 0;
+         jio_fprintf(stderr, "PS5 native library scratch: bytes=%zu malloc_errno=%d mapped_bytes=%zu mmap_errno=%d\n", size, heap_error, memory == MAP_FAILED ? 0 : mapped, map_error);
+         if (memory == MAP_FAILED) { errno = map_error; return NULL; }
+@@ -72,7 +73,7 @@
+     int saved = errno;
+     if (memory != NULL) {
+         NativeLibraryScratch *header = (NativeLibraryScratch *)memory - 1;
+-        if (header->mapped_size) munmap(header, header->mapped_size);
++        if (header->mapped_size) ps5_core_scratch_unmap(header, header->mapped_size);
+         else free(header);
+     }
+     errno = saved;

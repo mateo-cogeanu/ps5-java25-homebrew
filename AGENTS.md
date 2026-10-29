@@ -211,3 +211,15 @@ leasedtrace duringControlifyFFMclassgeneration. Hostactualdefault+extended nativ
 pool/exhaustion/reuse/wait/8000concurrency/cleanup andtargetIRchecks;PS5counts,
 FFM/startup/world/save/regressionpending. See docs/java25-extended-sync-reserve.md.
 Consumer142pin/enable/package/rawreports inProsperoCraft;frozenmilestonespreserved.
+
+## Optional native library-name scratch — 2026-10-29
+
+0132routes NativeLibraries.c temporaryname buffers through0127mapper/pairedrelease;
+existingJNU_PS5SetDirectScratchEnabled defaultoff,libc/anonymousfirst. Addsone
+64slot/8MiB Cunit (libjava3units24MiBaggregate);libnetindependent. No registry/
+nameparsing/JNIlifecycle/searchpath/arbitraryloader/heap/GC/globalallocchange.
+Consumer143menuworksbutControlifyfindBuiltinLibOOM and Deflaterclinit sameOOM
+blocks integratedworldstart. HostactualJNI default/direct/refusal/cleanupcontrols,
+existingmapperfailure/bounds andPS5java.base-libs/objecthashchecks;consolepending.
+See docs/java25-native-library-direct-scratch.md. Consumer144integrationpin belongs
+inProsperoCraft,rawreportlocal,preservefrozenmilestones/Store121.
