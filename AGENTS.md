@@ -177,3 +177,13 @@ publisherJOML classes pass fulllegacyverification with malloc+mmapdenied;
 bounds,wholearena reuse,concurrency and targetbuild checked. See
  docs/java25-verifier-variable-reserve.md. Consumer127 integration separate;
 PS5Fabric launch/world/endurancepending. Underlying libc refusal unproven.
+
+## Opt-in compiler-TLS direct fallback — 2026-10-29
+
+Consumer129 retained128-style nativeabort identifies compiler-rt__emutls_get_address
+and48byteprefixed allocation afterlibc/anonymousfailure;loadadjustment0x400000
+fromin-imageanchor. Reusableemutlsadapteraddsdefaultoff enable_direct setter and
+existing shared256MiB/2048entrynative-directledgerfallback onlyafterENOMEM.
+Matchingunmapownership/failedgrowthpreserved;noheap/GC/globalallocator change.
+See docs/java25-emutls-direct-fallback.md. Hostfailure/lifecycle/ledger/target
+checks recorded;consumer130integration andPS5launch/world/endurancepending.

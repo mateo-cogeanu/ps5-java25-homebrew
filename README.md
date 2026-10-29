@@ -129,3 +129,7 @@ by default; console consumer validation is pending.
 Runtime129 extends the optional [verifier reserve to variable-sized buffers](docs/java25-verifier-variable-reserve.md).
 Actual class verification succeeds on host with both ordinary allocation routes
 disabled; PS5 consumer validation remains pending.
+
+The optional [compiler-TLS direct fallback](docs/java25-emutls-direct-fallback.md)
+addresses an identified native abort after ordinary allocation routes fail.
+It is disabled by default; consumer console validation is pending.

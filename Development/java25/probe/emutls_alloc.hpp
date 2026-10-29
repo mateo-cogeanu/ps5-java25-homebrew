@@ -7,9 +7,15 @@
 #include <cstring>
 #include <sys/mman.h>
 #include <unistd.h>
+#if defined(__PROSPERO__) || defined(PS5_EMUTLS_DIRECT_TEST)
+extern "C" void* ps5_emutls_direct_map(size_t);
+extern "C" bool ps5_emutls_direct_unmap(void*,size_t,int*);
+#endif
 // Used only by the SDK compiler-rt emutls.o. Never mix these prefixed
 // allocations with ordinary libc pointers. All three allocator refs are rebound.
 namespace ps5::emutls_alloc {
+inline unsigned direct_enabled=0;
+inline void enable_direct(bool enabled){__atomic_store_n(&direct_enabled,enabled?1u:0u,__ATOMIC_RELEASE);}
 union Header {
  struct {size_t size, mapped;} block;
  max_align_t alignment;
@@ -26,6 +32,10 @@ inline void* allocate(size_t count) {
   if(page<=0||total>SIZE_MAX-(size_t)page+1){errno=ENOMEM;return nullptr;}
   mapped=(total+(size_t)page-1)/(size_t)page*(size_t)page;
   void* p=::mmap(nullptr,mapped,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
+#if defined(__PROSPERO__) || defined(PS5_EMUTLS_DIRECT_TEST)
+  if(p==MAP_FAILED && errno==ENOMEM && __atomic_load_n(&direct_enabled,__ATOMIC_ACQUIRE))
+   p=ps5_emutls_direct_map(mapped);
+#endif
   if(p==MAP_FAILED)return nullptr;
   h=static_cast<Header*>(p);
  }
@@ -34,7 +44,13 @@ inline void* allocate(size_t count) {
 inline void release(void* p){
  if(!p)return;
  const int saved=errno;Header* h=static_cast<Header*>(p)-1;
- if(h->block.mapped)::munmap(h,h->block.mapped);else std::free(h);
+ if(h->block.mapped){
+#if defined(__PROSPERO__) || defined(PS5_EMUTLS_DIRECT_TEST)
+  int result;
+  if(!ps5_emutls_direct_unmap(h,h->block.mapped,&result))
+#endif
+   ::munmap(h,h->block.mapped);
+ }else std::free(h);
  errno=saved;
 }
 inline void* resize(void* p,size_t count){

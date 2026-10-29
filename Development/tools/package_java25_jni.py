@@ -134,7 +134,7 @@ if args.startup:
             raise SystemExit("Unadapted compiler-TLS dependency: "+name)
     subprocess.run([str(llvm/"llvm-ar"),"r",str(native_libc),str(emutls_obj)],check=True)
     backend=emutls_dir/"backend.o"
-    subprocess.run([str(llvm/"clang++"),"-target","x86_64-sie-ps5","-fvisibility-nodllstorageclass=default","-isysroot",str(SDK),"-isystem",str(SDK/"target/include/c++/v1"),"-isystem",str(SDK/"target/include"),"-std=c++20","-O2","-Wall","-Wextra","-Werror","-fno-exceptions","-fno-rtti","-fno-stack-protector","-femulated-tls","-c",str(ROOT/"java25/probe/emutls_alloc.cpp"),"-o",str(backend)],check=True)
+    subprocess.run([str(llvm/"clang++"),"-target","x86_64-sie-ps5","-fvisibility-nodllstorageclass=default","-isysroot",str(SDK),"-isystem",str(SDK/"target/include/c++/v1"),"-isystem",str(SDK/"target/include"),"-std=c++20","-O2","-Wall","-Wextra","-Werror","-fno-exceptions","-fno-rtti","-fno-stack-protector","-femulated-tls","-I"+str(ROOT/".tools/java25/openjdk/src/hotspot/share"),"-c",str(ROOT/"java25/probe/emutls_alloc.cpp"),"-o",str(backend)],check=True)
     emutls_backend=[backend]
 # Keep SDK resolver result ownership coherent when its small libc allocations
 # fail. Rebind only the pinned netdb object, including its matching free/strdup.

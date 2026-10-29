@@ -51,7 +51,7 @@ p=W/'test.cpp';p.write_text(source)
 subprocess.run(['/usr/bin/clang++','-std=c++20','-O1','-g','-fsanitize=address,undefined','-pthread','-I',str(ROOT),str(p),'-o',str(W/'test')],check=True)
 subprocess.run([str(W/'test')],check=True)
 env=os.environ.copy();env.setdefault('LLVM_CONFIG','/opt/homebrew/opt/llvm/bin/llvm-config')
-subprocess.run([str(ROOT/'.tools/native-sdk/ps5-payload-sdk/bin/prospero-clang++'),'-std=c++20','-O2','-S','-emit-llvm',str(ROOT/'java25/probe/emutls_alloc.cpp'),'-o',str(W/'backend.ll')],env=env,check=True)
+subprocess.run([str(ROOT/'.tools/native-sdk/ps5-payload-sdk/bin/prospero-clang++'),'-std=c++20','-O2','-S','-emit-llvm','-I'+str(ROOT/'.tools/java25/openjdk/src/hotspot/share'),str(ROOT/'java25/probe/emutls_alloc.cpp'),'-o',str(W/'backend.ll')],env=env,check=True)
 ir=(W/'backend.ll').read_text()
 assert '__emutls' not in ir and '__cxa_guard' not in ir
 assert '@mmap' in ir and '@munmap' in ir

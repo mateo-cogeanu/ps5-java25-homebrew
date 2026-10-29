@@ -1,7 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "emutls_alloc.hpp"
 #include "../../.tools/java25/openjdk/src/hotspot/share/runtime/ps5StartupTrace.hpp"
+#ifdef __PROSPERO__
+#include "runtime/ps5NativeDirectMemory.hpp"
+extern "C" void* ps5_emutls_direct_map(size_t bytes){return ps5_native_direct::map(bytes);}
+extern "C" bool ps5_emutls_direct_unmap(void* address,size_t bytes,int* result){return ps5_native_direct::unmap(address,bytes,result);}
+#endif
 extern "C" {
+void ps5_emutls_enable_direct(int enabled){ps5::emutls_alloc::enable_direct(enabled!=0);}
 void* ps5_emutls_malloc(size_t count){
  void* p=ps5::emutls_alloc::allocate(count);
  if(p){
