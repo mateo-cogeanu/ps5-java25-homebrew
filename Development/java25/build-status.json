@@ -499,5 +499,22 @@
     ],
     "console": "Pending exact consumer141 PS5 DNS/HTTPS/Fabric startup/world/save/endurance;not a console pass",
     "consumer": "ProsperoCraft owns policy enablement/runtime pin/package;no raw game reports here;no Store release"
+  },
+  "extended_sync_reserve": {
+    "date": "2026-10-29",
+    "patch": "0131-opt-in-extended-synchronization-reserve.patch",
+    "patch_sha256": "eba704c62e51e27a63a52aab0bf32352d5f0671ab8e43b812c14a2560e49f8ff",
+    "os_posix_object_sha256": "8dee7ac6be4fb9a0bec36db9108c8e63c3c749bb1ff8cf5a800b7096a370b397",
+    "libjvm_sha256": "1094351ae815082261f8a4a303860ce56e31968cd54d3d558b98b9d3d5c1529e",
+    "policy": "Default4096mutex/4096relative/2048absolute,bootstrap opt-in8192/8192/2048;fixedmaximum metadata,extra native initialization onlyopt-in;EBUSY afterpriming starts;native ownership/wait/clock/failure unchanged",
+    "observed_failure": "Consumer141 originalfatalmonitor mutex_init ENOMEM;matchingconfigured attributes and4096initialized/4096leased while ControlifyFFM generates hidden classes;rawreports consumer-local",
+    "checks": [
+      "PASS actual native pool ASan/UBSan default andextended processes,exact counts,lateinit refused,exhaustion/reuse,wait/signal/timeout,busy destroy,attribute-domain controls,8000concurrent lease lifetimes and finalcleanup",
+      "PASS setter default/enable andpost-prime rejection",
+      "PASS targetIR noallocator/TLS/lazyguard inmetadata",
+      "PASS actualHotSpot target build,policy export andpatch reversecheck"
+    ],
+    "console": "Pending PS5 native prime counts/FFM/Fabric startup/world/save/endurance andregression;not aconsole pass",
+    "scope": "ReusableJava runtime only;consumer142owns pin/policy/package;noStore/frozenmilestone"
   }
 }

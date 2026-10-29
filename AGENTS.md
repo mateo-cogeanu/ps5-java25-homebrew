@@ -199,3 +199,15 @@ Hostactualheader/mapperASan/UBSan andexistingDNS/conversion/cleanupregressions,
 PS5java.base-libsbuild/exportschecked;actualconsolelookup/Fabric/world/savepending.
 See docs/java25-network-direct-scratch.md. Consumer141pin/enable/package belongs
 inProsperoCraft;rawreportslocal,preservefrozenmilestones/Store121.
+
+## Optional extended native synchronization reserve — 2026-10-29
+
+Patch0131 adds bootstrap-only JVM_PS5SetExtendedSyncReserveEnabled;default native
+counts4096mutex/4096relative/2048absolute unchanged,explicitmode8192/8192/2048.
+Fixedmaximum metadata grows;nativeextraobjects onlyopt-in. SetterEBUSYafterprime,
+bootstrapthreadonly. Existingprimingcounts/nativefallback/checks/attributeclock/
+wait/ownership semanticsretained. Consumer141fatalmonitorinitENOMEM and4096/4096
+leasedtrace duringControlifyFFMclassgeneration. Hostactualdefault+extended native
+pool/exhaustion/reuse/wait/8000concurrency/cleanup andtargetIRchecks;PS5counts,
+FFM/startup/world/save/regressionpending. See docs/java25-extended-sync-reserve.md.
+Consumer142pin/enable/package/rawreports inProsperoCraft;frozenmilestonespreserved.

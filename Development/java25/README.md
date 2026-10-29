@@ -2156,3 +2156,10 @@ default-off direct-memory fallback for DNS/interface conversion nodes after
 libc and anonymous ENOMEM. Consumers enable it before JVM startup; three
 64-slot/8MiB ledgers remain bounded. Host allocation/ownership controls and
 target build checks do not establish PS5 lookup/gameplay acceptance.
+
+## Optional extended synchronization reserve (0131)
+
+[Patch0131](../docs/java25-extended-sync-reserve.md) preserves default native
+resource counts and offers an explicit pre-JVM8192 mutex/relative-condition
+reserve after a consumer exhausts4096 leases. Native synchronization semantics
+and bounded failure remain; host tests do not establish PS5 priming/gameplay.
