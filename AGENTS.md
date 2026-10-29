@@ -156,3 +156,14 @@ unmap/release retainbudget/backingownership;noorphanrecoveryclaim. Hostheader
 ASan/UBSan,actualdisabledJNIstring/ClassLoader/leaseconcurrency,targetbasebuildpass;
 PS5allocation/release/startup/world/endurancepending. See docs/java25-core-direct-scratch.md.
 Publishreusablepatch/runtimehereandconsumerintegrationseparately;frozenpreserved.
+
+## Optional verifier small reserve — 2026-10-29
+
+Runtime128 adds default-off JNU_PS5SetVerifierSmallReserveEnabled: after libc
+refusal, up to16384aligned256byte verifier slots (4MiB BSS) avoid mapping16KiB
+per tiny name/node; larger/exhausted requests retain anonymous fallback. Consumer125
+Fabric26.2 Matrix4f site4221/ENOMEM reproduced this waste. Host bounds/ownership/
+concurrency and actual disabled verifier tests pass; target rebuild and PS5
+Fabric/world/endurance validation recorded separately. Reusable patch here;
+consumer126 explicit enablement/integration in ProsperoCraft. See
+ docs/java25-verifier-small-reserve.md. No frozen milestone or Store pass implied.

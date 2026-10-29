@@ -1,0 +1,74 @@
+--- a/src/java.base/share/native/libverify/ps5_verify_alloc.h
++++ b/src/java.base/share/native/libverify/ps5_verify_alloc.h
+@@ -13,6 +13,50 @@
+ typedef union { size_t mapped; max_align_t alignment; } VerifyNativeHeader;
+ /* Process-wide sampling avoids C TLS or allocator-dependent initialization. */
+ static unsigned long long verify_native_map_successes;
++/* Opt-in small-buffer reserve: avoid one 16KiB VM mapping per tiny name or
++ * cleanup node when libc refuses allocations. Fixed BSS, no lazy allocator. */
++static unsigned verify_small_enabled;
++void JNU_PS5SetVerifierSmallReserveEnabled(int enabled) {
++    __atomic_store_n(&verify_small_enabled, enabled != 0, __ATOMIC_RELEASE);
++}
++static union { max_align_t alignment; unsigned char bytes[256]; } verify_small[16384];
++static uint32_t verify_small_used[512];
++static unsigned verify_small_lock, verify_small_next;
++static void verify_small_acquire(void) {
++    while (__atomic_exchange_n(&verify_small_lock, 1, __ATOMIC_ACQUIRE)) {}
++}
++static void verify_small_unlock(void) {
++    __atomic_store_n(&verify_small_lock, 0, __ATOMIC_RELEASE);
++}
++static void *verify_small_allocate(size_t bytes) {
++    if (bytes > sizeof(verify_small[0]) || !__atomic_load_n(&verify_small_enabled, __ATOMIC_ACQUIRE)) return NULL;
++    void *result = NULL;
++    verify_small_acquire();
++    for (unsigned n = 0; n < 512; ++n) {
++        unsigned word = (verify_small_next + n) % 512;
++        uint32_t available = ~verify_small_used[word];
++        if (available) {
++            unsigned bit = (unsigned)__builtin_ctz(available);
++            verify_small_used[word] |= (uint32_t)1 << bit;
++            verify_small_next = word;
++            result = &verify_small[word * 32 + bit];
++            break;
++        }
++    }
++    verify_small_unlock();
++    return result;
++}
++static int verify_small_release(void *memory) {
++    uintptr_t offset = (uintptr_t)memory - (uintptr_t)verify_small;
++    if (offset >= sizeof(verify_small)) return 0;
++    /* Only allocator-owned aligned slot bases reach this function. */
++    if (offset % sizeof(verify_small[0])) return 1;
++    unsigned slot = (unsigned)(offset / sizeof(verify_small[0]));
++    verify_small_acquire();
++    verify_small_used[slot / 32] &= ~((uint32_t)1 << (slot % 32));
++    verify_small_unlock();
++    return 1;
++}
+ static void *verify_native_allocate(size_t size) {
+     int saved_errno = errno;
+     if (size > SIZE_MAX - sizeof(VerifyNativeHeader)) { errno = ENOMEM; return NULL; }
+@@ -22,6 +66,12 @@
+     if (header != NULL) header->mapped = 0;
+     else {
+         int heap_error = errno;
++        header = verify_small_allocate(bytes);
++        if (header != NULL) {
++            header->mapped = 0;
++            errno = saved_errno;
++            return header + 1;
++        }
+         long page = sysconf(_SC_PAGESIZE);
+         if (page <= 0 || bytes > SIZE_MAX - ((size_t)page - 1)) { errno = ENOMEM; return NULL; }
+         size_t mapped = ((bytes + (size_t)page - 1) / (size_t)page) * (size_t)page;
+@@ -49,6 +99,7 @@
+     int saved_errno = errno;
+     if (buffer != NULL) {
+         VerifyNativeHeader *header = ((VerifyNativeHeader *)buffer) - 1;
++        if (verify_small_release(header)) { errno = saved_errno; return; }
+         if (header->mapped != 0) munmap(header, header->mapped);
+         else free(header);
+     }

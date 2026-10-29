@@ -121,3 +121,7 @@ This project builds on **OpenJDK**, the **FreeBSD OpenJDK port**, the community 
 Sources retain their individual licenses and upstream notices. See [THIRD_PARTY_NOTICES.md](Development/THIRD_PARTY_NOTICES.md) and [embedded runtime notices](Development/java25/EMBEDDED-RUNTIME-NOTICES.md) for attribution and licensing details.
 
 Development runtime 127 adds an opt-in bounded direct-memory fallback for temporary JNI platform-string and class-loading buffers under native allocation pressure. Defaults stay unchanged; [scope and validation](docs/java25-core-direct-scratch.md). Physical PS5 validation remains pending.
+
+Optional runtime128 [verifier small-allocation reserve](docs/java25-verifier-small-reserve.md)
+reduces page waste after native libc allocation failures. It remains disabled
+by default; console consumer validation is pending.
