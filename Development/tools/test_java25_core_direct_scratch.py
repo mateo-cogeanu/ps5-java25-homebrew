@@ -18,16 +18,17 @@ int JNU_PS5DirectScratchEnabled(void){return enabled;}
 static void* fixture_mmap(void*a,size_t n,int p,int f,int d,off_t o){if(deny_anon){errno=ENOMEM;return MAP_FAILED;}return mmap(a,n,p,f,d,o);}
 static int fixture_munmap(void*a,size_t n){return munmap(a,n);}
 size_t sceKernelGetDirectMemorySize(void){return 1ULL<<30;}
-int sceKernelAllocateDirectMemory(int64_t a,int64_t b,size_t n,size_t align,int type,int64_t*out){assert(!a&&b==(1ULL<<30)&&align==16384&&type==12);if(deny_allocate)return -1;void*p=NULL;if(posix_memalign(&p,align,n))return -1;*out=(int64_t)(uintptr_t)p;allocations++;return 0;}
-int sceKernelMapDirectMemory(void**out,size_t n,int p,int f,int64_t physical,size_t align){assert(p==3&&!f&&align==16384);if(deny_direct_map)return -1;*out=(void*)(uintptr_t)physical;maps++;return 0;}
-int sceKernelMunmap(void*a,size_t n){if(deny_unmap)return -1;unmaps++;return 0;}
-int sceKernelReleaseDirectMemory(int64_t p,size_t n){if(deny_release)return -1;free((void*)(uintptr_t)p);releases++;return 0;}
+int sceKernelAllocateDirectMemory(int64_t a,int64_t b,size_t n,size_t align,int type,int64_t*out){assert(!a&&b==(1ULL<<30)&&align==16384&&type==12);if(deny_allocate)return -1;void*p=NULL;if(posix_memalign(&p,align,n))return -1;*out=(int64_t)(uintptr_t)p;__atomic_add_fetch(&allocations,1,__ATOMIC_RELAXED);return 0;}
+int sceKernelMapDirectMemory(void**out,size_t n,int p,int f,int64_t physical,size_t align){assert(p==3&&!f&&align==16384);if(deny_direct_map)return -1;*out=(void*)(uintptr_t)physical;__atomic_add_fetch(&maps,1,__ATOMIC_RELAXED);return 0;}
+int sceKernelMunmap(void*a,size_t n){if(deny_unmap)return -1;__atomic_add_fetch(&unmaps,1,__ATOMIC_RELAXED);return 0;}
+int sceKernelReleaseDirectMemory(int64_t p,size_t n){if(deny_release)return -1;free((void*)(uintptr_t)p);__atomic_add_fetch(&releases,1,__ATOMIC_RELAXED);return 0;}
 #define mmap fixture_mmap
 #define munmap fixture_munmap
 #define __PROSPERO__ 1
 '''
 post=r'''
 static void reset_orphans(void){for(unsigned i=0;i<64;i++)if(ps5_scratch_entries[i].state){free((void*)(uintptr_t)ps5_scratch_entries[i].physical);ps5_scratch_forget(i);}assert(!ps5_scratch_held);}
+static void* worker(void* ignored){for(int i=0;i<100;i++){void*p=ps5_core_scratch_map(16384);assert(p!=MAP_FAILED);memset(p,i,16384);assert(((unsigned char*)p)[16383]==(unsigned char)i);assert(!ps5_core_scratch_unmap(p,16384));}return NULL;}
 int main(void){
  assert(ps5_core_scratch_map(16384)==MAP_FAILED&&!allocations);enabled=1;
  errno=EDOM;void*p=ps5_core_scratch_map(16384);assert(p!=MAP_FAILED&&errno==EDOM&&ps5_scratch_held==16384);memset(p,0xa5,16384);
@@ -36,6 +37,7 @@ int main(void){
  assert(ps5_core_scratch_map(0)==MAP_FAILED&&ps5_core_scratch_map(1)==MAP_FAILED&&ps5_core_scratch_map(SIZE_MAX)==MAP_FAILED);
  void* slots[64];for(unsigned i=0;i<64;i++){slots[i]=ps5_core_scratch_map(16384);assert(slots[i]!=MAP_FAILED);}assert(ps5_core_scratch_map(16384)==MAP_FAILED);for(unsigned i=0;i<64;i++)assert(!ps5_core_scratch_unmap(slots[i],16384));assert(!ps5_scratch_held);
  p=ps5_core_scratch_map(8*1024*1024);assert(p!=MAP_FAILED&&ps5_core_scratch_map(16384)==MAP_FAILED);assert(ps5_core_scratch_unmap(p,16384)==-1&&errno==EINVAL);assert(!ps5_core_scratch_unmap(p,8*1024*1024));
+ pthread_t threads[8];for(int i=0;i<8;i++)assert(!pthread_create(&threads[i],NULL,worker,NULL));for(int i=0;i<8;i++)assert(!pthread_join(threads[i],NULL));assert(!ps5_scratch_held);
  deny_allocate=1;assert(ps5_core_scratch_map(16384)==MAP_FAILED&&!ps5_scratch_held);deny_allocate=0;
  deny_direct_map=1;assert(ps5_core_scratch_map(16384)==MAP_FAILED&&!ps5_scratch_held);deny_direct_map=0;
  p=ps5_core_scratch_map(16384);deny_unmap=1;before=releases;assert(ps5_core_scratch_unmap(p,16384)==-1&&releases==before&&ps5_scratch_held==16384);deny_unmap=0;reset_orphans();
