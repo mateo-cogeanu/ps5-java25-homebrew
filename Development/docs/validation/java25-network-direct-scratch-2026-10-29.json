@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-29",
+  "patch": "0130-opt-in-network-node-direct-scratch.patch",
+  "patch_sha256": "8c0ba5e9e12f0c3c9e2073d5b767632e60541a98b4f48531798472662ee6f51b",
+  "policy": "Independent default-off network-node direct scratch after libc/anonymous ENOMEM;64slots/8MiB per Cunit,24MiB aggregate;paired release and conservative orphan ownership",
+  "objects_sha256": {
+    "Inet4AddressImpl.o": "f0fb74942713dbf8a5e9ba8adabea2ee3785ec2bb8630d29263f2e2ff3d1ffaf",
+    "Inet6AddressImpl.o": "428f6c695d9d9546591cc0754dc3cc9d2eb5d830e69a1a72afd8e6accc1facbb",
+    "NetworkInterface.o": "cd168644a7a581a90862c4f703680a3c3829dace759335746fc6e27b2a2f5920",
+    "net_util_md.o": "08846b69850c416fd6c3565c71fdc4ec9b8b34a69184c1c30be4b7025588c92d"
+  },
+  "libnet_sha256": "65f009f8f3605b58a1602d4071232f9ac276bd2dd77a516dddabe2d5867a3ee9",
+  "checks": [
+    "PASS actual headers/default-off policy getter/setter and forced malloc/anonymous ENOMEM direct conversion-node controls,8000concurrent operations,errno/overflow/bounds/rollback/exact cleanup ASan/UBSan",
+    "PASS existing SDK DNS/results/ownership/IPv4/IPv6 conversion controls ASan/UBSan",
+    "PASS existing actual core scratch map/unmap/release failure ownership/8MiB bounds tests",
+    "PASS target java.base-libs build with LLVM_CONFIG set;two policy exports present;patch reverse application check"
+  ],
+  "console": "Pending exact consumer141 PS5 DNS/HTTPS/Fabric startup/world/save/endurance;not a console pass",
+  "consumer": "ProsperoCraft owns policy enablement/runtime pin/package;no raw game reports here;no Store release"
+}

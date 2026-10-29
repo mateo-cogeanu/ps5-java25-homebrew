@@ -187,3 +187,15 @@ existing shared256MiB/2048entrynative-directledgerfallback onlyafterENOMEM.
 Matchingunmapownership/failedgrowthpreserved;noheap/GC/globalallocator change.
 See docs/java25-emutls-direct-fallback.md. Hostfailure/lifecycle/ledger/target
 checks recorded;consumer130integration andPS5launch/world/endurancepending.
+
+## Optional native network-node scratch — 2026-10-29
+
+Patch0130 gives libnet DNS/interface conversion nodes independent default-off
+JNU_PS5SetNetworkScratchEnabled policy. Reuses0127mapper afterlibc/anonymousENOMEM,
+64slots/8MiB perInet4/Inet6/NetworkInterfaceCunit,24MiBaggregate;pairedreleaseand
+boundedretainedcleanupfailureownership,noDNSanswer/auth/heap/GC/globalallocator
+change. Consumer140reports original Inet4lookup Nativeheapallocationfailed.
+Hostactualheader/mapperASan/UBSan andexistingDNS/conversion/cleanupregressions,
+PS5java.base-libsbuild/exportschecked;actualconsolelookup/Fabric/world/savepending.
+See docs/java25-network-direct-scratch.md. Consumer141pin/enable/package belongs
+inProsperoCraft;rawreportslocal,preservefrozenmilestones/Store121.

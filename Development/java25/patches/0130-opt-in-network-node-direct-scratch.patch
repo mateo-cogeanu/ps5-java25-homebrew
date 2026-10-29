@@ -1,0 +1,57 @@
+--- a/src/java.base/unix/native/libnet/ps5NetifAlloc.h
++++ b/src/java.base/unix/native/libnet/ps5NetifAlloc.h
+@@ -6,6 +6,12 @@
+ #include <stdlib.h>
+ #include <errno.h>
+ #include <sys/mman.h>
++#ifdef __PROSPERO__
++/* Independent default-off policy; reuse the bounded temporary mapper. */
++#define JNU_PS5DirectScratchEnabled JNU_PS5NetworkScratchEnabled
++#include "ps5_core_direct_scratch.h"
++#undef JNU_PS5DirectScratchEnabled
++#endif
+ #ifndef PS5_NETIF_ALLOC_NOTE
+ #define PS5_NETIF_ALLOC_NOTE(phase,bytes) ((void)0)
+ #endif
+@@ -24,7 +30,11 @@
+         PS5_NETIF_ALLOC_NOTE("node libc refused",size);
+         size_t mapped=(bytes+page-1)&~(page-1);
+         errno=0;
++        #ifdef __PROSPERO__
++        owner=ps5_core_scratch_map(mapped);
++#else
+         owner=mmap(NULL,mapped,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
++#endif
+         if (owner==MAP_FAILED) {PS5_NETIF_ALLOC_NOTE("node mapping failed",mapped);return NULL;}
+         owner->mapped=mapped;
+         PS5_NETIF_ALLOC_NOTE("node mapped",mapped);
+@@ -35,7 +45,13 @@
+     if (!value) return;
+     int saved=errno;
+     Ps5NetifAllocation *owner=(Ps5NetifAllocation *)value-1;
+-    if (owner->mapped) munmap(owner,owner->mapped); else free(owner);
++    if (owner->mapped) {
++#ifdef __PROSPERO__
++        ps5_core_scratch_unmap(owner,owner->mapped);
++#else
++        munmap(owner,owner->mapped);
++#endif
++    } else free(owner);
+     errno=saved;
+ }
+ #endif
+--- a/src/java.base/unix/native/libnet/net_util_md.c
++++ b/src/java.base/unix/native/libnet/net_util_md.c
+@@ -46,6 +46,12 @@
+ 
+ #include "jvm.h"
+ #include "net_util.h"
++
++#ifdef __PROSPERO__
++static unsigned ps5_network_scratch_enabled;
++int JNU_PS5NetworkScratchEnabled(void){return __atomic_load_n(&ps5_network_scratch_enabled,__ATOMIC_ACQUIRE)!=0;}
++void JNU_PS5SetNetworkScratchEnabled(int enabled){__atomic_store_n(&ps5_network_scratch_enabled,enabled!=0,__ATOMIC_RELEASE);}
++#endif
+ 
+ #include "java_net_SocketOptions.h"
+ #include "java_net_InetAddress.h"

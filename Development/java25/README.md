@@ -2148,3 +2148,11 @@ Both PS5 sandbox and explicit tracing properties are required. It preserves I/O
 semantics and logs only fixed categories/class-method frames for native socket
 creation/bind/listen failures. Host collision/gating/cap checks and target Java
 compilation pass; actual PS5 failure diagnosis and hosting remain pending.
+
+## Optional network conversion scratch (0130)
+
+[Patch0130](../docs/java25-network-direct-scratch.md) adds an independent,
+default-off direct-memory fallback for DNS/interface conversion nodes after
+libc and anonymous ENOMEM. Consumers enable it before JVM startup; three
+64-slot/8MiB ledgers remain bounded. Host allocation/ownership controls and
+target build checks do not establish PS5 lookup/gameplay acceptance.
