@@ -167,3 +167,13 @@ concurrency and actual disabled verifier tests pass; target rebuild and PS5
 Fabric/world/endurance validation recorded separately. Reusable patch here;
 consumer126 explicit enablement/integration in ProsperoCraft. See
  docs/java25-verifier-small-reserve.md. No frozen milestone or Store pass implied.
+
+## Variable-sized verifier reserve — 2026-10-29
+
+Runtime129 extends opt-in128's fixed4MiB arena to contiguous256byte unit runs,
+so originalMatrix4f verifier2048byteCCinit and larger buffers fit without one
+mapping per request. Defaultoff/mallocfirst/anonymousfallback remain. Real
+publisherJOML classes pass fulllegacyverification with malloc+mmapdenied;
+bounds,wholearena reuse,concurrency and targetbuild checked. See
+ docs/java25-verifier-variable-reserve.md. Consumer127 integration separate;
+PS5Fabric launch/world/endurancepending. Underlying libc refusal unproven.

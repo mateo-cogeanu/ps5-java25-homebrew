@@ -125,3 +125,7 @@ Development runtime 127 adds an opt-in bounded direct-memory fallback for tempor
 Optional runtime128 [verifier small-allocation reserve](docs/java25-verifier-small-reserve.md)
 reduces page waste after native libc allocation failures. It remains disabled
 by default; console consumer validation is pending.
+
+Runtime129 extends the optional [verifier reserve to variable-sized buffers](docs/java25-verifier-variable-reserve.md).
+Actual class verification succeeds on host with both ordinary allocation routes
+disabled; PS5 consumer validation remains pending.

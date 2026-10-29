@@ -1,0 +1,72 @@
+--- a/src/java.base/share/native/libverify/ps5_verify_alloc.h
++++ b/src/java.base/share/native/libverify/ps5_verify_alloc.h
+@@ -13,8 +13,8 @@
+ typedef union { size_t mapped; max_align_t alignment; } VerifyNativeHeader;
+ /* Process-wide sampling avoids C TLS or allocator-dependent initialization. */
+ static unsigned long long verify_native_map_successes;
+-/* Opt-in small-buffer reserve: avoid one 16KiB VM mapping per tiny name or
+- * cleanup node when libc refuses allocations. Fixed BSS, no lazy allocator. */
++/* Opt-in bounded verifier arena: contiguous 256-byte units serve both tiny
++ * names and large class/method scratch after libc refusal. Fixed BSS. */
+ static unsigned verify_small_enabled;
+ void JNU_PS5SetVerifierSmallReserveEnabled(int enabled) {
+     __atomic_store_n(&verify_small_enabled, enabled != 0, __ATOMIC_RELEASE);
+@@ -22,6 +22,7 @@
+ static union { max_align_t alignment; unsigned char bytes[256]; } verify_small[16384];
+ static uint32_t verify_small_used[512];
+ static unsigned verify_small_lock, verify_small_next;
++static unsigned short verify_small_runs[16384];
+ static void verify_small_acquire(void) {
+     while (__atomic_exchange_n(&verify_small_lock, 1, __ATOMIC_ACQUIRE)) {}
+ }
+@@ -29,18 +30,26 @@
+     __atomic_store_n(&verify_small_lock, 0, __ATOMIC_RELEASE);
+ }
+ static void *verify_small_allocate(size_t bytes) {
+-    if (bytes > sizeof(verify_small[0]) || !__atomic_load_n(&verify_small_enabled, __ATOMIC_ACQUIRE)) return NULL;
++    if (bytes > sizeof(verify_small) || !bytes ||
++        !__atomic_load_n(&verify_small_enabled, __ATOMIC_ACQUIRE)) return NULL;
++    unsigned need = (unsigned)((bytes + 255) / 256);
+     void *result = NULL;
+     verify_small_acquire();
+-    for (unsigned n = 0; n < 512; ++n) {
+-        unsigned word = (verify_small_next + n) % 512;
+-        uint32_t available = ~verify_small_used[word];
+-        if (available) {
+-            unsigned bit = (unsigned)__builtin_ctz(available);
+-            verify_small_used[word] |= (uint32_t)1 << bit;
+-            verify_small_next = word;
+-            result = &verify_small[word * 32 + bit];
+-            break;
++    /* Second pass covers the entire arena so a free run crossing the search
++     * cursor is not lost. Runs never wrap across the arena boundary. */
++    for (unsigned pass = 0; pass < 2 && !result; ++pass) {
++        unsigned run = 0;
++        for (unsigned slot = pass ? 0 : verify_small_next; slot < 16384; ++slot) {
++            if (verify_small_used[slot / 32] & ((uint32_t)1 << (slot % 32))) run = 0;
++            else if (++run == need) {
++                unsigned first = slot + 1 - need;
++                for (unsigned i = first; i <= slot; ++i)
++                    verify_small_used[i / 32] |= (uint32_t)1 << (i % 32);
++                verify_small_runs[first] = (unsigned short)need;
++                verify_small_next = (slot + 1) % 16384;
++                result = &verify_small[first];
++                break;
++            }
+         }
+     }
+     verify_small_unlock();
+@@ -53,7 +62,12 @@
+     if (offset % sizeof(verify_small[0])) return 1;
+     unsigned slot = (unsigned)(offset / sizeof(verify_small[0]));
+     verify_small_acquire();
+-    verify_small_used[slot / 32] &= ~((uint32_t)1 << (slot % 32));
++    unsigned count = verify_small_runs[slot];
++    if (count && count <= 16384 - slot) {
++        for (unsigned i = slot; i < slot + count; ++i)
++            verify_small_used[i / 32] &= ~((uint32_t)1 << (i % 32));
++        verify_small_runs[slot] = 0;
++    }
+     verify_small_unlock();
+     return 1;
+ }
