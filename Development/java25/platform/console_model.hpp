@@ -7,19 +7,36 @@ enum class Model { unknown, standard, pro };
 enum class Status { unavailable, failed, malformed, unrecognized, recognized };
 struct Result { Model model=Model::unknown; Status status=Status::unavailable; int native_result=0; };
 using Query=int(*)(char*);
-// Optional lookup in the already-loaded kernel only. SDK rtld uses handle1 or0x2001
-// for different process types. Never load libkernel_sys or trust failed outputs.
+// Query only loaded modules; no dlopen or system-library startup dependency.
 using Resolver=int(*)(int,const char*,void**);
-struct Resolution {Query query=nullptr;int handle=-1;int native_result=-1;};
-inline Resolution resolve_loaded_query(Resolver resolve) {
+using ModuleList=int(*)(int*,std::size_t,std::size_t*);
+struct Lookup {int handle=-1,name_result=-1,nid_result=-1;bool name_pointer=false,nid_pointer=false;};
+struct Resolution {
+ Query query=nullptr;int handle=-1,native_result=-1,list_result=-1;bool by_nid=false;
+ std::size_t module_count=0,attempt_count=0,record_count=0;Lookup records[8]{};
+};
+inline Resolution resolve_loaded_query(Resolver resolve,ModuleList list=nullptr) {
  Resolution out;if(!resolve)return out;
- const int handles[]={1,0x2001};
- for(int handle:handles){
-  void* probe=nullptr;int rc=resolve(handle,"sceKernelDlsym",&probe);
-  if(rc!=0||!probe)continue;
-  void* address=nullptr;rc=resolve(handle,"sceKernelGetHwModelName",&address);
-  out.native_result=rc;
-  if(rc==0&&address){out.query=reinterpret_cast<Query>(address);out.handle=handle;return out;}
+ int handles[514]={1,0x2001};std::size_t count=2,listed=0;
+ if(list){out.list_result=list(handles+2,512,&listed);out.module_count=listed;
+  if(out.list_result==0&&listed<=512)count+=listed;}
+ for(std::size_t i=0;i<count;i++){
+  int handle=handles[i];if(handle<0)continue;
+  bool duplicate=false;for(std::size_t j=0;j<i;j++)if(handles[j]==handle)duplicate=true;
+  if(duplicate)continue;
+  Lookup row;row.handle=handle;void* address=nullptr;
+  row.name_result=resolve(handle,"sceKernelGetHwModelName",&address);row.name_pointer=address!=nullptr;
+  if(row.name_result==0&&address){out.query=reinterpret_cast<Query>(address);out.handle=handle;out.native_result=0;}
+  else {
+   address=nullptr;
+   // SDK nid_encode(name): SHA1(name+salt), reversed first8bytes, PS base64.
+   row.nid_result=resolve(handle,"JC7I7J1bllQ",&address);row.nid_pointer=address!=nullptr;
+   if(row.nid_result==0&&address){out.query=reinterpret_cast<Query>(address);out.handle=handle;out.native_result=0;out.by_nid=true;}
+   else out.native_result=row.nid_result;
+  }
+  out.attempt_count++;
+  if(out.record_count<8)out.records[out.record_count++]=row;
+  if(out.query)return out;
  }
  return out;
 }
@@ -32,6 +49,11 @@ inline Model classify(const char* text,std::size_t capacity) {
  if(n<8||n>13||std::memcmp(text,"CFI-",4))return Model::unknown;
  for(unsigned i=4;i<8;i++)if(text[i]<'0'||text[i]>'9')return Model::unknown;
  std::size_t i=8;
+ // Native model example: CFI-2014 A01X. Only a bounded retail revision suffix.
+ if(i<n&&text[i]==' '){
+  if(n!=13||(text[9]!='A'&&text[9]!='B')||text[10]<'0'||text[10]>'9'||text[11]<'0'||text[11]>'9'||text[12]!='X')return Model::unknown;
+  i=n;
+ }
  if(i<n&&(text[i]=='A'||text[i]=='B'))i++;
  if(i<n&&text[i]=='-')i++;
  if(i<n){if(n-i!=2||text[i]<'0'||text[i]>'9'||text[i+1]<'0'||text[i+1]>'9')return Model::unknown;i+=2;}
