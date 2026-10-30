@@ -1,7 +1,0 @@
-{
-  "date": "2026-10-12",
-  "version": "01.000.023",
-  "console_jvm_startup": "PASS",
-  "console_hello25": "PASS",
-  "console_vm_shutdown": "PASS"
-}

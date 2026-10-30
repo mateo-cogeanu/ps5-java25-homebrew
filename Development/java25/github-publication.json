@@ -2,36 +2,26 @@
   "repository": "https://github.com/mateo-cogeanu/ps5-java25-homebrew",
   "checkout": ".tools/github-publish/ps5-java25-homebrew",
   "development_folder": "Development",
-  "milestones": {
-    "JVM_Startup": {
-      "version": "01.000.023",
-      "console": "ALL PASS",
-      "release_tag": "JVM_Startup-v01.000.023"
-    },
-    "IO_Probe": {
-      "version": "01.000.004",
-      "console": "ALL PASS",
-      "release_tag": "IO_Probe-v01.000.004"
-    },
-    "ZIP_JAR_Probe": {
-      "version": "01.000.000",
-      "console": "ALL PASS",
-      "release_tag": "ZIP_JAR_Probe-v01.000.000"
-    },
-    "Network_Probe": {
-      "version": "01.000.003",
-      "console": "ALL PASS",
-      "release_tag": "Network_Probe-v01.000.003"
-    },
-    "LAN_DNS_Probe": {
-      "version": "01.000.000",
-      "console": "ALL PASS",
-      "release_tag": "LAN_DNS_Probe-v01.000.000"
-    }
-  },
-  "publication_rule": "Sync every completed set of development changes; freeze a new milestone only after user confirms ALL PASS on PS5.",
+  "publication_rule": "Sync completed active development changes. Freeze exact PS5-passing source in the separate archive with provenance; preserve existing release assets and tags.",
   "minecraft_repository": {
     "repository": "https://github.com/mateo-cogeanu/ProsperoCraft",
-    "scope": "Minecraft-specific project; currently project documentation; runtime development stays here"
-  }
+    "scope": "Active Minecraft consumer, launcher, game-specific harnesses and validation; runtime development stays here"
+  },
+  "history_archive": {
+    "repository": "https://github.com/mateo-cogeanu/ps5-homebrew-history",
+    "commit": "aa7db35ee9aa5cc6515f49b23ebda6d1ecfcf91d",
+    "manifest_sha256": "ce9c4641f9864ffd969fe8d44f82bdb42de536e4e4d2c0ba6d790786c6e4ddcd",
+    "runtime_snapshots": [
+      "Advanced_Network_Probe",
+      "Dependency_Probe",
+      "IO_Probe",
+      "Inbound_LAN_Probe",
+      "JVM_Startup",
+      "LAN_DNS_Probe",
+      "LAN_Endurance_Probe",
+      "Network_Probe",
+      "ZIP_JAR_Probe"
+    ]
+  },
+  "milestone_index": "https://github.com/mateo-cogeanu/ps5-homebrew-history/tree/aa7db35ee9aa5cc6515f49b23ebda6d1ecfcf91d/runtime"
 }

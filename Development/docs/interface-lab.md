@@ -111,7 +111,7 @@ confirmed that 01.001.002 runs and responds well on their PS5.
 The target is Minecraft Java Edition, Fabric/Forge support, and a Minecraft
 server. All six initial platform tests passed on the user's console. HotSpot
 and java.base now cross-build successfully, but JVM startup on PS5 remains
-untested. See [java25/README.md](java25/README.md) for the pinned
+untested. See [java25/README.md](../java25/README.md) for the pinned
 source, build blocker, milestones, and console probe instructions.
 
 `make java25-probe` builds the separate `dist/PPSA99862/` title folder and
