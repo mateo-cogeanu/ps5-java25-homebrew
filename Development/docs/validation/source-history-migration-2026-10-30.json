@@ -50,11 +50,343 @@
     "consumer_startup_host": "PASS CPU property handoff, launch policy, observer/transition sampling, bytecode sequencing, GC logging, real LWJGL allocator and unchanged original host Main reaching expected missing-host-native exit253. No host menu pass.",
     "original_release153": "PASS original package CRC/identity/privacy/dependency/notices, exact normal/replacement OpenAL native relinks and shipped snapshot defaults; unchanged release package SHA256 07f3e3b2bed254ffd3c6b42cefca66892f6f48d61d2f2ba512944e959b4ce4b0.",
     "fresh_consumer": "PASS isolated full build_current_client.py pipeline: pinned native preparation, graphics prerequisites, current Java/runtime/native integration, metadata153 and signing/package container checks. Final STB cache-path canonicalization repackage succeeds.",
-    "cleaned_consumer_package": "PASS full strict package suite in cleaned canonical consumer checkout; isolated rebuild package suite pending final repeat.",
-    "documentation_links": "PASS all active local Markdown targets,59 archive Markdown destinations verified in independent clone,HTTP200 archive/runtime latest-passing release/consumer153 release.",
-    "publication_idempotence": "PENDING post-push repeat sync",
-    "active_git_diff_check": "PASS consumer staged and unstaged diffs; runtime final staged check pending sync.",
-    "fresh_build_check_package_sha256": "bb9c4bbf38f037d480590dcfe3a9881281b92528acf571a68598e5854d0720fd"
+    "cleaned_consumer_package": "PASS full unchanged strict package suite in both cleaned canonical checkout and isolated rebuilt checkout. CRC/signatures,identity,deps,19resident groups,symbol/constructor policy,original JAR hashes,all frozen regression inputs and required notices checked.",
+    "documentation_links": "PASS all maintained first-party Markdown targets,59 archive links in independent clone,HTTP200 archive/runtime release/consumer153 release. Original hash-pinned toolkit documentation retains 81 pre-existing links to omitted upstream sample/runtime files; unchanged from baseline,listed separately.",
+    "publication_idempotence": "PASS runtime sync pushed6ab44034fd2b0c6e5184cfdbd5b0df72fee393c0; immediate repeat sync created no commit, working tree clean, all9 archived runtime folders remain absent.",
+    "active_git_diff_check": "PASS runtime sync staged git diff --check gate and consumer staged/unstaged git diff --check.",
+    "fresh_build_check_package_sha256": "bb9c4bbf38f037d480590dcfe3a9881281b92528acf571a68598e5854d0720fd",
+    "release_preservation": "PASS complete runtime and consumer GitHub release metadata/asset inventories compare unchanged before/after source migration.",
+    "pre_existing_vendored_links": [
+      {
+        "document": "client/launcher/toolkit/docs/COMPONENTS.md",
+        "relative_target": "../src/concepts/components/lists_page.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/COMPONENTS.md",
+        "relative_target": "../src/concepts/components/data_page.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/COMPONENTS.md",
+        "relative_target": "../src/concepts/components/layout_page.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/aurora.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/paper.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/neon.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/editorial.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/carousel.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/radial.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/hud.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/dashboard.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/player.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/keyboard.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/constellation.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/terminal.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/store.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/trophies.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/files.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/inventory.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/boot.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/settings.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/themes.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/components.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/toolbox.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/aurora.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/aurora_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/paper.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/paper_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/neon.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/neon_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/editorial.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/editorial_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/carousel.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/carousel_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/radial.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/radial_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/hud.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/hud_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/dashboard.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/dashboard_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/player.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/player_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/keyboard.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/keyboard_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/constellation.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/constellation_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/terminal.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/terminal_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/store.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/store_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/trophies.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/trophies_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/files.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/files_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/inventory.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/inventory_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/boot.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/boot_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/settings.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/settings_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/themes.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/concepts_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/components.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/concepts_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../src/concepts/toolbox.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/DESIGNS.md",
+        "relative_target": "../tests/unit/concepts_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/components/collections.md",
+        "relative_target": "../../src/concepts/components/collections_page.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/components/collections.md",
+        "relative_target": "../../tests/unit/components_collections_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/components/layout.md",
+        "relative_target": "../../src/concepts/components/layout_page.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/components/layout.md",
+        "relative_target": "../../tests/unit/components_layout_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/components/lists.md",
+        "relative_target": "../../src/concepts/components/lists_page.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/components/lists.md",
+        "relative_target": "../../tests/unit/components_list_test.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/platform/CONFIGURATION.md",
+        "relative_target": "../../sce_sys/param.json"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/platform/README.md",
+        "relative_target": "../../src/platform/ps5/display_egl.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/platform/RUNTIME_SHIM.md",
+        "relative_target": "../../tooling/native/libc_builder.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/platform/RUNTIME_SHIM.md",
+        "relative_target": "../../tooling/native/runtime/api-surface.txt"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/platform/RUNTIME_SHIM.md",
+        "relative_target": "../../tooling/native/runtime/imports.txt"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/platform/RUNTIME_SHIM.md",
+        "relative_target": "../../tooling/native/self_container.cpp"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/platform/RUNTIME_SHIM.md",
+        "relative_target": "../../tools/rebuild-libc.sh"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/platform/RUNTIME_SHIM.md",
+        "relative_target": "../../tools/rebuild-libc.ps1"
+      },
+      {
+        "document": "client/launcher/toolkit/docs/platform/RUNTIME_SHIM.md",
+        "relative_target": "../../runtime/libc.prx.sha256"
+      }
+    ],
+    "tracked_file_audit": {
+      "runtime_files": 473,
+      "consumer_files": 1483,
+      "result": "PASS no compiled packages/game JARs/caches/raw logs; maintained local Markdown targets resolve. Vendor subset exceptions preserved as exact upstream input."
+    }
   },
   "verification_isolation": "Fresh runtime source/configuration/object outputs and fresh consumer checkout/build/dist. Reused revision/hash-checked SDK/source/download caches, not old project source/build outputs. Preserved immutable local milestone ZIPs explicitly linked as regression test inputs; tests check their expected hashes. No removed frozen source folder supplied the clean build.",
   "console_validation": "No new PS5 acceptance claimed. Exact rebuilt153 runtime/native/audio/input/world/save/lifecycle and endurance regressions remain pending; Fabric26.2 stays held. Previously recorded passing snapshots and release identities are unchanged.",

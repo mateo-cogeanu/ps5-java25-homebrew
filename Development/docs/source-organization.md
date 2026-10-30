@@ -57,3 +57,5 @@ Consumer changes are committed directly to ProsperoCraft. Historical source is m
 For recovery, clone the pinned archive, run `python3 verify.py`, then use its manifest to locate the original source commit and destination. Original release download URLs remain authoritative. Archived Markdown is byte-preserved, so old relative cross-repository links or historical absolute workspace paths may require consulting the provenance record. Active Markdown snapshot links point directly to the pinned archive. Raw console reports remain local.
 
 See [migration validation](validation/source-history-migration-2026-10-30.json) for measured build results and remaining limitations. Compilation and host testing do not establish PS5 gameplay acceptance.
+
+The consumer includes a hash-pinned subset of upstream toolkit documentation. Its 81 pre-existing relative links to omitted sample/runtime files remain byte-preserved with that upstream source input; consult the [complete pinned toolkit tree](https://github.com/mihawk-99/PS5_VKHomebrewUI/tree/2188642afbcc8d84d36149124f3d9e39dc1b1a05). These are distinct from maintained project/archive links, which resolve.
