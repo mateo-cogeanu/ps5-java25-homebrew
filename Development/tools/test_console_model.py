@@ -26,7 +26,13 @@ static int modules(int* handles,std::size_t count,std::size_t* actual){
  assert(count==512);if(list_mode==3){for(int i=0;i<512;i++)handles[i]=100+i;*actual=512;return 0;}handles[0]=1;handles[1]=0x2001;handles[2]=-1;handles[3]=77;handles[4]=77;
  *actual=list_mode==2?513:5;return list_mode==1?-4:0;
 }
+static unsigned long long soc=0;static unsigned long long soc_query(){return soc;}
 int main(){
+ assert(read_soc(nullptr).model==Model::unknown);
+ soc=0x840fd0;assert(read_soc(soc_query).model==Model::pro);
+ soc=0x840f00;assert(read_soc(soc_query).model==Model::standard);
+ for(auto id:{0ULL,1ULL,0x80020003ULL,0xffffffffff840fd0ULL,0x940fd0ULL}){soc=id;auto r=read_soc(soc_query);assert(r.model==Model::unknown&&r.id==id);}
+
  assert(!resolve_loaded_query(nullptr).query);
  assert(!resolve_loaded_query(resolver).query);
  mode=1;auto loaded=resolve_loaded_query(resolver);assert(loaded.query==query&&loaded.handle==1);assert(read(loaded.query).model==Model::pro);

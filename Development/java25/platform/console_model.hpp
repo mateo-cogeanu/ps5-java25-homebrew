@@ -74,6 +74,18 @@ inline Result read(Query query) {
  out.status=out.model==Model::unknown?Status::unrecognized:Status::recognized;
  return out;
 }
+// Native PS5-only SoC query; never CPU-brand, GPU-name or firmware inference.
+// PS5Dev/Byepervisor-Reborn uses 0x840fd0 for Pro and other PS5 SoCs for base.
+// Restrict that split to the PS5 signature family; reject errors/unknown families.
+using SocQuery=unsigned long long(*)();
+struct SocResult { Model model=Model::unknown; unsigned long long id=0; };
+inline SocResult read_soc(SocQuery query) {
+ SocResult out;if(!query)return out;
+ out.id=query();
+ if((out.id&~0xffULL)==0x840f00ULL)
+  out.model=out.id==0x840fd0ULL?Model::pro:Model::standard;
+ return out;
+}
 inline const char* name(Model model) {
  switch(model){case Model::standard:return "PlayStation 5";case Model::pro:return "PlayStation 5 Pro";default:return "PlayStation 5 (model unknown)";}
 }
