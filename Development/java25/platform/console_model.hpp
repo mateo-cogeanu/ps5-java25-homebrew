@@ -7,6 +7,22 @@ enum class Model { unknown, standard, pro };
 enum class Status { unavailable, failed, malformed, unrecognized, recognized };
 struct Result { Model model=Model::unknown; Status status=Status::unavailable; int native_result=0; };
 using Query=int(*)(char*);
+// Optional lookup in the already-loaded kernel only. SDK rtld uses handle1 or0x2001
+// for different process types. Never load libkernel_sys or trust failed outputs.
+using Resolver=int(*)(int,const char*,void**);
+struct Resolution {Query query=nullptr;int handle=-1;int native_result=-1;};
+inline Resolution resolve_loaded_query(Resolver resolve) {
+ Resolution out;if(!resolve)return out;
+ const int handles[]={1,0x2001};
+ for(int handle:handles){
+  void* probe=nullptr;int rc=resolve(handle,"sceKernelDlsym",&probe);
+  if(rc!=0||!probe)continue;
+  void* address=nullptr;rc=resolve(handle,"sceKernelGetHwModelName",&address);
+  out.native_result=rc;
+  if(rc==0&&address){out.query=reinterpret_cast<Query>(address);out.handle=handle;return out;}
+ }
+ return out;
+}
 // Only documented retail CFI families. Unknown revisions/devkits stay unknown.
 inline Model classify(const char* text,std::size_t capacity) {
  if(!text)return Model::unknown;
