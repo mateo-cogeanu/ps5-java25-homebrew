@@ -46,3 +46,40 @@ def read_aliases(values, names):
             raise ValueError('Invalid, duplicate or unknown resident alias')
         used.add(alias); result[alias] = target
     return result
+
+
+def read_alias_symbols(values, aliases):
+    """Opt-in lookup overrides on an explicit alias, within its existing group."""
+    result = {}
+    for value in values:
+        match = re.fullmatch(r'([^:=]+):([A-Za-z_][A-Za-z0-9_]*)=([A-Za-z_][A-Za-z0-9_]*)', value)
+        if not match or match[1] not in aliases:
+            raise ValueError('Alias symbol requires known_alias:export=resident_symbol')
+        alias, export, replacement = match.groups()
+        if export.startswith(('JNI_', 'JVM_', 'Java_')) or replacement.startswith(('JNI_', 'JVM_', 'Java_')):
+            raise ValueError('Alias symbol override cannot change JNI/JVM lifecycle or entrypoints')
+        group = result.setdefault(alias, {})
+        if export in group:
+            raise ValueError('Duplicate alias symbol override')
+        group[export] = replacement
+    return result
+
+
+def alias_symbol_entries(entries, overrides):
+    """Copy a generated alias table, resolving only actual exports of its group."""
+    addresses = {}
+    for entry in entries:
+        match = re.fullmatch(r'\{"([A-Za-z_][A-Za-z0-9_]*)", reinterpret_cast<void \*>\(&([A-Za-z_][A-Za-z0-9_]*)\)\}', entry)
+        if not match:
+            raise ValueError('Invalid generated resident table entry')
+        addresses[match[1]] = match[2]
+    if any(export not in addresses or replacement not in addresses for export, replacement in overrides.items()):
+        raise ValueError('Alias symbol override must name two actual exports in the same resident group')
+    result = []
+    for entry in entries:
+        name = entry.split('"', 2)[1]
+        if name in overrides:
+            result.append('{"'+name+'", reinterpret_cast<void *>(&'+addresses[overrides[name]]+')}')
+        else:
+            result.append(entry)
+    return result

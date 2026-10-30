@@ -231,3 +231,14 @@ Frozen top-level milestone sources now live in https://github.com/mateo-cogeanu/
 ## Explicit release approval gate — 2026-10-30
 
 The user requires physical-console confirmation that the exact build works before creating any further GitHub release, including development prereleases. Continue authorized source commits/pushes and local test builds, but do not create a release until the user confirms that build works. This supersedes earlier practice of publishing unvalidated hardware-test prereleases. Remove only the three specifically identified 154/155/156 hardware-test releases; all other releases/assets, including 153, remain preserved. Local test artifacts and source tags for the withdrawn releases stay retained.
+
+## Optional resident alias symbol lookup — 2026-10-30
+
+The runtime registry supports explicit --alias-symbol Alias:export=resident_symbol
+on a known resident alias. Both functions must be actual exports in its existing
+group; defaults/base tables unchanged, no loader/newobjects/platformspoofing.
+Schema/duplicates/missing/crossgroup/JNIentrypoint rejection and actual generated
+hosttable calls tested. Consumer owns ABI correctness; generator cannot infer C
+signatures. See docs/java25-resident-alias-symbols.md. ProsperoCraft SDL3 event
+facade/isolation/physicalhandoff belongs in consumer;target+console validation
+recorded separately. Preserve frozen snapshots and release/Store hold.

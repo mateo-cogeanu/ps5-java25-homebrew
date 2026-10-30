@@ -40,3 +40,25 @@ for values in [['dot..name=consumer'],['quote\"=consumer'],['bad'],['../SDL=cons
  try:read_aliases(values,{'consumer'});raise AssertionError('invalid alias accepted')
  except ValueError:pass
 print('PASS explicit alias schema/known target/unique name/path rejection; no additional native objects')
+
+from java25_resident_libraries import read_alias_symbols, alias_symbol_entries
+aliases={'ConsumerAlias':'consumer'}
+overrides=read_alias_symbols(['ConsumerAlias:poll=private_poll'],aliases)
+entries=['{"poll", reinterpret_cast<void *>(&real_poll)}','{"private_poll", reinterpret_cast<void *>(&scoped_poll)}','{"other", reinterpret_cast<void *>(&other)}']
+remapped=alias_symbol_entries(entries,overrides['ConsumerAlias'])
+assert remapped[0]=='{"poll", reinterpret_cast<void *>(&scoped_poll)}'
+assert entries[0]=='{"poll", reinterpret_cast<void *>(&real_poll)}' and remapped[1:]==entries[1:]
+assert alias_symbol_entries(entries,{})==entries
+for values in [['consumer:poll=private_poll'],['Absent:poll=private_poll'],['ConsumerAlias:poll=missing','ConsumerAlias:poll=private_poll'],['ConsumerAlias:JNI_OnLoad=private_poll'],['ConsumerAlias:poll=Java_Fake'],['ConsumerAlias:poll=bad-name'],['ConsumerAlias:poll=bad;code']]:
+ try:read_alias_symbols(values,aliases);raise AssertionError('invalid override accepted')
+ except ValueError:pass
+for value in [{'missing':'private_poll'},{'poll':'other_library_symbol'}]:
+ try:alias_symbol_entries(entries,value);raise AssertionError('unknown export accepted')
+ except ValueError:pass
+# Compile and call the exact generated table expressions: alias-only redirection.
+with tempfile.TemporaryDirectory(prefix='alias-symbol-')as folder:
+ w=Path(folder);p=w/'check.cpp'
+ p.write_text('#include <cassert>\nint real_poll(){return 1;}int scoped_poll(){return 2;}int other(){return 3;}struct Symbol{const char*name;void*address;};\nstatic Symbol base[]={'+','.join(entries)+'};\nstatic Symbol alias[]={'+','.join(remapped)+'};\nint main(){assert(reinterpret_cast<int(*)()>(base[0].address)()==1);assert(reinterpret_cast<int(*)()>(alias[0].address)()==2);assert(reinterpret_cast<int(*)()>(alias[2].address)()==3);}\n')
+ subprocess.run(['clang++','-std=c++17','-fsanitize=address,undefined',str(p),'-o',str(w/'check')],check=True)
+ subprocess.run([str(w/'check')],check=True)
+print('PASS opt-in alias lookup redirection: actual compiled table calls,base/default/unrelated entries preserved,knownalias/samegroup actualexports/schema/duplicate/JNIentrypoint rejection;ASanUBSan')
