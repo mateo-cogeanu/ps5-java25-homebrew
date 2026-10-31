@@ -1,0 +1,29 @@
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -909,7 +909,10 @@
+ #ifdef __PROSPERO__
+     // CompilerThread is a JavaThread with the same entry/guard/exit contract.
+     // Keep its requested stack size and the existing owned-stack lifecycle.
+-    if (ret == EAGAIN && errno == ENOMEM &&
++    // pthread_create returns its error directly; errno can be stale or zero.
++    // A bounded custom-stack retry still uses the real native create and cannot
++    // bypass a process thread quota. Other errors and thread kinds stay excluded.
++    if (ret == EAGAIN &&
+         (thr_type == java_thread || thr_type == compiler_thread)) {
+       ret=ps5_thread_stacks::create(&tid,stack_size,(void*(*)(void*))thread_native_entry,thread);
+     }
+--- a/src/hotspot/share/runtime/ps5ThreadStacks.hpp
++++ b/src/hotspot/share/runtime/ps5ThreadStacks.hpp
+@@ -56,10 +56,10 @@
+ }
+ inline int create(pthread_t* thread,size_t bytes,void*(*function)(void*),void* argument){
+  int saved=errno;
+- if(!__atomic_load_n(available(),__ATOMIC_ACQUIRE)||!bytes||bytes%ps5_native_direct::page_bytes||bytes>stack_budget){errno=saved;return EAGAIN;}
++ if(!__atomic_load_n(available(),__ATOMIC_ACQUIRE)||!bytes||bytes%ps5_native_direct::page_bytes||bytes>stack_budget){ps5_vm_trace_values("PS5 direct stack rejected: available=",__atomic_load_n(available(),__ATOMIC_ACQUIRE)," requested=",bytes," budget=",stack_budget);errno=saved;return EAGAIN;}
+  lock();Slot* s=nullptr;
+  if(bytes<=stack_budget-*held())for(unsigned i=0;i<capacity;++i)if(slots()[i].valid&&slots()[i].state==0){s=&slots()[i];s->state=1;*held()+=bytes;break;}
+- unlock();if(!s){errno=saved;return EAGAIN;}
++ size_t reserved=*held();unlock();if(!s){ps5_vm_trace_values("PS5 direct stack exhausted: held=",reserved," requested=",bytes," budget=",stack_budget);errno=saved;return EAGAIN;}
+  s->bytes=bytes;s->memory=ps5_native_direct::map(bytes,ps5_native_direct::page_bytes,false,true);s->entry=function;s->argument=argument;__atomic_store_n(&s->done,0u,__ATOMIC_RELAXED);
+  void* mapped=s->memory;
+  if(mapped!=MAP_FAILED)memset(mapped,0,bytes);

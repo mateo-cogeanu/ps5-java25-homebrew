@@ -532,5 +532,13 @@
     ],
     "console": "Pending PS5 Controlify loading/compression/worldcreation/save/reload/audio/regression;not aconsole pass",
     "consumer": "143menu confirmed byuser;Controlify andDeflater fail findBuiltinLibOOM;144integration inProsperoCraft;rawreportslocal,noStore/frozenmilestone"
+  },
+  "pthread_return_stack_fallback": {
+    "date": "2026-10-31",
+    "patch": "0133-pthread-return-stack-fallback.patch",
+    "patch_sha256": "b8777f872310065980f9c3bf4e13ebf489acf47f8691d7f3be364cfc6e160458",
+    "os_bsd_object_sha256": "8408eb1e5e9ff71b2eb86ddb7eecabfa2a5fb14bb40dd8727c180c6c46db9d25",
+    "checks": "PASS extracted gate matrix and actual direct stack1024KiB lifecycle/fault ASan/UBSan; target HotSpot build",
+    "console": "Consumer171 native thread EAGAIN reproduced; exact resource cause unproven;172 recovery/world/shader/save/voice/endurance pending"
   }
 }

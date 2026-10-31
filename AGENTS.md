@@ -275,3 +275,13 @@ nested exception checks with setter refusal plus target symbol audit pass;
 PS5 world/voice/error recovery/save/endurance pending. AudioOut cause unresolved.
 See docs/java25-cxxabi-compiler-tls.md. Consumer integration separate, raw logs
 local, preserve frozen history and release/Store gate.
+
+## Returned pthread error stack fallback — 2026-10-31
+
+Patch0133 removes errno dependence from PS5 Java/compiler EAGAIN owned-stack
+retry. Native pthread return controls it; unchanged64slots/32MiB/requested sizes,
+realcreate/quota/ledger/join/failedcleanup semantics. Adds rejection/budget trace.
+Consumer171 Sodium/Vitrail EAGAIN+OOM observed; live VMtrace denied, exact cause
+unproven. Hostgate/actual1024KiB lifecycle+faulttests,targetHotSpotpass;172world,
+shader on/off,save,voice,endurancepending. See docs/java25-pthread-return-stack-fallback.md.
+Publish runtime+consumer integration separately; no release/Store or frozen pass.
