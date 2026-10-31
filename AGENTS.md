@@ -285,3 +285,14 @@ Consumer171 Sodium/Vitrail EAGAIN+OOM observed; live VMtrace denied, exact cause
 unproven. Hostgate/actual1024KiB lifecycle+faulttests,targetHotSpotpass;172world,
 shader on/off,save,voice,endurancepending. See docs/java25-pthread-return-stack-fallback.md.
 Publish runtime+consumer integration separately; no release/Store or frozen pass.
+
+## Optional owned thread-stack budget — 2026-10-31
+
+0134 bootstrap-only JVM_PS5SetExtendedThreadStackBudgetEnabled selects64MiB;
+default32MiB/64slots unchanged,lateEBUSY,serializedfreeze,noallocationinsetter.
+Full171trace retrieved viaSafariHTTP shows32MiBlive and8nativeEAGAINattempts
+beforeemergencyshutdown;errno gate133notthisrun'scause,nativeallocatorrefusal
+unresolved.172explicitlyenables. Actualhostdefault32reject/extended33concurrent
+1MiBthreads,joinedreclaim,TLS/fault/budgettests,targetHotSpotpass;PS5world/shader/
+save/voice/endurancepending. See docs/java25-thread-stack-budget.md. Shared256MiB
+nativeledger,requestedstacks,realnativecreate/quotas,conservativecleanupretained.

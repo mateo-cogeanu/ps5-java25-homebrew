@@ -26,3 +26,8 @@ stack host tests pass220 lifecycles, TLS destructor/join-before-free, refusal,
 cleanup failures and budget controls under ASan/UBSan. Target HotSpot rebuild
 passes. PS5 world entry with shaders on/off, save/reload, voice and endurance are
 pending. Raw reports remain local; no release or Store approval implied.
+
+Follow-up: Safari HTTP retrieval succeeded. The complete171 native trace reaches
+32MiB of live owned stacks with eight further native refusals before emergency
+shutdown. The old errno gate did run in that trace (errno ENOMEM); it is not the
+observed cause. See [opt-in budget134](java25-thread-stack-budget.md).

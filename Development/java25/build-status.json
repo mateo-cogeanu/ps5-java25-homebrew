@@ -537,8 +537,18 @@
     "date": "2026-10-31",
     "patch": "0133-pthread-return-stack-fallback.patch",
     "patch_sha256": "b8777f872310065980f9c3bf4e13ebf489acf47f8691d7f3be364cfc6e160458",
-    "os_bsd_object_sha256": "8408eb1e5e9ff71b2eb86ddb7eecabfa2a5fb14bb40dd8727c180c6c46db9d25",
+    "os_bsd_object_sha256": "234fd859881c370afd5c602b20e95d393812ee8df1b8577a3d9f56ceaa57a72d",
     "checks": "PASS extracted gate matrix and actual direct stack1024KiB lifecycle/fault ASan/UBSan; target HotSpot build",
-    "console": "Consumer171 native thread EAGAIN reproduced; exact resource cause unproven;172 recovery/world/shader/save/voice/endurance pending"
+    "console": "Full171trace recovered: errnoENOMEM gate did run; separate correctness fix, not observed cause.32MiB owned-stack budget saturated."
+  },
+  "extended_thread_stack_budget": {
+    "date": "2026-10-31",
+    "patch": "0134-opt-in-thread-stack-budget.patch",
+    "patch_sha256": "79b36f3db2dcbb65f307777311fd10436edb81776b9a1f0cee0bd6ca93edb451",
+    "os_bsd_object_sha256": "234fd859881c370afd5c602b20e95d393812ee8df1b8577a3d9f56ceaa57a72d",
+    "default": "32MiB/64slots",
+    "opt_in": "64MiB/64slots;bootstrap only;late EBUSY",
+    "checks": "PASS actual default32 live stack rejection,extended33 real1MiB concurrent stack lifecycles and220lifecycle/fault/TLScleanup ASan/UBSan; HotSpot target build",
+    "console": "171trace32MiBlive/eightEAGAINattempts;172world/shader/save/voice/endurancepending;nativeallocatorcauseunproven"
   }
 }

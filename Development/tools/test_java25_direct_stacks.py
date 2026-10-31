@@ -2,7 +2,7 @@
 """Actual direct stack owner with real custom-stack pthreads and gated TLS destruction."""
 from pathlib import Path
 import subprocess,argparse
-parser=argparse.ArgumentParser(description=__doc__);parser.add_argument("--compiler",action="store_true");args=parser.parse_args()
+parser=argparse.ArgumentParser(description=__doc__);parser.add_argument("--compiler",action="store_true");parser.add_argument("--extended",action="store_true");args=parser.parse_args()
 r=Path(__file__).resolve().parents[1];w=r/'build/java25/direct-stack-test';(w/'runtime').mkdir(parents=True,exist_ok=True)
 (w/'runtime/ps5StartupTrace.hpp').write_text('#pragma once\ninline void ps5_vm_trace_values(const char*,unsigned long long,const char*,unsigned long long,const char*,unsigned long long){}\n')
 code=r'''
@@ -42,11 +42,13 @@ static void wait_for(std::atomic<bool>& value){while(!value)std::this_thread::yi
 static void* empty(void*){return nullptr;}
 static void drain(){for(unsigned n=0;n<10000&&*owner::held();++n){owner::reap_once();usleep(100);}assert(*owner::held()==0&&live==0);}
 int main(){
- owner::initialize();initializing=false;assert(*owner::available()==1);constexpr size_t bytes=512*1024;pthread_t child;
+ assert(*owner::configured_budget()==owner::stack_budget);
+ /* SELECT_POLICY */
+ owner::initialize();assert(owner::set_extended_budget(0)==EBUSY);initializing=false;assert(*owner::available()==1);constexpr size_t bytes=512*1024;pthread_t child;
  errno=EDOM;deny_alloc=true;assert(owner::create(&child,bytes,empty,nullptr)==EAGAIN&&errno==EDOM&&!*owner::held()&&!live);deny_alloc=false;
  deny_stack=true;assert(owner::create(&child,bytes,empty,nullptr)==EINVAL&&!*owner::held()&&!live);deny_stack=false;
  deny_create=true;assert(owner::create(&child,bytes,empty,nullptr)==EAGAIN&&!*owner::held()&&!live);deny_create=false;
- *owner::held()=owner::stack_budget;assert(owner::create(&child,bytes,empty,nullptr)==EAGAIN&&!live);*owner::held()=0;
+ *owner::held()=*owner::configured_budget();assert(owner::create(&child,bytes,empty,nullptr)==EAGAIN&&!live);*owner::held()=0;
  for(unsigned i=0;i<owner::capacity;++i)owner::slots()[i].state=4;assert(owner::create(&child,bytes,empty,nullptr)==EAGAIN);for(unsigned i=0;i<owner::capacity;++i)owner::slots()[i].state=0;
  for(int round=0;round<20;++round){
   destructor_entered=false;allow_destructor=false;destructor_done=false;int before=unmaps;
@@ -58,6 +60,14 @@ int main(){
   allow_destructor=true;reaping.join();assert(destructor_done&&reaped&&unmaps==before+1&&!live&&!*owner::held());
  }
  for(int i=0;i<200;++i){assert(!owner::create(&child,bytes,empty,nullptr));drain();}
+ // Hold real custom-stack threads concurrently across the old32MiB boundary.
+ {std::atomic<bool> release{false};constexpr size_t one=1024*1024;
+  unsigned count=*owner::configured_budget()>owner::stack_budget?33:32;
+  for(unsigned i=0;i<count;++i){assert(!owner::create(&child,one,[](void*p)->void*{auto*flag=static_cast<std::atomic<bool>*>(p);while(!flag->load())std::this_thread::yield();return nullptr;},&release));}
+  assert(*owner::held()==size_t(count)*one&&live==int(count));
+  if(count==32)assert(owner::create(&child,one,empty,nullptr)==EAGAIN);
+  release=true;while(live){owner::reap_once();std::this_thread::yield();}assert(!*owner::held());
+ }
  // A failed join must retain the mapping; test-only later join proves death.
  assert(!owner::create(&child,bytes,empty,nullptr));while(!__atomic_load_n(&owner::slots()[0].done,__ATOMIC_ACQUIRE))std::this_thread::yield();deny_join=true;owner::reap_once();deny_join=false;assert(live==1&&owner::slots()[0].state==4);assert(!pthread_join(child,nullptr));int rc;assert(ps5_native_direct::unmap(owner::slots()[0].memory,bytes,&rc)&&!rc);*owner::held()=0;owner::slots()[0].state=0;
  // Physical release refusal stays charged/owned, even after successful join.
@@ -67,6 +77,7 @@ int main(){
  puts("PASS: actual direct stack owner, real512KiB custom-stack pthreads, gated TLS destructors/join-before-free,220reclaimed lifetimes, allocation/attribute/create/join/release faults and slot/budget caps; ASan/UBSan");
 }
 '''
+code=code.replace('/* SELECT_POLICY */','assert(!owner::set_extended_budget(1)&&*owner::configured_budget()==64*1024*1024);' if args.extended else 'assert(!owner::set_extended_budget(0));')
 if args.compiler:code=code.replace('constexpr size_t bytes=512*1024','constexpr size_t bytes=1024*1024').replace('real512KiB','real1024KiB')
 (w/'test.cpp').write_text('#include <cstdio>\n'+code)
 subprocess.run(['clang++','-std=c++17','-O1','-g','-pthread','-fsanitize=address,undefined','-I'+str(w),'-I'+str(r/'.tools/java25/openjdk/src/hotspot/share'),str(w/'test.cpp'),'-o',str(w/'check')],check=True)

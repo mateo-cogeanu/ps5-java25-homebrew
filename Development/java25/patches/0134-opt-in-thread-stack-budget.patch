@@ -1,0 +1,62 @@
+--- a/src/hotspot/share/runtime/ps5ThreadStacks.hpp
++++ b/src/hotspot/share/runtime/ps5ThreadStacks.hpp
+@@ -9,6 +9,7 @@
+ namespace ps5_thread_stacks {
+ constexpr unsigned capacity=64;
+ constexpr size_t stack_budget=32*1024*1024;
++inline size_t* configured_budget(){static size_t value=stack_budget;return &value;}
+ struct Slot {pthread_attr_t attr;bool valid;unsigned state,done;pthread_t thread;void* memory;size_t bytes;void*(*entry)(void*);void* argument;};
+ inline Slot* slots(){static Slot value[capacity]={};return value;}
+ inline unsigned* mutex(){static unsigned value=0;return &value;}
+@@ -21,6 +22,10 @@
+ #endif
+ }}
+ inline void unlock(){__atomic_store_n(mutex(),0u,__ATOMIC_RELEASE);}
++inline int set_extended_budget(int enabled){
++ lock();if(__atomic_load_n(initialized(),__ATOMIC_ACQUIRE)){unlock();return EBUSY;}
++ *configured_budget()=enabled?64*1024*1024:stack_budget;unlock();return 0;
++}
+ inline void* entry(void* pointer){
+  Slot* slot=(Slot*)pointer;void* result=slot->entry(slot->argument);
+  // A return is only a hint to join. It does not prove TLS destructors finished.
+@@ -41,8 +46,9 @@
+ }
+ inline void* reaper(void*){for(;;){reap_once();usleep(100000);}return nullptr;}
+ inline void initialize(){
+- unsigned expected=0;
+- if(!__atomic_compare_exchange_n(initialized(),&expected,1u,false,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE))return;
++ lock();unsigned expected=0;
++ if(!__atomic_compare_exchange_n(initialized(),&expected,1u,false,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE)){unlock();return;}
++ unlock();
+  for(unsigned i=0;i<capacity;++i){Slot& s=slots()[i];s.valid=pthread_attr_init(&s.attr)==0;
+   if(s.valid)s.valid=pthread_attr_setdetachstate(&s.attr,PTHREAD_CREATE_JOINABLE)==0&&pthread_attr_setguardsize(&s.attr,0)==0;
+  }
+@@ -52,14 +58,14 @@
+   pthread_t thread;if(!status)status=pthread_create(&thread,&attr,reaper,nullptr);pthread_attr_destroy(&attr);
+  }
+  __atomic_store_n(available(),status==0?1u:0u,__ATOMIC_RELEASE);
+- ps5_vm_trace_values("PS5 direct stack reaper: result=",status," capacity=",capacity," budget=",stack_budget);
++ ps5_vm_trace_values("PS5 direct stack reaper: result=",status," capacity=",capacity," budget=",*configured_budget());
+ }
+ inline int create(pthread_t* thread,size_t bytes,void*(*function)(void*),void* argument){
+  int saved=errno;
+- if(!__atomic_load_n(available(),__ATOMIC_ACQUIRE)||!bytes||bytes%ps5_native_direct::page_bytes||bytes>stack_budget){ps5_vm_trace_values("PS5 direct stack rejected: available=",__atomic_load_n(available(),__ATOMIC_ACQUIRE)," requested=",bytes," budget=",stack_budget);errno=saved;return EAGAIN;}
++ if(!__atomic_load_n(available(),__ATOMIC_ACQUIRE)||!bytes||bytes%ps5_native_direct::page_bytes||bytes>*configured_budget()){ps5_vm_trace_values("PS5 direct stack rejected: available=",__atomic_load_n(available(),__ATOMIC_ACQUIRE)," requested=",bytes," budget=",*configured_budget());errno=saved;return EAGAIN;}
+  lock();Slot* s=nullptr;
+- if(bytes<=stack_budget-*held())for(unsigned i=0;i<capacity;++i)if(slots()[i].valid&&slots()[i].state==0){s=&slots()[i];s->state=1;*held()+=bytes;break;}
+- size_t reserved=*held();unlock();if(!s){ps5_vm_trace_values("PS5 direct stack exhausted: held=",reserved," requested=",bytes," budget=",stack_budget);errno=saved;return EAGAIN;}
++ if(bytes<=*configured_budget()-*held())for(unsigned i=0;i<capacity;++i)if(slots()[i].valid&&slots()[i].state==0){s=&slots()[i];s->state=1;*held()+=bytes;break;}
++ size_t reserved=*held();unlock();if(!s){ps5_vm_trace_values("PS5 direct stack exhausted: held=",reserved," requested=",bytes," budget=",*configured_budget());errno=saved;return EAGAIN;}
+  s->bytes=bytes;s->memory=ps5_native_direct::map(bytes,ps5_native_direct::page_bytes,false,true);s->entry=function;s->argument=argument;__atomic_store_n(&s->done,0u,__ATOMIC_RELAXED);
+  void* mapped=s->memory;
+  if(mapped!=MAP_FAILED)memset(mapped,0,bytes);
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -40,6 +40,7 @@
+ #ifdef __PROSPERO__
+ #include "runtime/ps5NativeDirectMemory.hpp"
+ #include "runtime/ps5ThreadStacks.hpp"
++extern "C" int JVM_PS5SetExtendedThreadStackBudgetEnabled(int enabled){return ps5_thread_stacks::set_extended_budget(enabled);}
+ #endif
+ #include "os_posix.inline.hpp"
+ #include "prims/jniFastGetField.hpp"
