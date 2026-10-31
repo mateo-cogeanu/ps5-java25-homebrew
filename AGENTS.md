@@ -242,3 +242,24 @@ hosttable calls tested. Consumer owns ABI correctness; generator cannot infer C
 signatures. See docs/java25-resident-alias-symbols.md. ProsperoCraft SDL3 event
 facade/isolation/physicalhandoff belongs in consumer;target+console validation
 recorded separately. Preserve frozen snapshots and release/Store hold.
+
+## ProsperoCraft portable host verification — 2026-10-31
+
+Append to, and preserve, all existing rules. Launcher host tooling and Actions
+live in the active ProsperoCraft checkout, not the runtime tree. Follow that
+repository's docs/host-testing.md and tests/host-lanes.json: run
+`python3 tools/run_host_tests.py` (first use `--fetch-deps`) for deterministic
+launcher policy assertions, and `--lane native` for affected scoped native code.
+Require Python3.10+ without optimization, JDK25 and verified host-only library
+pins; use explicit options/JAVA_HOME/CC/CXX/LLVM_HOME/PATH/HOMEBREW_PREFIX instead
+of machine paths. Keep shared discovery import-safe and fail clearly on missing
+required tools/dependencies; never silently substitute private game caches.
+Verify portability in a source-only checkout with empty dependency cache and
+outside-root invocation. Consult the consumer inventory for SDK/package,
+graphics/audio and downloaded-game checks; do not equate file counts with
+coverage or one Vulkan backend with another. Preserve active compatibility
+implementations, original JARs and archived snapshots. Publish source changes to
+the owning repositories, inspect actual Actions jobs, and distinguish local,
+hosted and physical-console results. Existing release/Store gates remain in force;
+host CI does not establish an exact PS5 build pass. New workflow rules must be
+added alongside existing AGENTS.md rules rather than replacing them.
