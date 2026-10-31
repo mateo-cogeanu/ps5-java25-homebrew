@@ -296,3 +296,14 @@ unresolved.172explicitlyenables. Actualhostdefault32reject/extended33concurrent
 1MiBthreads,joinedreclaim,TLS/fault/budgettests,targetHotSpotpass;PS5world/shader/
 save/voice/endurancepending. See docs/java25-thread-stack-budget.md. Shared256MiB
 nativeledger,requestedstacks,realnativecreate/quotas,conservativecleanupretained.
+
+## PS5 socket pre-close — 2026-10-31
+
+Patch0135 replaces PS5 socket preClose0 dup2 (consumer173 SVC disconnect EPERM)
+with checked shutdown(SHUT_RDWR), EINTR retry/ENOTCONN acceptance. Descriptor
+ownership, Java closing state/signals and deferred final close remain; never
+close/recycle an in-flight descriptor. ENOTSOCK retains original non-socket error
+path; other platforms unchanged. Actual JNI JDK25 blocked UDP/TCP/accept repeated
+close, negative controls and target java.base rebuild pass; PS5 wakeup/disconnect/
+rejoin/save pending. See docs/java25-socket-preclose.md. Consumer174 integration
+and mic diagnostics belong in ProsperoCraft; release/Store holds remain.

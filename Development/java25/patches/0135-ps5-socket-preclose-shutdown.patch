@@ -1,0 +1,27 @@
+--- a/src/java.base/unix/native/libnio/ch/UnixDispatcher.c
++++ b/src/java.base/unix/native/libnio/ch/UnixDispatcher.c
+@@ -62,6 +62,24 @@
+ Java_sun_nio_ch_UnixDispatcher_preClose0(JNIEnv *env, jclass clazz, jobject fdo)
+ {
+     jint fd = fdval(env, fdo);
++#ifdef __PROSPERO__
++    /* The title sandbox rejects dup2 with EPERM. For sockets, shutdown
++     * disables future I/O without releasing/reusing the descriptor while an
++     * operation still owns it. UnixDispatcher subsequently signals the I/O
++     * threads; their normal end/tryClose path performs the single final close.
++     * ENOTCONN also covers bound, unconnected UDP/listening sockets. Never
++     * substitute close here: a late reader could use a recycled descriptor.
++     * Non-sockets retain the existing dup2/error path below.
++     */
++    int result;
++    do { result = shutdown(fd, SHUT_RDWR); } while (result < 0 && errno == EINTR);
++    if (result == 0 || errno == ENOTCONN)
++        return;
++    if (errno != ENOTSOCK) {
++        JNU_ThrowIOExceptionWithLastError(env, "socket pre-close shutdown failed");
++        return;
++    }
++#endif
+     if (preCloseFD >= 0) {
+         if (dup2(preCloseFD, fd) < 0)
+             JNU_ThrowIOExceptionWithLastError(env, "dup2 failed");
