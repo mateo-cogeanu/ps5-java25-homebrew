@@ -263,3 +263,15 @@ the owning repositories, inspect actual Actions jobs, and distinguish local,
 hosted and physical-console results. Existing release/Store gates remain in force;
 host CI does not establish an exact PS5 build pass. New workflow rules must be
 added alongside existing AGENTS.md rules rather than replacing them.
+
+## Optional C++ exception compiler TLS — 2026-10-31
+
+Runtime-owned tools/java25_cxxabi_tls.py builds pinned genuine LLVM18.1.8
+exception globals HAS_THREAD_LOCAL branch, explicitly linked by consumer171.
+Defaults/SDK archives unchanged; existing compiler-TLS allocation/retirement
+policy remains. Consumer170 voice-chat playback abort reports native key setter
+failure after real AudioOut0x8026000d refusal. Host storage concurrency/reuse and
+nested exception checks with setter refusal plus target symbol audit pass;
+PS5 world/voice/error recovery/save/endurance pending. AudioOut cause unresolved.
+See docs/java25-cxxabi-compiler-tls.md. Consumer integration separate, raw logs
+local, preserve frozen history and release/Store gate.
