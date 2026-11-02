@@ -307,3 +307,16 @@ path; other platforms unchanged. Actual JNI JDK25 blocked UDP/TCP/accept repeate
 close, negative controls and target java.base rebuild pass; PS5 wakeup/disconnect/
 rejoin/save pending. See docs/java25-socket-preclose.md. Consumer174 integration
 and mic diagnostics belong in ProsperoCraft; release/Store holds remain.
+
+
+## Optional JDK management extensions —2026-11-02
+
+The runtime registry supports default-off --management-extensions for genuine
+OpenJDK jdk.management/libmanagement_ext, implying java.management. Consumer must
+include target-built module classes and matching resident native library. Keep real
+JMM values/flag origins/read-only behavior; no replacement MBeans, fabricated VM
+flags or game JAR rewrites. Full OS/sysctl/procfs/heap-dump/diagnostic-command
+behavior is not established by flag queries. See docs/management-runtime.md.
+Consumer shader acceptance is an explicit physical-console release prerequisite;
+its pack/build integration and validation belong in ProsperoCraft. No runtime host
+result or shader compilation alone substitutes for that consumer confirmation.

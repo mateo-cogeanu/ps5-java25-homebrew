@@ -160,12 +160,15 @@ app_source="java25/probe/jni.cpp"
 app_param="java25/probe/jni-param.json"
 if args.startup:
     subprocess.run(["python3",str(ROOT/"tools/java25_boot_image.py"),*(["--modules",",".join(external.get("modules",["java.base"]))] if external else [])],check=True)
-    management=bool(external and "java.management" in external.get("modules",[]))
+    management_extensions=bool(external and "jdk.management" in external.get("modules",[]))
+    management=management_extensions or bool(external and "java.management" in external.get("modules",[]))
     if management:
         subprocess.run(["gmake","-C",str(ROOT/".tools/java25/openjdk"),"CONF=ps5-bootstrap","java.management-libs"],env=env,check=True)
+    if management_extensions:
+        subprocess.run(["gmake","-C",str(ROOT/".tools/java25/openjdk"),"CONF=ps5-bootstrap","jdk.management-libs"],env=env,check=True)
     imageio=bool(external and external.get("headless_imageio",False))
     if imageio and "java.desktop" not in external.get("modules",[]):raise ValueError("ImageIO requires target java.desktop classes")
-    resident_options=["--imageio"] if imageio else []
+    resident_options=(["--imageio"] if imageio else [])+(["--management-extensions"] if management_extensions else [])
     if external and external.get("resident_libraries"):
         resident_manifest=WORK/"external-resident-libraries.json"
         resident_manifest.write_text(json.dumps(external["resident_libraries"],indent=2)+"\n")
@@ -187,6 +190,8 @@ if args.startup:
         shutil.copy2(native_libs/("lib"+name+".so"),assets/"lib"/("lib"+name+".so"))
     if management:
         shutil.copy2(native_libs.parent/"java.management/libmanagement.so",assets/"lib/libmanagement.so")
+    if management_extensions:
+        shutil.copy2(native_libs.parent/"jdk.management/libmanagement_ext.so",assets/"lib/libmanagement_ext.so")
     if imageio:
         imageio_dir=WORK/"imageio-target"
         for name in ("awt","lcms"):shutil.copy2(imageio_dir/("lib"+name+".so"),assets/"lib"/("lib"+name+".so"))

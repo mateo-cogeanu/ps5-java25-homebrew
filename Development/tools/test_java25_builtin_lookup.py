@@ -42,6 +42,14 @@ int main() {
   assert(__dlsym(management,"Java_sun_management_MemoryImpl_getMemoryUsage0"));
   assert(!__dlsym(__dlopen("libjava.so",0),"Java_sun_management_MemoryImpl_getMemoryUsage0"));
  }
+ if(void *extensions=__dlopen("libmanagement_ext.so",0)) {
+  auto load=reinterpret_cast<int (*)(void *,void *)>(__dlsym(process,"JNI_OnLoad_management_ext"));
+  assert(load && load(nullptr,nullptr)>=0x00010008);++expected_loads;
+  assert(__dlsym(extensions,"Java_com_sun_management_internal_Flag_getFlags"));
+  assert(__dlsym(extensions,"Java_com_sun_management_internal_HotSpotDiagnostic_dumpHeap0"));
+  assert(!__dlsym(__dlopen("libmanagement.so",0),"Java_com_sun_management_internal_Flag_getFlags"));
+  assert(!__dlsym(__dlopen("libjava.so",0),"Java_com_sun_management_internal_Flag_getFlags"));
+ }
  assert(loads==expected_loads); // original library hooks still execute
  auto nio_load=reinterpret_cast<int (*)(void *,void *)>(__dlsym(process,"JNI_OnLoad_nio"));
  load_version=-1;

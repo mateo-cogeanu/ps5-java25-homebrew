@@ -22,21 +22,23 @@ LIBRARIES = ['java','zip','jimage','net','nio','verify']
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--management",action="store_true",help="Embed the target java.management native library")
+    parser.add_argument("--management-extensions",action="store_true",help="Opt in to genuine target jdk.management natives; also requires java.management")
     parser.add_argument("--jni-fixture",action="store_true",help="Include real dependency-probe JNI test library")
     parser.add_argument("--external-libraries",type=Path,help="Consumer-owned named ELF object groups to embed; no arbitrary ELF loading")
     parser.add_argument("--imageio",action="store_true",help="Embed genuine headless ImageIO raster/Disposer and LCMS subset")
     parser.add_argument("--library-alias",action="append",default=[],help="Explicit resident alias=library; same symbols and ownership, no new loader")
     parser.add_argument("--alias-symbol",action="append",default=[],help="Opt-in alias:export=resident_symbol lookup; both exports must exist in that same group")
     args=parser.parse_args()
+    if args.management_extensions:args.management=True
     if args.imageio:
         from java25_imageio import build
         build()
-    external=read_libraries(args.external_libraries,LIBRARIES+["jvm","management","ps5probe","awt","lcms"]) if args.external_libraries else []
+    external=read_libraries(args.external_libraries,LIBRARIES+["jvm","management","management_ext","ps5probe","awt","lcms"]) if args.external_libraries else []
     declarations=[]; tables=[]; mapped=[]; links=[]; alias_index=0; builtin_loaders=[]
     libraries=[('jvm',WORK/'embedded-jvm.o')]
-    resident=LIBRARIES+(['management'] if args.management else [])+(['awt','lcms'] if args.imageio else [])
+    resident=LIBRARIES+(['management'] if args.management else [])+(['management_ext'] if args.management_extensions else [])+(['awt','lcms'] if args.imageio else [])
     for name in resident:
-        module='java.management' if name=='management' else 'java.base'
+        module='jdk.management' if name=='management_ext' else 'java.management' if name=='management' else 'java.base'
         objects=[WORK/'imageio-target'/('lib'+name+'.o')] if name in ('awt','lcms') else sorted((BUILD/'support/native'/module/('lib'+name)).glob('*.o'))
         if not objects: raise SystemExit('Missing built native objects: '+name)
         rsp=WORK/(name+'-objects.rsp')
