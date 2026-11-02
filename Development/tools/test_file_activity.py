@@ -20,6 +20,10 @@ int main(){
  auto worker=[](int id){for(int n=0;n<500;n++){ps5::file_activity::open_result(id,"/fixture");ps5::file_activity::close_result(id,0);}};
  std::thread a(worker,30),b(worker,31);a.join();b.join();
  ps5::file_activity::snapshot(report,sizeof(report));assert(strstr(report,"tracked_live=0"));char tiny[2];assert(ps5::file_activity::snapshot(tiny,2)==1&&tiny[1]==0);
+ for(unsigned i=100;i<400;i++)ps5::file_activity::open_result(i,"/fixture/archive.jar");
+ char full[65536];ps5::file_activity::snapshot(full,sizeof(full),512);assert(strstr(full,"tracked_live=300")&&strstr(full,"fd=399 "));
+ ps5::file_activity::snapshot(report,sizeof(report));assert(!strstr(report,"fd=399 "));
+ for(unsigned i=100;i<400;i++)ps5::file_activity::close_result(i,0);
  puts("PASS optional file activity:actual handle remains caller-owned,failed close retained,successful close clears,failed/out-of-bound opens counted,concurrent recording,bounded output");
 }
 '''

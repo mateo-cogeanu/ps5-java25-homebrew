@@ -11,3 +11,20 @@ The actual target-built ZipFile classes pass on a host JVM with a real96-descrip
 Consumer114 enables64 and integrates the new module image, preserving0125 native path changes and113 vibration. Actual PS5 world access/load/save/deletion, descriptor headroom and game performance remain pending. The smaller-budget hypothesis must be validated against the next console run; host success is not a console pass. Frozen milestones/packages are unchanged.
 
 On2026-10-28 the user reports playing and successfully reloading a world on the exact114candidate. This is positive PS5 integration feedback for basic use; deletion and extended lifecycle remain unreported. See [matching package/source record](validation/bounded-zip-114-console-feedback-2026-10-28.json). No new frozen milestone is created.
+
+
+2026-11-02 diagnostics follow-up: the opt-in file-activity report retains its
+original24entry view, and a new `/file-activity-all.txt` view reports up to512
+tracked entries into a fixed64KiB stack buffer without opening another file.
+Accounting remains opt-in, bounded and non-owning; native internal opens may be
+absent, paths remain112byte prefixes, and this is not complete kernel ownership
+or proof of a leak. Consumers may use it under EMFILE while file-backed reports
+are unavailable. No preset client/device address or filter is introduced.
+
+`test_java25_zip_handle_pool.py --java-home <JDK25> --budget 8` exercises the actual
+target-built ZipFile classes at the supported minimum pool size, retaining real
+96descriptor-cap/default-exhaustion,300logical ZIPs, data/concurrency, world-like
+write/read/walk/delete and identity/ownership/refusal checks. Lower budgets can
+increase archive reopen I/O and contention. They create headroom within the ZIP
+pool only, not a universal process limit or a mutable region-file eviction policy.
+Physical save/reload/endurance and performance remain consumer validation.
