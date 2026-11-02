@@ -320,3 +320,14 @@ behavior is not established by flag queries. See docs/management-runtime.md.
 Consumer shader acceptance is an explicit physical-console release prerequisite;
 its pack/build integration and validation belong in ProsperoCraft. No runtime host
 result or shader compilation alone substitutes for that consumer confirmation.
+
+
+## PS5 management small-query stack —2026-11-02
+
+0136 uses per-call stack storage for up to16original jmmVMGlobal flag records;
+larger requests retain malloc/refusal, all free paths distinguish ownership and
+other platforms stay unchanged. Actual JMM/values/origins remain; Java/VM allocation
+failure is still possible. Forced native host1/16/17/refusal/concurrent tests and
+target management_ext build are scoped evidence, not PS5 shader acceptance. See
+docs/management-runtime.md. Consumer202integration/pack/quit remain separate and
+release/Store gates stay held.

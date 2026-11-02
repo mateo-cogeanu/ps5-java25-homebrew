@@ -29,7 +29,22 @@ public class ManagementExtensionsCheck {
   if(option.isWriteable())throw new AssertionError("UseFMA unexpectedly writeable");
   try{bean.getVMOption("PS5_No_Such_VM_Option");throw new AssertionError("fabricated option");}catch(IllegalArgumentException expected){}
   try{bean.setVMOption("UseFMA",args[0]);throw new AssertionError("readonly accepted");}catch(IllegalArgumentException expected){}
-  if(bean.getDiagnosticOptions()==null)throw new AssertionError("missing options");
+  if(Boolean.getBoolean("ps5.managementTest.denyMalloc")){
+   try{
+    Class<?> flag=Class.forName("com.sun.management.internal.Flag");
+    var query=flag.getDeclaredMethod("getFlags",String[].class,int.class);query.setAccessible(true);
+    String[] names=new String[16];java.util.Arrays.fill(names,"UseFMA");
+    if(((java.util.List<?>)query.invoke(null,names,16)).size()!=16)throw new AssertionError("small boundary");
+    try{query.invoke(null,new String[17],17);throw new AssertionError("large allocation not refused");}catch(java.lang.reflect.InvocationTargetException expected){if(!(expected.getCause()instanceof OutOfMemoryError))throw new AssertionError(expected);}
+   }catch(ReflectiveOperationException failure){throw new AssertionError(failure);}
+
+   try{bean.getDiagnosticOptions();throw new AssertionError("large query should retain refused heap allocation");}catch(OutOfMemoryError expected){}
+   java.util.List<Thread> workers=new java.util.ArrayList<>();
+   java.util.concurrent.atomic.AtomicReference<Throwable> failure=new java.util.concurrent.atomic.AtomicReference<>();
+   for(int n=0;n<8;n++){Thread thread=new Thread(()->{try{for(int i=0;i<1000;i++)if(!bean.getVMOption("UseFMA").getValue().equals(args[0]))throw new AssertionError("concurrent value");}catch(Throwable t){failure.compareAndSet(null,t);}});workers.add(thread);thread.start();}
+   for(Thread thread:workers)try{thread.join();}catch(InterruptedException t){throw new AssertionError(t);}
+   if(failure.get()!=null)throw new AssertionError(failure.get());
+  }else if(bean.getDiagnosticOptions()==null)throw new AssertionError("missing options");
   String client=System.getProperty("ps5.managementTest.class");
   if(client!=null){
    try{
@@ -49,6 +64,7 @@ def main():
  p=argparse.ArgumentParser(description=__doc__)
  p.add_argument('--java-home',type=Path,required=True)
  p.add_argument('--cc',type=Path,required=True)
+ p.add_argument('--deny-flag-malloc',action='store_true',help='Exercise actual PS5 small-query branch with only Flag.c malloc denied')
  p.add_argument('--class-path',default='',help='Explicit optional original consumer test dependencies; never packaged')
  p.add_argument('--initialize-class',help='Optional original consumer class initializer to exercise')
  p.add_argument('--boolean-field',help='Its static boolean result, compared with actual UseFMA')
@@ -65,14 +81,21 @@ def main():
  incs=[jdk/'include',jdk/'include/darwin',src/'java.base/share/native/libjava',src/'java.base/unix/native/libjava',src/'hotspot/share/include',src/'hotspot/os/posix/include',src/'jdk.management/share/native/libmanagement_ext',build/'support/headers/jdk.management']
  with tempfile.TemporaryDirectory(prefix='management-ext-forced-')as tmp:
   work=Path(tmp);runtime=work/'runtime';library=work/'libmanagement_ext.dylib'
-  subprocess.run([str(a.cc),'-std=c11','-D_ALLBSD_SOURCE','-dynamiclib','-undefined','dynamic_lookup',*['-I'+str(x)for x in incs],*map(str,units),'-o',str(library)],check=True)
+  compile_flags=['-std=c11','-D_ALLBSD_SOURCE',*['-I'+str(x)for x in incs]]
+  if a.deny_flag_malloc:
+   wrapped=work/'flag.o'
+   subprocess.run([str(a.cc),*compile_flags,'-D__PROSPERO__','-Dmalloc=ps5_test_flag_malloc','-c',str(next(x for x in units if x.name=='Flag.c')),'-o',str(wrapped)],check=True)
+   bridge=work/'refuse.c';bridge.write_text('#include <stdlib.h>\nvoid *ps5_test_flag_malloc(size_t bytes){(void)bytes;return NULL;}\n')
+   native_inputs=[str(x)for x in units if x.name!='Flag.c']+[str(wrapped),str(bridge)]
+  else:native_inputs=list(map(str,units))
+  subprocess.run([str(a.cc),*compile_flags,'-dynamiclib','-undefined','dynamic_lookup',*native_inputs,'-o',str(library)],check=True)
   subprocess.run([str(jdk/'bin/jlink'),'--add-modules','java.base,java.management,jdk.management','--output',str(runtime),'--strip-debug','--no-header-files','--no-man-pages'],check=True)
   installed=runtime/'lib/libmanagement_ext.dylib';shutil.copyfile(library,installed)
   java=work/'ManagementExtensionsCheck.java';java.write_text(JAVA)
   subprocess.run([str(jdk/'bin/javac'),'-d',str(work),str(java)],check=True)
   logs=[]
   for enabled in [False,True]:
-   command=[str(runtime/'bin/java'),'-Xcheck:jni','-XX:'+('+'if enabled else'-')+'UseFMA','-Xlog:library=debug','--patch-module','jdk.management='+str(module),*(['-Dps5.managementTest.class='+a.initialize_class,'-Dps5.managementTest.field='+a.boolean_field]if a.initialize_class else []),'-cp',str(work)+(':'+a.class_path if a.class_path else ''),'ManagementExtensionsCheck',str(enabled).lower()]
+   command=[str(runtime/'bin/java'),'-Xcheck:jni','--add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED',*(['-Dps5.managementTest.denyMalloc=true']if a.deny_flag_malloc else []),'-XX:'+('+'if enabled else'-')+'UseFMA','-Xlog:library=debug','--patch-module','jdk.management='+str(module),*(['-Dps5.managementTest.class='+a.initialize_class,'-Dps5.managementTest.field='+a.boolean_field]if a.initialize_class else []),'-cp',str(work)+(':'+a.class_path if a.class_path else ''),'ManagementExtensionsCheck',str(enabled).lower()]
    result=subprocess.run(command,capture_output=True,text=True,timeout=45);text=result.stdout+result.stderr;name='fma-'+str(enabled).lower();(out/(name+'.log')).write_text(text)
    assert result.returncode==0 and 'PASS genuine diagnostic MXBean'in text,text[-3000:]
    if a.initialize_class:assert 'PASS original consumer initializer and real VM flag'in text
@@ -86,7 +109,7 @@ def main():
   installed.unlink()
   result=subprocess.run(command,capture_output=True,text=True,timeout=45);text=result.stdout+result.stderr;(out/'missing-library.log').write_text(text)
   assert result.returncode!=0 and 'UnsatisfiedLinkError'in text and 'management_ext'in text,'Missing custom library silently fell back'
-  audit={'scope':'Actual target-built jdk.management Java + genuine OpenJDK native extension, real host JMM; isolated host-only image. No stock management_ext fallback; stock host java.management core intentionally retained.','source_sha256':{str(x.relative_to(src)):hashlib.sha256(x.read_bytes()).hexdigest()for x in units},'target_class_sha256':{str(x.relative_to(module)):hashlib.sha256(x.read_bytes()).hexdigest()for x in module.rglob('*.class')},'library_sha256':hashlib.sha256(library.read_bytes()).hexdigest(),'checks':logs+['missing-native refusal','unknown flag refusal','readonly setter refusal','Xcheck:jni'],'ps5':'Not executed; native provider/flag/shader behavior pending'}
+  audit={'scope':'Actual target-built jdk.management Java + genuine OpenJDK native extension, real host JMM; isolated host-only image. No stock management_ext fallback; stock host java.management core intentionally retained.','source_sha256':{str(x.relative_to(src)):hashlib.sha256(x.read_bytes()).hexdigest()for x in units},'target_class_sha256':{str(x.relative_to(module)):hashlib.sha256(x.read_bytes()).hexdigest()for x in module.rglob('*.class')},'library_sha256':hashlib.sha256(library.read_bytes()).hexdigest(),'flag_malloc_denied':a.deny_flag_malloc,'checks':logs+['missing-native refusal','unknown flag refusal','readonly setter refusal','Xcheck:jni'],'ps5':'Not executed; native provider/flag/shader behavior pending'}
   (out/'audit.json').write_text(json.dumps(audit,indent=2)+'\n')
  print('PASS genuine extension JNI/real flag values/default query and refusal controls; PS5 pending')
 

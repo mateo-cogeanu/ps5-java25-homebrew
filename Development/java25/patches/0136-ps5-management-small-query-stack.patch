@@ -1,0 +1,96 @@
+--- a/src/jdk.management/share/native/libmanagement_ext/Flag.c
++++ b/src/jdk.management/share/native/libmanagement_ext/Flag.c
+@@ -86,6 +86,10 @@
+     jint num_flags, i, index;
+     jmmVMGlobal* globals;
+     size_t gsize;
++#ifdef __PROSPERO__
++    /* Per-call bounded scratch: no shared owner and no allocation for tiny queries. */
++    jmmVMGlobal small_globals[16];
++#endif
+     const char* class_name = "com/sun/management/internal/Flag";
+     const char* signature = "(Ljava/lang/String;Ljava/lang/Object;ZZLcom/sun/management/VMOption$Origin;)V";
+     jobject origin;
+@@ -103,7 +107,11 @@
+     }
+
+     gsize = (size_t)count * sizeof(jmmVMGlobal);
++#ifdef __PROSPERO__
++    globals = count <= 16 ? small_globals : (jmmVMGlobal*) malloc(gsize);
++#else
+     globals = (jmmVMGlobal*) malloc(gsize);
++#endif
+     if (globals == NULL) {
+         JNU_ThrowOutOfMemoryError(env, 0);
+         return 0;
+@@ -112,7 +120,13 @@
+     memset(globals, 0, gsize);
+     num_flags = jmm_interface_management_ext->GetVMGlobals(env, names, globals, count);
+     if (num_flags == 0) {
++#ifdef __PROSPERO__
++        if (globals != small_globals) {
++            free(globals);
++        }
++#else
+         free(globals);
++#endif
+         return 0;
+     }
+
+@@ -143,7 +157,13 @@
+         }
+
+         if (valueObj == NULL && globals[i].type != JMM_VMGLOBAL_TYPE_JSTRING) {
+-            free(globals);
++#ifdef __PROSPERO__
++            if (globals != small_globals) {
++                free(globals);
++            }
++#else
++            free(globals);
++#endif
+             JNU_ThrowOutOfMemoryError(env, 0);
+             return 0;
+         }
+@@ -182,7 +202,13 @@
+                                    valueObj, globals[i].writeable,
+                                    globals[i].external, origin);
+         if (flag == NULL) {
+-            free(globals);
++#ifdef __PROSPERO__
++            if (globals != small_globals) {
++                free(globals);
++            }
++#else
++            free(globals);
++#endif
+             JNU_ThrowOutOfMemoryError(env, 0);
+             return 0;
+         }
+@@ -192,11 +218,23 @@
+
+     if (index != num_flags) {
+         JNU_ThrowInternalError(env, "Number of Flag objects created unmatched");
++#ifdef __PROSPERO__
++        if (globals != small_globals) {
++            free(globals);
++        }
++#else
+         free(globals);
+-        return 0;
+-    }
+-
++#endif
++        return 0;
++    }
++
++#ifdef __PROSPERO__
++    if (globals != small_globals) {
++        free(globals);
++    }
++#else
+     free(globals);
++#endif
+
+     /* return the number of Flag objects created */
+     return num_flags;

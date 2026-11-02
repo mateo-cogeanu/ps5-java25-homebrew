@@ -74,3 +74,23 @@ The generated lookup test covers original hook execution, extension native-symbo
 visibility and isolation from management/java handles. Console API behavior remains
 pending until independently recorded; host compilation or a linked image is not
 physical acceptance. Existing frozen milestones and release gates remain intact.
+
+## PS5 small native flag queries —0136
+
+PS5 builds now use a per-call stack array for up to16 jmmVMGlobal records in the
+original Flag.getFlags native routine. No shared reserve, loader/VM-flag spoof,
+heap/GC change or new JNI implementation is added. Larger requests retain the
+original malloc/refusal behavior; every cleanup path distinguishes stack from
+heap ownership. Other platforms keep the original allocation. The genuine JMM
+query, Java values/origins/writability and original error handling remain.
+This avoids a small native allocation under PS5 libc refusal; Java object or
+underlying VM allocations can still fail. Native allocator root cause is open.
+
+The forced extension test's --deny-flag-malloc option compiles the actual PS5
+branch while denying only Flag.c malloc. It checks1and16record queries,17record
+and full-list malloc refusal, unknown/readonly controls,8concurrent workers making
+1000real UseFMA queries each, false/true flags, Xcheck:jni and no stock extension
+fallback. The consumer also exercises its original initializer with that option.
+Target jdk.management-libs rebuild passes. Actual PS5 small-query behavior and
+consumer shader rendering remain pending; this does not establish broad native
+allocation or OS-management compatibility.
