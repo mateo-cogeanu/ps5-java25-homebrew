@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-03",
+  "scope": "Explicit external resident symbol namespaces and scoped builtin JNI handles; defaults unchanged",
+  "source_sha256": {
+    "tools/java25_builtin_runtime.py": "c800ce963654f2f0f65d01dd7b4e0ea86f197b6bf3888a5c7c237ed4ff9807c0",
+    "tools/java25_resident_libraries.py": "1dad25d792ddafa7036dc7ba7099f57c2cfecea4f974f4d057929a5b4f9de92b",
+    "tools/test_java25_resident_namespace.py": "36513a966c3e0b963e7e79dfd93a5f28f0f6451f5e4604e0a5706b1e3eb9ee0d",
+    "java25/patches/0137-opt-in-resident-builtin-handle-scope.patch": "47f97ff6e43078cb4b82e27b6828d2a7286623158bd935cf59cb337ce2a4166e"
+  },
+  "local": {
+    "namespace": "PASS actual target code/data/emulated-TLS collision-free link; objcopy allocated bytes unchanged; actual generated host tables/base/process/alias/initializer/error checks; actual JNI load/find bodies on JDK25 with controlled OS handles and Xcheck:jni/UBSan",
+    "defaultGeneratorSourceUnchanged": "596713fa1b0fff88bb850ca38f01042a5e3f52487550a693c9a73a14a10b72e7",
+    "defaultComparedWithRuntimeCommit": "82429cb",
+    "residentSchemaAliases": "PASS existing test_java25_resident_libraries.py including actual constructor-section rejection and real compiled alias tables",
+    "nativeLibraryNames": "PASS actual JNI allocation/refusal/direct-scratch/default-platform tests",
+    "builtinLookup": "PASS existing discovery/original-hook/JNI-version/handle-scope checks",
+    "target": "PASS gmake CONF=ps5-bootstrap java.base-libs",
+    "targetNativeLibrariesObjectSha256": "e0383e15e8bbb4fe0e18ec221cadbe54c1ad538125a61f7b6f0694c24adf8f8b"
+  },
+  "console": "Pending actual PS5 dual-generation lookup/classloader/callback/lifecycle/consumer checks",
+  "hosted": "No new hosted-runtime result claimed",
+  "releaseStore": "No action; frozen sources and all accepted binaries preserved"
+}

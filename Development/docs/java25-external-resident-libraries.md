@@ -1,5 +1,9 @@
 # Consumer-owned resident JNI libraries
 
+Optional [symbol namespaces and builtin JNI handles](java25-resident-symbol-namespaces.md)
+allow separately linked native generations with colliding JNI names. This is an
+explicit build option; existing groups and default process lookup stay unchanged.
+
 External probe specifications can now pass `resident_libraries`, a list of named groups of absolute paths to target relocatable objects:
 
 ```json

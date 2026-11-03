@@ -331,3 +331,16 @@ failure is still possible. Forced native host1/16/17/refusal/concurrent tests an
 target management_ext build are scoped evidence, not PS5 shader acceptance. See
 docs/management-runtime.md. Consumer202integration/pack/quit remain separate and
 release/Store gates stay held.
+
+## Optional resident symbol namespaces —2026-11-03
+
+Runtime137 adds default-off --library-symbol-prefix external_group=prefix_ and
+PS5 weak JVM_PS5ScopedBuiltinHandle selection for explicit namespaced groups.
+Actual code/data/TLS definitions are separated; handle lookup retains original
+names, process-first lookup/default groups remain. Native signatures and coherent
+classloader ownership remain consumer responsibilities; no ABI adapter or arbitrary
+loader. Schema/collision/link/code-byte/generated-table/actual JNI load-body/error/
+default/alias tests and target java.base-libs pass; PS5 dual-generation lookup,
+callbacks/lifecycle remain pending. See docs/java25-resident-symbol-namespaces.md.
+ProsperoCraft owns approved333 Vanilla integration; Fabric is deferred until
+Vanilla121 is validated. Preserve released204, frozen history and release gates.

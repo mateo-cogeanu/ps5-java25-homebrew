@@ -1,0 +1,28 @@
+--- a/src/java.base/share/native/libjava/NativeLibraries.c
++++ b/src/java.base/share/native/libjava/NativeLibraries.c
+@@ -88,6 +88,10 @@
+ static jfieldID handleID;
+ static jfieldID jniVersionID;
+ static void *procHandle;
++#ifdef __PROSPERO__
++/* Optional consumer registry hook; absent for default runtime images. */
++extern void *JVM_PS5ScopedBuiltinHandle(const char *) __attribute__((weak));
++#endif
+
+ static jboolean initIDs(JNIEnv *env)
+ {
+@@ -166,6 +170,14 @@
+     if (cname == 0)
+         return JNI_FALSE;
+     handle = isBuiltin ? procHandle : JVM_LoadLibrary(cname, throwExceptionIfFail);
++#ifdef __PROSPERO__
++    /* Only explicitly namespaced resident groups opt in. Other builtins keep
++       the process handle, and non-builtin loading remains unchanged. */
++    if (isBuiltin && JVM_PS5ScopedBuiltinHandle != NULL) {
++        void *scoped = JVM_PS5ScopedBuiltinHandle(cname);
++        if (scoped != NULL) handle = scoped;
++    }
++#endif
+     if (handle) {
+         JNI_OnLoad_t JNI_OnLoad;
+         JNI_OnLoad = (JNI_OnLoad_t)findJniFunction(env, handle,

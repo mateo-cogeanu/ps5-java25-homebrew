@@ -9,7 +9,8 @@ import subprocess
 import re
 import argparse
 import hashlib
-from java25_resident_libraries import read_libraries, read_aliases, read_alias_symbols, alias_symbol_entries
+from java25_resident_libraries import (read_libraries, read_aliases, read_alias_symbols,
+                                      alias_symbol_entries, read_symbol_prefixes, symbol_prefix_map)
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / '.tools/java25/openjdk/build/ps5-bootstrap'
@@ -28,12 +29,15 @@ def main():
     parser.add_argument("--imageio",action="store_true",help="Embed genuine headless ImageIO raster/Disposer and LCMS subset")
     parser.add_argument("--library-alias",action="append",default=[],help="Explicit resident alias=library; same symbols and ownership, no new loader")
     parser.add_argument("--alias-symbol",action="append",default=[],help="Opt-in alias:export=resident_symbol lookup; both exports must exist in that same group")
+    parser.add_argument("--library-symbol-prefix",action="append",default=[],help="Opt-in external_group=prefix_: namespace definitions, retain original handle-scoped JNI lookup names")
     args=parser.parse_args()
     if args.management_extensions:args.management=True
     if args.imageio:
         from java25_imageio import build
         build()
     external=read_libraries(args.external_libraries,LIBRARIES+["jvm","management","management_ext","ps5probe","awt","lcms"]) if args.external_libraries else []
+    prefixes=read_symbol_prefixes(args.library_symbol_prefix,{name for name,_ in external})
+    scoped_handles=[]
     declarations=[]; tables=[]; mapped=[]; links=[]; alias_index=0; builtin_loaders=[]
     libraries=[('jvm',WORK/'embedded-jvm.o')]
     resident=LIBRARIES+(['management'] if args.management else [])+(['management_ext'] if args.management_extensions else [])+(['awt','lcms'] if args.imageio else [])
@@ -83,9 +87,15 @@ def main():
             raise SystemExit('External resident library constructors require an explicit lifecycle port: '+name)
         symbols=subprocess.check_output([str(LLVM/'llvm-nm'),'--defined-only','--extern-only',str(merged)],text=True)
         renames=[]
-        for entry in ['JNI_OnLoad','JNI_OnUnload']:
-            if re.search(r'\b'+entry+r'$',symbols,re.M):
-                renames+=['--redefine-sym',entry+'=ps5_'+name+'_'+entry]
+        if name in prefixes:
+            names=symbol_prefix_map(symbols,prefixes[name])
+            mapping=WORK/(name+'-symbol-prefix.txt')
+            mapping.write_text(''.join(old+' '+new+'\n'for old,new in sorted(names.items())))
+            renames=['--redefine-syms='+str(mapping)]
+        else:
+            for entry in ['JNI_OnLoad','JNI_OnUnload']:
+                if re.search(r'\b'+entry+r'$',symbols,re.M):
+                    renames+=['--redefine-sym',entry+'=ps5_'+name+'_'+entry]
         if renames:subprocess.run([str(LLVM/'llvm-objcopy'),*renames,str(merged)],check=True)
         libraries.append((name,merged));links.append(str(merged));external_names.add(name)
         external_audit.append({'name':name,'objects_sha256':[hashlib.sha256(p.read_bytes()).hexdigest()for p in objects],'constructors':'none; nontrivial constructors rejected'})
@@ -98,10 +108,15 @@ def main():
             fields=line.split()
             if len(fields)!=3 or fields[1] not in ('T','W'): continue
             symbol=fields[2]
-            if symbol.startswith('_Z') or '.' in symbol: continue
+            original=symbol
+            if name in prefixes:
+                if not symbol.startswith(prefixes[name]):
+                    raise ValueError('Unprefixed definition in namespaced group: '+name)
+                original=symbol[len(prefixes[name]):]
+            if original.startswith('_Z') or '.' in original: continue
             if name=='jvm' and not symbol.startswith(('JNI_','JVM_','Java_','jio_')): continue
             if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*',symbol): continue
-            display=symbol
+            display=original
             if symbol.startswith('ps5_'+name+'_JNI_On'): display=symbol[len('ps5_'+name+'_'):]
             if symbol.startswith('ps5_java_jio_'): display=symbol[len('ps5_java_'):]
             alias='embedded_symbol_'+str(alias_index);alias_index+=1
@@ -124,15 +139,24 @@ def main():
             for alias,target in aliases.items():
                 if target==name:entries.append('{"JNI_OnLoad_'+alias+'", reinterpret_cast<void *>(&'+loader+')}')
         tables.append('static const Symbol symbols_'+name+'[]={\n'+',\n'.join(entries)+'\n};')
+        if name in prefixes:scoped_handles.append((name,len(mapped)))
         mapped.append('{"lib'+name+'.so", symbols_'+name+', sizeof(symbols_'+name+')/sizeof(Symbol)}')
         for alias,target in aliases.items():
             if target==name:
+                if name in prefixes:scoped_handles.append((alias,len(mapped)))
                 if alias in alias_symbols:
                     table='symbols_alias_'+str(len(tables))
                     tables.append('static const Symbol '+table+'[]={\n'+',\n'.join(alias_symbol_entries(entries,alias_symbols[alias]))+'\n};')
                     mapped.append('{"lib'+alias+'.so", '+table+', sizeof('+table+')/sizeof(Symbol)}')
                 else:
                     mapped.append('{"lib'+alias+'.so", symbols_'+name+', sizeof(symbols_'+name+')/sizeof(Symbol)}')
+    scoped_resolver=''
+    if prefixes:
+        # OpenJDK normally assigns the process handle to builtins. A selected
+        # group must retain its real handle so duplicate JNI names stay scoped.
+        scoped_resolver='extern "C" void *JVM_PS5ScopedBuiltinHandle(const char *name) {\n if(!name) return nullptr;\n'
+        scoped_resolver+=''.join(' if(std::strcmp(name,"'+name+'") == 0) return const_cast<Library *>(&libraries['+str(index)+']);\n'for name,index in scoped_handles)
+        scoped_resolver+=' return nullptr;\n}\n'
     output='''/* Generated from real target native symbols; do not edit. */
 #include <cstddef>
 #include <cstring>
@@ -141,7 +165,7 @@ def main():
 '''+ '\n'.join(declarations)+'\n'+'\n'.join(builtin_loaders)+'''
 struct Symbol { const char *name; void *address; };
 struct Library { const char *name; const Symbol *symbols; size_t count; };
-'''+ '\n'.join(tables)+'\nstatic const Library libraries[]={\n'+',\n'.join(mapped)+'''\n};
+'''+ '\n'.join(tables)+'\nstatic const Library libraries[]={\n'+',\n'.join(mapped)+'\n};'+ ('\n'+scoped_resolver if scoped_resolver else '')+'''
 static thread_local const char *last_error=nullptr;
 static void *find_symbol(const Library &lib,const char *name) {
  for(size_t i=0;i<lib.count;++i) if(std::strcmp(name,lib.symbols[i].name)==0) return lib.symbols[i].address;
@@ -184,7 +208,9 @@ extern "C" int __dladdr(const void *address,Dl_info *info) {
         '-c',str(target),'-o',str(obj)],check=True)
     links.append(str(obj))
     (WORK/'builtin-link-inputs.json').write_text(json.dumps(links,indent=2)+'\n')
-    (WORK/'builtin-resident-audit.json').write_text(json.dumps({'external_resident_libraries':external_audit,'library_aliases':aliases,'alias_symbol_overrides':alias_symbols,'scope':'Build-time resident objects only; no arbitrary ELF loader'},indent=2)+'\n')
+    audit={'external_resident_libraries':external_audit,'library_aliases':aliases,'alias_symbol_overrides':alias_symbols,'scope':'Build-time resident objects only; no arbitrary ELF loader'}
+    if prefixes:audit['library_symbol_prefixes']=prefixes
+    (WORK/'builtin-resident-audit.json').write_text(json.dumps(audit,indent=2)+'\n')
     print('Generated embedded lookup table:',alias_index,'real function addresses')
 
 if __name__=='__main__':main()

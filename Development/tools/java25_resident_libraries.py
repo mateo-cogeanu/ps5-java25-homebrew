@@ -48,6 +48,40 @@ def read_aliases(values, names):
     return result
 
 
+def read_symbol_prefixes(values, external_names):
+    """Namespace a selected external group's real definitions, not its lookup ABI."""
+    result = {}
+    for value in values:
+        match = re.fullmatch(r'([a-z][a-z0-9_]{0,47})=([A-Za-z][A-Za-z0-9_]{0,47}_)', value)
+        if not match or match[1] not in external_names:
+            raise ValueError('Symbol prefix requires known_external_group=C_identifier_prefix_')
+        name, prefix = match.groups()
+        if name in result or prefix in result.values():
+            raise ValueError('Duplicate resident group or symbol prefix')
+        result[name] = prefix
+    return result
+
+
+def symbol_prefix_map(symbols, prefix):
+    """All real external definitions, including data and TLS; imports stay shared."""
+    result = {}
+    for line in symbols.splitlines():
+        fields = line.split()
+        if len(fields) != 3:
+            continue
+        _, kind, name = fields
+        if kind.upper() == 'U' or kind in ('w', 'v'):
+            continue
+        if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.$]*', name):
+            raise ValueError('Unsupported resident definition spelling')
+        if name in result:
+            raise ValueError('Duplicate resident definition')
+        result[name] = prefix + name
+    if not result:
+        raise ValueError('Namespaced group has no external definitions')
+    return result
+
+
 def read_alias_symbols(values, aliases):
     """Opt-in lookup overrides on an explicit alias, within its existing group."""
     result = {}
