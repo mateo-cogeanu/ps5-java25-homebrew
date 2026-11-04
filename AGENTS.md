@@ -356,3 +356,14 @@ HTTP/collector/writer/file accounting tests are scoped host evidence. PS5 HTTP
 access after consumer rebuild remains pending; do not infer exact native stack
 size or physical fault address. See docs/java25-log-share-stack.md. Consumer121
 callback allocation and candidate integration remain in ProsperoCraft.
+
+## Optional native presenter high refresh —2026-11-04
+
+The reusable native renderer keeps default60 behavior; explicit constructor-free
+ps5DemoPresentationTargetHz120 opts into native support/configure/vblank verification,
+checked restore before close and fast tiled RGBA publication. Caller owns manifest
+0x40, UI pacing/workload and integration. Default no-query and actual policy refusal,
+old/fast full-pixel/pitch/short-input sanitizer and target-object checks pass; actual
+PS5 refresh/FPS/reset/handoff remain pending. See docs/native-presenter-high-refresh.md.
+Source/runtime helper belongs here; ProsperoCraft owns launcher211 integration and
+physical animation/trigger/menu acceptance. Preserve frozen bytes and release gates.

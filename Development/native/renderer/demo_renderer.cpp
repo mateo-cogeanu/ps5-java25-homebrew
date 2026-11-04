@@ -9,6 +9,9 @@
 
 #include "demo_renderer.hpp"
 #include "fonts.hpp"
+#include "presentation_refresh.hpp"
+#include "tiled_frame_blit.hpp"
+#include <cstdio>
 #include <emmintrin.h>
 
 #include <array>
@@ -20,6 +23,11 @@
 #include <string_view>
 #include <utility>
 
+#if defined(__APPLE__)
+extern "C" unsigned ps5DemoPresentationTargetHz() noexcept __attribute__((weak_import));
+#else
+extern "C" unsigned ps5DemoPresentationTargetHz() noexcept __attribute__((weak));
+#endif
 extern "C"
 {
     std::size_t sceKernelGetDirectMemorySize();
@@ -44,6 +52,9 @@ extern "C"
     int sceVideoOutSubmitFlip(std::int32_t handle, std::int32_t buffer_index,
                               std::uint32_t flip_mode, std::int64_t flip_argument);
     int sceVideoOutWaitVblank(std::int32_t handle);
+    std::uint64_t sceKernelGetProcessTime();
+    int sceVideoOutIsOutputSupported(int,std::uint32_t,const void*,const void*,const void*);
+    int sceVideoOutConfigureOutput(int,std::uint32_t,const void*,const void*,const void*);
     bool ps5ObserveOwnedAllocation(const void *address) noexcept;
 }
 
@@ -51,6 +62,7 @@ namespace ps5::demo
 {
 namespace
 {
+bool fast_frame_path=false;
 constexpr unsigned frame_width = 1920;
 constexpr unsigned frame_height = 1080;
 constexpr std::size_t frame_bytes = 0x1000000;
@@ -336,10 +348,10 @@ void draw_text(std::uint32_t *pixels, unsigned x, unsigned y, std::string_view v
 
 // The mapped video buffers use write-combined memory. Never read them while
 // blending: draw into cached RAM, then publish with sequential streaming stores.
-void publish_frame(void *destination, const void *source) noexcept {
+void publish_frame(void *destination, const void *source, std::size_t bytes=frame_bytes) noexcept {
     auto *out = static_cast<__m128i *>(destination);
     const auto *in = static_cast<const __m128i *>(source);
-    for (std::size_t i = 0; i < frame_bytes / sizeof(__m128i); i += 4) {
+    for (std::size_t i = 0; i < bytes / sizeof(__m128i); i += 4) {
         _mm_stream_si128(out + i, _mm_loadu_si128(in + i));
         _mm_stream_si128(out + i + 1, _mm_loadu_si128(in + i + 1));
         _mm_stream_si128(out + i + 2, _mm_loadu_si128(in + i + 2));
@@ -358,6 +370,7 @@ bool Canvas::blit_rgba(std::span<const std::uint32_t> pixels, unsigned row_pitch
     if (row_pitch < frame_width || pixels.size() < frame_width ||
         (pixels.size() - frame_width) / (frame_height - 1) < row_pitch)
         return false;
+    if(fast_frame_path){detail::blit_tiled_1080(pixels_,pixels.data(),row_pitch);return true;}
     for (unsigned y = 0; y < frame_height; ++y)
         for (unsigned x = 0; x < frame_width; ++x)
             put_pixel_unchecked(pixels_, x, y, static_cast<Color>(pixels[std::size_t(y) * row_pitch + x]));
@@ -517,6 +530,12 @@ bool detail::present_session(DrawScene draw, std::string_view ready_message,
     if (video < 0)
         halt("Hello World: sceVideoOutOpen failed");
 
+    const unsigned requested=ps5DemoPresentationTargetHz?ps5DemoPresentationTargetHz():60;
+    fast_frame_path=requested==120;
+    const auto refresh=detail::negotiate_refresh(requested,[&]{return sceVideoOutIsOutputSupported(video,15,nullptr,nullptr,nullptr);},[&](unsigned mode){return sceVideoOutConfigureOutput(video,mode,nullptr,nullptr,nullptr);},[&]{return sceVideoOutWaitVblank(video);},[]{return sceKernelGetProcessTime();});
+    if(requested==120)std::fprintf(stderr,"PS5_UI presentation requestedHz=120 selectedHz=%u measuredPeriodUs=%llu status=%d safe=%d\n",refresh.selected_hz,(unsigned long long)refresh.period_us,refresh.status,int(refresh.safe));
+    if(!refresh.safe){(void)sceVideoOutClose(video);return false;}
+
     const std::size_t pool_size = sceKernelGetDirectMemorySize();
     if (pool_size < memory_bytes)
         halt("Hello World: insufficient direct memory");
@@ -561,6 +580,7 @@ bool detail::present_session(DrawScene draw, std::string_view ready_message,
     (void)sceVideoOutWaitVblank(video);
     if (!ready_message.empty()) notify(ready_message);
 
+    std::uint64_t window_start=requested==120?sceKernelGetProcessTime():0,draw_us=0,publish_us=0,wait_us=0;unsigned measured_frames=0;
     // Each frame is drawn whole into the buffer that isn't on screen, then shown.
     if (every_frame)
         for (std::int64_t frame = 2;; ++frame)
@@ -572,16 +592,20 @@ bool detail::present_session(DrawScene draw, std::string_view ready_message,
                 continue;
             }
             const std::size_t back = static_cast<std::size_t>(frame & 1) ^ 1U;
-            draw(cached);
-            publish_frame(buffers[back].data, staging.data());
+            auto begin=requested==120?sceKernelGetProcessTime():0;
+            draw(cached);auto drawn=requested==120?sceKernelGetProcessTime():0;
+            publish_frame(buffers[back].data, staging.data(),fast_frame_path?detail::active_tiled_bytes:frame_bytes);
+            auto copied=requested==120?sceKernelGetProcessTime():0;
             while (sceVideoOutSubmitFlip(video, static_cast<std::int32_t>(back), 1, frame) < 0)
                 (void)sceKernelUsleep(4000);
             (void)sceVideoOutWaitVblank(video);
+            if(requested==120){auto end=sceKernelGetProcessTime();draw_us+=drawn-begin;publish_us+=copied-drawn;wait_us+=end-copied;++measured_frames;if(end-window_start>=2000000){std::fprintf(stderr,"PS5_UI presentation samples=%u fpsMilli=%llu drawAvgUs=%llu publishAvgUs=%llu waitAvgUs=%llu\n",measured_frames,(unsigned long long)(std::uint64_t(measured_frames)*1000000000/(end-window_start)),(unsigned long long)(draw_us/measured_frames),(unsigned long long)(publish_us/measured_frames),(unsigned long long)(wait_us/measured_frames));window_start=end;measured_frames=0;draw_us=publish_us=wait_us=0;}}
         }
 
     if (stop) {
         // Close relinquishes display/buffer ownership before unmapping backing.
         // On failure retain remaining ownership and forbid a display handoff.
+        if(refresh.changed&&sceVideoOutConfigureOutput(video,1,nullptr,nullptr,nullptr)!=0)return false;
         if (sceVideoOutClose(video) < 0) return false;
         if (sceKernelMunmap(mapped, memory_bytes) < 0) return false;
         if (sceKernelReleaseDirectMemory(physical_address, memory_bytes) < 0) return false;
