@@ -89,6 +89,11 @@ inline std::atomic<int> state{0}; // 1 listening; negative errno on startup fail
 inline std::atomic<bool> stopping{false};
 inline int listener=-1;
 inline pthread_t thread{};
+// The single worker must not reserve a64KiB report on its native thread stack.
+// Also guard direct/concurrent callers: one full snapshot at a time, bounded503
+// rather than heap allocation, TLS allocation or a lock held waiting for a peer.
+inline char extended_snapshot[65536]{};
+inline std::atomic_flag extended_snapshot_busy=ATOMIC_FLAG_INIT;
 inline bool send_all(int fd,const char *data,size_t size) {
  while(size) {
 #ifdef MSG_NOSIGNAL
@@ -126,8 +131,13 @@ inline void serve(int fd,const Entry *available=files,size_t count=sizeof(files)
  char method[16]{},url[256]{},version[16]{};
  if(std::sscanf(request,"%15s %255s %15s",method,url,version)!=3){reply(fd,400,"Bad Request","Bad request\n");return;}
  if(std::strcmp(method,"GET")){reply(fd,405,"Method Not Allowed","GET only\n");return;}
- if(!std::strcmp(url,"/file-activity.txt")){char text[4096];ps5::file_activity::snapshot(text,sizeof(text));reply(fd,200,"OK",text);return;}
- if(!std::strcmp(url,"/file-activity-all.txt")){char text[65536];ps5::file_activity::snapshot(text,sizeof(text),512);reply(fd,200,"OK",text);return;}
+ if(!std::strcmp(url,"/file-activity.txt")){ps5::file_activity::snapshot(request,sizeof(request));reply(fd,200,"OK",request);return;}
+ if(!std::strcmp(url,"/file-activity-all.txt")){
+  if(extended_snapshot_busy.test_and_set(std::memory_order_acquire)){reply(fd,503,"Service Unavailable","Full file snapshot busy; retry\n");return;}
+  ps5::file_activity::snapshot(extended_snapshot,sizeof(extended_snapshot),512);
+  reply(fd,200,"OK",extended_snapshot);
+  extended_snapshot_busy.clear(std::memory_order_release);return;
+ }
  if(!std::strcmp(url,"/resource-status.txt")){char text[512];ps5::file_limits::snapshot(text,sizeof(text));reply(fd,200,"OK",text);return;}
  if(!std::strcmp(url,"/")) {
   reply(fd,200,"OK","<!doctype html><meta charset=utf-8><title>PS5 probe logs</title><h1>PS5 probe logs</h1><p>Read-only LAN downloads. Keep the probe open. Refresh to collect newer output. Missing files return 404. Build identifies the open app; session identifies the recorded run. Startup log contains historical runs.</p><ul><li><a href=/file-activity.txt>Tracked native file handles</a></li><li><a href=/file-activity-all.txt>Tracked file handles (up to512)</a></li><li><a href=/resource-status.txt>Live file descriptor status<li><a href=/build.txt>Open app build</a><li><a href=/session.txt>Recorded run status</a><li><a href=/startup-tail.log>Startup tail (last 512 KiB)</a><li><a href=/startup.log>Full startup history</a><li><a href=/native-stderr.log>Native stderr<li><a href=/previous-native-stderr.log>Previous native stderr<li><a href=/vm-trace.log>Native VM trace</a><li><a href=/server.log>Full Minecraft console</a><li><a href=/abort.txt>Last JVM abort</a><li><a href=/class-load.log>Class loading progress</a><li><a href=/process-usage.log>Native resource samples</a><li><a href=/exceptions.log>Java thrown exceptions</a><li><a href=/exceptions-rotated.log>Java thrown exceptions (rotated)</a><li><a href=/previous-exceptions.log>Previous Java thrown exceptions</a><li><a href=/previous-exceptions-rotated.log>Previous Java thrown exceptions (rotated)</a><li><a href=/gc.log>GC and safepoints<li><a href=/gc-rotated.log>GC and safepoints (rotated)<li><a href=/previous-gc.log>Previous GC and safepoints<li><a href=/previous-gc-rotated.log>Previous GC and safepoints (rotated)<li><a href=/jit.log>JIT compilation</a><li><a href=/previous-jit.log>Previous JIT compilation</a><li><a href=/hs-error.log>JVM fatal error report</a><li><a href=/previous-hs-error.log>Previous JVM fatal error report</a><li><a href=/verification-exception.txt>Verification failure</a><li><a href=/server-exception.txt>Server test failure</a><li><a href=/exception.txt>Current-run probe exception</a><li><a href=/previous-exception.txt>Previous-run exception</a><li><a href=/previous-abort.txt>Previous-run abort</a><li><a href=/previous-server.log>Previous-run server output</a></ul>","text/html; charset=utf-8");return;
@@ -144,7 +154,8 @@ inline void serve(int fd,const Entry *available=files,size_t count=sizeof(files)
   if(lseek(file,info.st_size-left,SEEK_SET)<0){close(file);reply(fd,500,"Internal Server Error","Cannot seek log tail\n");return;}
  }
  if(header(fd,200,"OK","text/plain; charset=utf-8",static_cast<long long>(left))) {
-  char block[16384];while(left>0){size_t size=left<static_cast<off_t>(sizeof(block))?static_cast<size_t>(left):sizeof(block);ssize_t n=read(file,block,size);if(n<0&&errno==EINTR)continue;if(n<=0||!send_all(fd,block,static_cast<size_t>(n)))break;left-=n;}
+  // Request parsing is complete; reuse its4KiB buffer for bounded streaming.
+  while(left>0){size_t size=left<static_cast<off_t>(sizeof(request))?static_cast<size_t>(left):sizeof(request);ssize_t n=read(file,request,size);if(n<0&&errno==EINTR)continue;if(n<=0||!send_all(fd,request,static_cast<size_t>(n)))break;left-=n;}
  }
  close(file);
 }

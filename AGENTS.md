@@ -344,3 +344,15 @@ default/alias tests and target java.base-libs pass; PS5 dual-generation lookup,
 callbacks/lifecycle remain pending. See docs/java25-resident-symbol-namespaces.md.
 ProsperoCraft owns approved333 Vanilla integration; Fabric is deferred until
 Vanilla121 is validated. Preserve released204, frozen history and release gates.
+
+
+## Report HTTP stack repair —2026-11-04
+
+The shared handler's512-row diagnostic formerly imposed a70,472byte target frame
+on every request. Fixed BSS snapshot ownership and4KiB request/stream reuse remove
+that large automatic array; concurrent full snapshots return503 and release on
+send failure. Actual64KiB pthread O0/O2 and historical x86_64 fault controls plus
+HTTP/collector/writer/file accounting tests are scoped host evidence. PS5 HTTP
+access after consumer rebuild remains pending; do not infer exact native stack
+size or physical fault address. See docs/java25-log-share-stack.md. Consumer121
+callback allocation and candidate integration remain in ProsperoCraft.
