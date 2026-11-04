@@ -27,3 +27,7 @@ Consumer205 was reported to exit when its HTTP reports are accessed; FTP remains
 available after reopening. No physical repair acceptance is inferred. ProsperoCraft
 owns the rebuilt app and the separate original1.21.11 native-callback allocation
 failure. Preserve original204/205 packages and reports; no release/Store action.
+
+The rebuilt target handler frame is **5,704bytes** (0x1648), down from70,472bytes
+(0x11348). Target compile/link/conversion pass; the report remains limited by the
+same request/response bounds. See [scoped validation](validation/java25-log-share-stack-2026-11-04.json).

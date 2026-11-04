@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-04",
+  "feature": "Bounded native report-server worker stack",
+  "old_target_handler_frame_bytes": 70472,
+  "repaired_target_handler_frame_bytes": 5704,
+  "target": "Exact consumer204/205 main object frame0x11348; rebuilt consumer206 main0x1648; compile/link/converter pass. Physical repaired HTTP access pending.",
+  "host": "PASS actual64KiB pthread index/full512rows/busy503/recovery/1MiB streaming/allowlist/FD status at O0/O2. Exact historical x86_64 O2 SIGBUS on64KiB, repaired x86_64 O2 passes. Historical ARM64 O0 SIGBUS; ARM64 O2 layout differs. Existing HTTP collector/report writer/file activity tests pass.",
+  "root_cause_scope": "Large automatic snapshot array imposes excessive per-request stack, including index. Physical PS5 thread stack size/fault address not retrieved; no physical acceptance inferred.",
+  "policy": "Fixed64KiB BSS snapshot with atomic nonblocking lease; reuse4KiB request storage for streaming; no heap/TLS allocation or stack/heap/GC policy change.",
+  "consumer": "ProsperoCraft owns exact rebuilt app, report retrieval and separate native closure-allocation failure.",
+  "console": "Pending HTTP access and application regression on physical PS5",
+  "release_store": "No action"
+}
