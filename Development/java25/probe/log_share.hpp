@@ -49,6 +49,21 @@ inline constexpr Entry files[]={
  {"/verification-exception.txt","/download0/probe-verification-exception.txt"},
  {"/server-exception.txt","/download0/probe-server-exception.txt"},
  {"/exception.txt","/download0/probe-exception.txt"}};
+// Explicit bootstrap-only relocation; default table and caller-supplied tables stay unchanged.
+inline constexpr size_t file_count=sizeof(files)/sizeof(files[0]);
+inline char configured_root[512]{};
+inline char configured_paths[file_count][640]{};
+inline Entry configured_files[file_count]{};
+inline std::atomic<bool> root_frozen{false};
+inline const char* report_root()noexcept{return configured_root[0]?configured_root:"/download0";}
+inline bool configure_root(const char* root)noexcept{
+ if(root_frozen.load(std::memory_order_acquire)){errno=EBUSY;return false;}
+ if(!root||root[0]!='/'||std::strlen(root)>=sizeof(configured_root)||std::strstr(root,"/../")||std::strstr(root,"/./")){errno=EINVAL;return false;}
+ size_t n=std::strlen(root);if(n<2||root[n-1]=='/'||(n>=3&&!std::strcmp(root+n-3,"/.."))||(n>=2&&!std::strcmp(root+n-2,"/."))){errno=EINVAL;return false;}
+ for(size_t i=0;i<file_count;i++)if(n+std::strlen(files[i].path+10)>=sizeof(configured_paths[i])){errno=ENAMETOOLONG;return false;}
+ for(size_t i=0;i<file_count;i++){std::snprintf(configured_paths[i],sizeof(configured_paths[i]),"%s%s",root,files[i].path+10);configured_files[i]={files[i].url,configured_paths[i]};}
+ std::memcpy(configured_root,root,n+1);return true;
+}
 // Preserve the last failure before starting a new run. On relaunch these
 // files are left alone until the user explicitly initializes another run.
 inline bool write_note(const char *path,const char *text) {
@@ -69,7 +84,8 @@ inline bool archive_report(const char *path,const char *previous) {
  if(std::ferror(input))ok=false;
  if(std::fclose(output)!=0)ok=false;std::fclose(input);return ok;
 }
-inline bool begin_session(const char *build,const char *run,const char *root="/download0") {
+inline bool begin_session(const char *build,const char *run,const char *root=nullptr) {
+ if(!root)root=report_root();
  char path[640],backup[640],note[512];bool ok=true;
  const char *current[]={"probe-exception.txt","mc-bootstrap-abort.txt","mc-server-start/server-console.log","hs_err_java25.log","java25-class-load.log","process-usage.log","probe-verification-exception.txt","probe-server-exception.txt","java25-jit.log","java25-exceptions.log","java25-exceptions.log.0","probe-native-stderr.log","java25-gc.log","java25-gc.log.0"};
  const char *old[]={"previous-probe-exception.txt","previous-mc-bootstrap-abort.txt","mc-server-start/previous-server-console.log","previous-hs_err_java25.log","previous-java25-class-load.log","previous-process-usage.log","previous-probe-verification-exception.txt","previous-probe-server-exception.txt","previous-java25-jit.log","previous-java25-exceptions.log","previous-java25-exceptions.log.0","previous-probe-native-stderr.log","previous-java25-gc.log","previous-java25-gc.log.0"};
@@ -115,7 +131,8 @@ inline bool header(int fd,int code,const char *reason,const char *type,long long
 inline void reply(int fd,int code,const char *reason,const char *body,const char *type="text/plain; charset=utf-8") {
  if(header(fd,code,reason,type,std::strlen(body)))send_all(fd,body,std::strlen(body));
 }
-inline void serve(int fd,const Entry *available=files,size_t count=sizeof(files)/sizeof(files[0])) {
+inline void serve(int fd,const Entry *available=nullptr,size_t count=file_count) {
+ if(!available)available=configured_root[0]?configured_files:files;
  timeval timeout{5,0};setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&timeout,sizeof(timeout));setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&timeout,sizeof(timeout));
 #ifdef SO_NOSIGPIPE
  int yes=1;setsockopt(fd,SOL_SOCKET,SO_NOSIGPIPE,&yes,sizeof(yes));
@@ -164,6 +181,7 @@ inline void *worker(void *) {
  return nullptr;
 }
 inline void start(unsigned short port=8765) {
+ root_frozen.store(true,std::memory_order_release);
  listener=socket(AF_INET,SOCK_STREAM,0);if(listener<0){state=-errno;return;}
  int yes=1;setsockopt(listener,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(yes));
  sockaddr_in address{};

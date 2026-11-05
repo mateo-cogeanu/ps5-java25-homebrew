@@ -367,3 +367,14 @@ old/fast full-pixel/pitch/short-input sanitizer and target-object checks pass; a
 PS5 refresh/FPS/reset/handoff remain pending. See docs/native-presenter-high-refresh.md.
 Source/runtime helper belongs here; ProsperoCraft owns launcher211 integration and
 physical animation/trigger/menu acceptance. Preserve frozen bytes and release gates.
+
+## Optional bootstrap report directory —2026-11-05
+
+The reusable native HTTP handler supports explicit configure_root before start,
+with bounded BSS path/allowlist storage and default archive/session relocation.
+Defaults remain download0; caller owns actual access, consistent writers and
+storage fallback. No mounts/elevation/arbitrary URLs or VM/image policy change.
+start freezes selection, including after failure/stop; late EBUSY. Default,
+refusal/actual HTTP bytes/session and existing collector/64KiB stack regressions
+pass. Consumer216 all-data/report/tmp migration and fallback belongs in
+ProsperoCraft; physical console validation pending. See docs/probe-report-root.md.
