@@ -154,3 +154,21 @@ buffers with fewer than1,200 mappings, verify every buffer and release all
 backing. Existing default/extended ledger fault tests remain. Native heap tests
 account for the new class and larger-slot borrowing. Target compilation and
 console Fabric26.2 play/save/rejoin/endurance validation are separate.
+
+Consumer246 exact-build reports confirm a longer Fabric26.2 run followed by
+native64KiB ReallocateHeap failure. The ledger again held4,096 net live mappings,
+approximately426MiB of its512MiB budget. Patch0151 extends medium pooling to
+16,32and64KiB classes, using eight-slot slabs for larger classes. Existing
+mapping refusal falls back to the minimum single-slot slab when possible.
+This trades some sparse-class backing overhead for fewer mapping entries.
+Maximum idle storage now includes the three medium-class slabs; larger buffers
+still use independent mappings.
+
+The actual header host regression keeps6,144 buffers across9,000/32,664/65,536
+byte requests with fewer than900 mappings, checks data and releases all backing.
+The previous8,192buffer4,112byte regression and default/extended fault tests pass.
+Native heap tests cover twelve classes, minimum slab fallback, NMT accounting,
+realloc failure preservation and concurrency. Historical two-page arena
+allocation size is no longer the pooled-path guarantee; constrained medium
+requests may require up to64KiB mapping capacity. PS5 bytes/mapping headroom,
+Fabric play/save/rejoin/endurance and performance remain pending.

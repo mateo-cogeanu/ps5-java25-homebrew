@@ -126,7 +126,7 @@ int main(){
  });
  for(auto &thread:workers)thread.join();assert(map_live<=heap::slab_class_count);heap::trim_idle();assert(map_live==0&&heap_live==0&&notes>0);
  deny_heap=false;p=heap::allocate(90);assert(p&&heap_live==1);heap::release(p);assert(heap_live==0);
- std::puts("PASS: real mapped storage, bounded idle slab reuse/pressure trimming, nine pooled classes, alignment, normal/mapped realloc migration, failed growth preserves bytes, overflow, concurrency and complete backend cleanup");
+ std::puts("PASS: real mapped storage, bounded idle slab reuse/pressure trimming, twelve pooled classes, alignment, normal/mapped realloc migration, failed growth preserves bytes, overflow, concurrency and complete backend cleanup");
 }
 '''
 # Reuse the same actual raw allocator and stress test, then exercise the exact
@@ -213,19 +213,19 @@ int main(){
  void* early=raw_malloc(90);assert(early);std::memset(early,0x61,90);
  deny_heap=true;early=raw_realloc(early,128);check(early,90,0x61);
  deny_heap=true;early=os::realloc(early,300,mtInternal);check(early,90,0x61);os::free(early);
- // The default arena request must fit two16KiB pages even with NMT overhead.
+ // Under a constrained mapping size, medium slabs fall back to one-slot storage.
  for(bool nmt:{false,true}) {
-  tracking=nmt;accounted=0;limit=SIZE_MAX;deny_heap=true;map_limit=32768;
+  tracking=nmt;accounted=0;limit=SIZE_MAX;deny_heap=true;map_limit=65536;
   size_t request=sizeof(ArenaChunkLayoutContract)+ArenaChunkLayoutContract::size;
   void* arena=os::malloc(request,mtInternal);assert(arena);
   void* raw=nmt?(void*)((MallocHeader*)arena-1):arena;
-  assert(heap::mapped_bytes((heap::Header*)raw-1)==32768);
+  assert(heap::owning_slab((heap::Header*)raw-1)->mapped<=65536);
   memset(arena,0x47,request);os::free(arena);heap::trim_idle();assert(map_live==0&&accounted==0);
-  // The compact prefix also keeps the old untracked32752-byte request in32KiB.
+  // The old untracked request also remains usable through pooled ownership.
   tracking=false;void* old_arena=os::malloc(32752,mtInternal);assert(old_arena);os::free(old_arena);heap::trim_idle();assert(map_live==0);
  }
  map_limit=SIZE_MAX;
- std::puts("PASS: exact arena size enum with layout/NMT contracts and16KiB page model fits32KiB; compact prefix also fits32752-byte untracked request at32KiB mapping limit");
+ std::puts("PASS: exact arena layout/NMT contracts and16KiB page model with bounded single-slot medium fallback; old32752-byte request remains usable");
  for(bool nmt:{false,true}) {
   tracking=nmt;accounted=0;limit=SIZE_MAX;deny_heap=false;
   void* p=os::malloc(128,mtInternal);assert(p);std::memset(p,0x52,128);

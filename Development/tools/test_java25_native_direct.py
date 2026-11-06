@@ -94,7 +94,7 @@ int main(int argc,char**){
  assert(selected_capacity==(extended?4096u:2048u));
  errno=EDOM;void* p=heap::allocate(100);assert(p&&errno==EDOM&&alloc_calls==0);heap::release(p);
  deny_heap=true;
- p=heap::allocate(32664);assert(p&&errno==EDOM&&direct::state().held==32768);memset(p,0x57,32664);assert(direct::set_extended_budget(0)==EBUSY);
+ p=heap::allocate(32664);assert(p&&errno==EDOM&&direct::state().held>32768);memset(p,0x57,32664);assert(direct::set_extended_budget(0)==EBUSY);
  p=heap::reallocate(p,65536);assert(p&&errno==EDOM);for(int i=0;i<32664;++i)assert(((unsigned char*)p)[i]==0x57);
  fail_alloc=true;void* old=p;assert(!heap::reallocate(p,131072)&&errno==ENOMEM);p=old;for(int i=0;i<32664;++i)assert(((unsigned char*)p)[i]==0x57);fail_alloc=false;
  errno=EDOM;heap::release(p);assert(errno==EDOM);empty();
@@ -111,12 +111,27 @@ int main(int argc,char**){
    heap::release(zbuffers[i]);
  }
  empty();
+ // Occupancy regression from Fabric native64KiB grow/arena failures.
+ const auto medium_maps=direct::state().mappings;
+ std::vector<std::pair<void*,size_t>> medium;
+ for(size_t size:{size_t(9000),size_t(32664),size_t(65536)}){
+   for(unsigned i=0;i<2048;++i){
+     void* q=heap::allocate(size);assert(q);memset(q,0x6b,size);
+     medium.emplace_back(q,size);
+   }
+ }
+ assert(direct::state().mappings-medium_maps<900);
+ for(auto item:medium){
+   assert(((unsigned char*)item.first)[item.second-1]==0x6b);
+   heap::release(item.first);
+ }
+ empty();
  // Small allocation slabs use and release the same exact direct-memory owner.
  std::vector<void*> small;for(int i=0;i<300;++i){void* q=heap::allocate(4096);assert(q);memset(q,0x35,4096);small.push_back(q);}
  for(void* q:small){assert(((unsigned char*)q)[4095]==0x35);heap::release(q);}empty();
- size_t before=alloc_calls;mmap_error=EACCES;assert(!heap::allocate(8193)&&errno==EACCES&&alloc_calls==before);mmap_error=ENOMEM;
- fail_map=true;assert(!heap::allocate(8193)&&errno==ENOMEM);fail_map=false;empty();
- fail_map=true;fail_release=true;assert(!heap::allocate(8193)&&errno==ENOMEM);assert(live_physical==2&&live_mappings==0&&direct::state().held==32768);fail_map=false;fail_release=false;clean_retained_for_test();
+ size_t before=alloc_calls;mmap_error=EACCES;assert(!heap::allocate(65537)&&errno==EACCES&&alloc_calls==before);mmap_error=ENOMEM;
+ fail_map=true;assert(!heap::allocate(65537)&&errno==ENOMEM);fail_map=false;empty();
+ fail_map=true;fail_release=true;assert(!heap::allocate(65537)&&errno==ENOMEM);assert(live_physical==2&&live_mappings==0&&direct::state().held==163840);fail_map=false;fail_release=false;clean_retained_for_test();
  void* mapping=direct::map(16384);assert(mapping!=MAP_FAILED);memset(mapping,0x48,16384);
  int result=0;assert(direct::unmap(mapping,32768,&result)&&result==-1&&errno==EINVAL);assert(live_physical==1&&live_mappings==1);
  fail_unmap=true;before=release_calls;assert(direct::unmap(mapping,16384,&result)&&result==-1);assert(release_calls==before&&live_mappings==1&&((char*)mapping)[0]==0x48);fail_unmap=false;

@@ -1,0 +1,38 @@
+--- a/src/hotspot/share/runtime/ps5NativeHeap.hpp
++++ b/src/hotspot/share/runtime/ps5NativeHeap.hpp
+@@ -51,7 +51,7 @@
+ inline void release_libc(size_t bytes) {
+   __atomic_fetch_sub(libc_held_word(), bytes, __ATOMIC_RELAXED);
+ }
+-constexpr unsigned slab_class_count = 9;
++constexpr unsigned slab_class_count = 12;
+ inline Slab** classes() { static Slab* heads[slab_class_count] = {}; return heads; }
+ inline unsigned* mutex_word() { static unsigned lock = 0; return &lock; }
+ inline void lock() {
+@@ -93,7 +93,7 @@
+   ps5_vm_trace_values("PS5 native libc held_bytes=", libc_held(), " budget_bytes=", libc_budget, " reserved=", 0);
+   ps5_native_direct::report();
+ }
+-// At most one empty slab per class stays warm (<=9*64KiB). Reclaim it
++// At most one empty slab per class stays warm (<=9*64KiB+3*576KiB). Reclaim it
+ // before propagating mapping pressure. Live allocations are never displaced.
+ inline void trim_idle_locked() {
+   for (unsigned index=0;index<slab_class_count;++index) {
+@@ -121,7 +121,7 @@
+     }
+     release_libc(libc_bytes);
+   }
+-  if (size > 8192) {
++  if (size > 65536) {
+     size_t mapped;
+     if (!rounded(sizeof(Header) + size, &mapped)) { errno = ENOMEM; return nullptr; }
+     void* memory = map_pages(mapped);
+@@ -140,7 +140,7 @@
+     Slab* slab = classes()[index];
+     while (slab && !slab->available) slab = slab->next;
+     if (!slab) {
+-      if (rounded(65536, &mapped)) {
++      if (rounded(stride > 8192 ? stride * 8 + sizeof(Slab) : 65536, &mapped)) {
+         void* memory = map_pages(mapped);
+         if (memory == MAP_FAILED) {
+           error = errno;
