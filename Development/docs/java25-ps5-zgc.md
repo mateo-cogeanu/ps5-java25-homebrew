@@ -122,3 +122,17 @@ identities, recursion, publication, contention and400,000 concurrent updates.
 A desktop control still constructs the original lock member. Target builds
 check the PS5 atomic/yield calls. Fabric startup, GC, saving and contention/frame
 pacing remain physical-console validation.
+
+Consumer243 Fabric gameplay stutter reports show safepoint-entry delays of
+roughly0.5..0.8seconds and a VM trace HTTP size of411,750,102bytes. The sampled
+contents are dominated by successful32KiB native arena allocation reports,
+each performing synchronous diagnostic IO. This is a concrete source of heavy
+diagnostic work; the reports do not prove it explains every frame drop.
+
+Patch0149 applies the consumer-selected startup trace interval to successful
+native allocator reports. The default interval0 preserves prior output.
+Interval4096 keeps the first success and every4096th event. Errors always retain
+the complete allocator/ledger diagnostics. An atomic event counter avoids
+racing concurrent writers. The host test extracts the actual trace function
+and checks default output, success sampling, all errors and concurrency under
+ASan/UBSan. Console frame pacing and remaining safepoint causes need retesting.

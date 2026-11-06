@@ -15,7 +15,7 @@ subprocess.run(['git','apply','--reverse',str(r/'java25/patches/0103-ps5-bound-v
 subprocess.run(['git','apply','--reverse',str(r/'java25/patches/0101-ps5-native-direct-memory-fallback.patch')],cwd=control,check=True)
 subprocess.run(['patch','-R','-o',str(w/'baseline/runtime/ps5NativeHeap.hpp'),str(control/'src/hotspot/share/runtime/ps5NativeHeap.hpp'),str(patch)],check=True,capture_output=True)
 (w/'stubs/utilities/permitForbiddenFunctions.hpp').write_text('#pragma once\nnamespace permit_forbidden_function{inline void*malloc(size_t){return nullptr;}inline void*realloc(void*,size_t){return nullptr;}inline void free(void*){abort();}}\n')
-(w/'stubs/runtime/ps5StartupTrace.hpp').write_text('#pragma once\ninline void ps5_vm_trace_values(const char*,unsigned long long,const char*,unsigned long long,const char*,unsigned long long){}\n')
+(w/'stubs/runtime/ps5StartupTrace.hpp').write_text('#pragma once\ninline unsigned* ps5_vm_metadata_interval(){static unsigned value=0;return &value;}\ninline void ps5_vm_trace_values(const char*,unsigned long long,const char*,unsigned long long,const char*,unsigned long long){}\n')
 c=w/'bench.cpp';c.write_text(r'''
 #include <cstdlib>
 #include <cstdint>

@@ -5,6 +5,7 @@ import subprocess
 ROOT=Path(__file__).resolve().parents[1];WORK=ROOT/'build/java25/native-heap-test'
 (WORK/'utilities').mkdir(parents=True,exist_ok=True);(WORK/'runtime').mkdir(exist_ok=True)
 (WORK/'utilities/permitForbiddenFunctions.hpp').write_text('''#pragma once
+inline unsigned* ps5_vm_metadata_interval(){static unsigned value=0;return &value;}
 namespace permit_forbidden_function {
 inline void* malloc(size_t n){return test_malloc(n);}
 inline void* realloc(void* p,size_t n){return test_realloc(p,n);}

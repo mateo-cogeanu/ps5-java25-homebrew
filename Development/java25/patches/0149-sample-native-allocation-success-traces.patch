@@ -1,0 +1,17 @@
+--- a/src/hotspot/share/runtime/ps5NativeHeap.hpp
++++ b/src/hotspot/share/runtime/ps5NativeHeap.hpp
+@@ -80,6 +80,14 @@
+   return ps5_native_direct::unmap(address,bytes,&result) ? result : munmap(address,bytes);
+ }
+ inline void note(const char* label, size_t requested, size_t mapped, int error) {
++  // Consumers already select the startup trace sampling interval. Apply it to
++  // successful allocator activity too; failures always retain full diagnostics.
++  const unsigned interval = __atomic_load_n(ps5_vm_metadata_interval(), __ATOMIC_ACQUIRE);
++  if (error == 0 && interval > 1) {
++    static unsigned long long successes = 0;
++    const auto event = __atomic_fetch_add(&successes, 1ULL, __ATOMIC_RELAXED);
++    if (event != 0 && event % interval != 0) return;
++  }
+   ps5_vm_trace_values(label, requested, " mapped=", mapped, " errno=", (unsigned long long)error);
+   ps5_vm_trace_values("PS5 native libc held_bytes=", libc_held(), " budget_bytes=", libc_budget, " reserved=", 0);
+   ps5_native_direct::report();

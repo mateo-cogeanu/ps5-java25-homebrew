@@ -8,6 +8,7 @@ work=root/'build/java25/native-direct-test'
 (work/'utilities').mkdir(parents=True,exist_ok=True)
 (work/'runtime').mkdir(exist_ok=True)
 (work/'utilities/permitForbiddenFunctions.hpp').write_text('''#pragma once
+inline unsigned* ps5_vm_metadata_interval(){static unsigned value=0;return &value;}
 namespace permit_forbidden_function {
 inline void* malloc(size_t n){return deny_heap?nullptr:std::malloc(n);}
 inline void* realloc(void* p,size_t n){return deny_heap?nullptr:std::realloc(p,n);}
