@@ -27,3 +27,11 @@ Target compilation and a signed application can establish build integration.
 They cannot establish console JVM creation, barriers, concurrent relocation,
 reference processing, world saving or frame pacing. These need physical tests
 of the exact ZGC candidate before any release or Store publication.
+
+The initial 2026-11-06 target build compiled all ZGC HotSpot objects. Its
+standalone shared-library link was rejected by the SDK driver's simultaneous
+shared/PIE selection. The compiled object set was merged with
+`tools/java25_embedded_hotspot.py` and then linked successfully into the signed
+ProsperoCraft 237 application. Thus the embedded application link passes,
+while the standalone shared-library target remains unresolved. This distinction
+also applies when reproducing the build command above.
