@@ -29,6 +29,10 @@ constructors = constructors[:constructors.index('#endif // PLATFORM_MONITOR_IMPL
     'static pthread_condattr_t* _condAttr;\n'
     + platform + constructors
 )
+method_data = (hotspot / 'share/oops/methodData.cpp').read_text()
+stripes_start = method_data.index('#ifdef __PROSPERO__\nnamespace {\nconstexpr size_t extra_data_lock_count')
+stripes_end = method_data.index('// Remove SpeculativeTrapData', stripes_start)
+(W / 'method_data_stripes.hpp').write_text(method_data[stripes_start:stripes_end])
 cpp=r'''
 #include <pthread.h>
 #include <cassert>
@@ -50,6 +54,31 @@ int test_cond_init(pthread_cond_t*p,const pthread_condattr_t*a){if(a)++relative_
 #undef pthread_cond_init
 #include "platform.hpp"
 using namespace ps5_sync;
+class Mutex : public PlatformMonitor {
+ public:
+  static constexpr int nosafepoint = 20;
+  Mutex() : PlatformMonitor(false) {}
+  void lock() { assert(pthread_mutex_lock(mutex()) == 0); }
+  void unlock() { assert(pthread_mutex_unlock(mutex()) == 0); }
+};
+class PaddedMutex : public Mutex {
+ public:
+  PaddedMutex(int rank, const char*) { assert(rank == nosafepoint - 1); }
+};
+class MethodData {
+  uintptr_t simulated_profile = 0;
+ public:
+  static void initialize_extra_data_locks();
+  Mutex* extra_data_lock();
+  void update() { ++simulated_profile; }
+  uintptr_t profile() const { return simulated_profile; }
+};
+inline void vm_assert(bool condition) { assert(condition); }
+#pragma push_macro("assert")
+#undef assert
+#define assert(condition, message) vm_assert(condition)
+#include "method_data_stripes.hpp"
+#pragma pop_macro("assert")
 int main(int argc,char**){
  bool expanded=argc>1,extra_mutex=argc>2;
  assert(set_extended_reserve(0)==0&&set_extra_mutex_reserve(0)==0);
@@ -99,6 +128,36 @@ int main(int argc,char**){
   {PlatformMonitor monitor;assert(relative_pool().stats().leased==leases+1);}
   assert(relative_pool().stats().leased==leases);
  }
+ {
+  const auto mutex_leases=mutex_pool().stats().leased;
+  const auto cond_leases=relative_pool().stats().leased;
+  MethodData::initialize_extra_data_locks();
+  std::vector<MethodData> methods(32768);
+  std::vector<Mutex*> assigned;
+  for (auto& method : methods) {
+   auto* lock = method.extra_data_lock();
+   assert(method.extra_data_lock() == lock);
+   assigned.push_back(lock);
+  }
+  assert(mutex_pool().stats().leased == mutex_leases + 64);
+  assert(relative_pool().stats().leased == cond_leases);
+  std::vector<std::thread> readers;
+  for (int worker = 0; worker < 4; ++worker) {
+   readers.emplace_back([&] {
+    for (size_t i = 0; i < methods.size(); ++i) {
+     auto* lock = methods[i].extra_data_lock();
+     assert(lock == assigned[i]);
+     lock->lock();
+     methods[i].update();
+     lock->unlock();
+    }
+   });
+  }
+  for (auto& worker : readers) worker.join();
+  for (auto& method : methods) assert(method.profile() == 4);
+  for (auto*& lock : extra_data_locks) { delete lock; lock = nullptr; }
+  assert(mutex_pool().stats().leased == mutex_leases);
+ }
  // Condition-pair syntax retains distinct relative/absolute resources.
  CondPair pair;assert(cond_init_at(pair,0,&ca)==0&&cond_init_at(pair,1,nullptr)==0);assert(&pair[0]!=&pair[1]);assert(cond_destroy_at(pair,0)==0&&cond_destroy_at(pair,1)==0);
  // Actual condition wait/signal exchange after initialization refusal.
@@ -114,7 +173,7 @@ int main(int argc,char**){
  for(auto&s:relative_pool().slots){assert(!s.busy);if(s.initialized)assert(pthread_cond_destroy(&s.native)==0);}
  for(auto&s:absolute_pool().slots){assert(!s.busy);if(s.initialized)assert(pthread_cond_destroy(&s.native)==0);}
  pthread_condattr_destroy(&different);pthread_condattr_destroy(&ca);pthread_mutexattr_destroy(&ma);pthread_mutexattr_destroy(&other);
- puts("PASS: real pooled mutex/cond objects, late init ENOMEM, no handle copying, lock/busy and wait/signal/timeout behavior, exact attrs,default4096 or opt-in8192/12288 mutex,4096/8192 relative +2048 absolute exhaustion/reuse;post-prime policy change rejected,8000 concurrent lease lifetimes and complete native teardown and distinct exhaustion/attribute-mismatch diagnostics");
+ puts("PASS: 32768 method profiles share 64 locks under concurrent access; real pooled mutex/cond objects, late init ENOMEM, no handle copying, lock/busy and wait/signal/timeout behavior, exact attrs,default4096 or opt-in8192/12288 mutex,4096/8192 relative +2048 absolute exhaustion/reuse;post-prime policy change rejected,8000 concurrent lease lifetimes and complete native teardown and distinct exhaustion/attribute-mismatch diagnostics");
 }
 '''
 p=W/'test.cpp';p.write_text(cpp)

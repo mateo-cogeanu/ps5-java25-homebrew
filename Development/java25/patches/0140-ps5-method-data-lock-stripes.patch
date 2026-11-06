@@ -1,0 +1,72 @@
+--- a/src/hotspot/share/oops/methodData.hpp
++++ b/src/hotspot/share/oops/methodData.hpp
+@@ -2557,6 +2557,9 @@
+
+   void clean_method_data(bool always_clean);
+   void clean_weak_method_links();
++#ifdef __PROSPERO__
++  static void initialize_extra_data_locks();
++#endif
+   Mutex* extra_data_lock();
+   void check_extra_data_locked() const NOT_DEBUG_RETURN;
+ };
+--- a/src/hotspot/share/runtime/mutexLocker.cpp
++++ b/src/hotspot/share/runtime/mutexLocker.cpp
+@@ -27,6 +27,7 @@
+ #include "logging/logStream.hpp"
+ #include "memory/resourceArea.hpp"
+ #include "memory/universe.hpp"
++#include "oops/methodData.hpp"
+ #include "runtime/javaThread.hpp"
+ #include "runtime/mutexLocker.hpp"
+ #include "runtime/safepoint.hpp"
+@@ -203,6 +204,10 @@
+
+ // Using Padded subclasses to prevent false sharing of these global monitors and mutexes.
+ void mutex_init() {
++#ifdef __PROSPERO__
++  MethodData::initialize_extra_data_locks();
++#endif
++
+   MUTEX_DEFN(tty_lock                        , PaddedMutex  , tty);      // allow to lock in VM
+
+   MUTEX_DEFN(STS_lock                        , PaddedMonitor, nosafepoint);
+--- a/src/hotspot/share/oops/methodData.cpp
++++ b/src/hotspot/share/oops/methodData.cpp
+@@ -1859,7 +1859,28 @@
+   bool is_live(Method* m) { return !m->is_old(); }
+ };
+
++#ifdef __PROSPERO__
++namespace {
++constexpr size_t extra_data_lock_count = 64;
++PaddedMutex* extra_data_locks[extra_data_lock_count];
++}
++
++void MethodData::initialize_extra_data_locks() {
++  for (PaddedMutex*& lock : extra_data_locks) {
++    lock = new PaddedMutex(Mutex::nosafepoint-1, "MDOExtraData_lock");
++  }
++}
++#endif
++
+ Mutex* MethodData::extra_data_lock() {
++#ifdef __PROSPERO__
++  // Metadata does not move. Mix adjacent and higher address bits so a class
++  // loader arena's regular allocation stride does not concentrate its locks.
++  const uintptr_t address_bits = reinterpret_cast<uintptr_t>(this);
++  const size_t index = ((address_bits >> 3) ^ (address_bits >> 12)) % extra_data_lock_count;
++  assert(extra_data_locks[index] != nullptr, "initialized during mutex_init");
++  return extra_data_locks[index];
++#else
+   Mutex* lock = Atomic::load_acquire(&_extra_data_lock);
+   if (lock == nullptr) {
+     // This lock could be acquired while we are holding DumpTimeTable_lock/nosafepoint
+@@ -1872,6 +1893,7 @@
+     }
+   }
+   return lock;
++#endif
+ }
+
+ // Remove SpeculativeTrapData entries that reference an unloaded or
