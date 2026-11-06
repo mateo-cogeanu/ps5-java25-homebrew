@@ -9,6 +9,8 @@ import subprocess
 import argparse
 import shutil
 
+from java25_embedded_hotspot import embed_hotspot
+
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--startup", action="store_true", help="Package the experimental VM startup attempt")
@@ -72,21 +74,11 @@ def response(path, values):
 
 # Keep HotSpot constructors out of application startup. They run once only
 # after the UI shows RUN, so a constructor crash has an identifiable stage.
-source_response = WORK / "jvm-objects.rsp"
-response(source_response, objects)
 merged = WORK / "embedded-jvm.o"
 lld = llvm / "ld.lld"
 if not lld.exists():
     lld = Path(subprocess.check_output(["brew", "--prefix", "lld"], text=True).strip()) / "bin/ld.lld"
-subprocess.run([str(lld), "-r", "@" + str(source_response), "-o", str(merged)], check=True)
-sections = subprocess.check_output([str(llvm / "llvm-readelf"), "-SW", str(merged)], text=True)
-names = sorted(set(re.findall(r"\]\s+(\.(?:init_array|ctors)\S*)\s", sections)))
-renames = []
-for name in names:
-    renames += ["--rename-section", name + "=.data.rel.ro.jvm_init_array" + name]
-if not names:
-    raise SystemExit("No HotSpot constructors found in merged object")
-subprocess.run([str(llvm / "llvm-objcopy"), *renames, str(merged)], check=True)
+embed_hotspot(objects, merged, llvm, lld)
 layout = WORK / "jni-probe.ld"
 script = (NATIVE / "ps5-pie.ld").read_text()
 script = script.replace("KEEP(*(.eh_frame_hdr))", "PROVIDE_HIDDEN(__eh_frame_hdr_start = .); KEEP(*(.eh_frame_hdr)) PROVIDE_HIDDEN(__eh_frame_hdr_end = .);")

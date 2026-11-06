@@ -1,0 +1,41 @@
+--- a/src/hotspot/share/runtime/ps5Synchronization.hpp
++++ b/src/hotspot/share/runtime/ps5Synchronization.hpp
+@@ -36,22 +36,28 @@
+  bool release(Handle*p){bool found=false;lock();for(auto&s:slots)if(&s.native==p){found=s.initialized&&s.busy;if(found)s.busy=false;break;}unlock();return found;}
+ };
+ enum { mutex_capacity=4096, relative_capacity=4096, absolute_capacity=2048 };
+-inline Pool<pthread_mutex_t,mutex_capacity*2>& mutex_pool(){static Pool<pthread_mutex_t,mutex_capacity*2> p{};return p;}
++inline Pool<pthread_mutex_t,mutex_capacity*3>& mutex_pool(){static Pool<pthread_mutex_t,mutex_capacity*3> p{};return p;}
+ inline Pool<pthread_cond_t,relative_capacity*2>& relative_pool(){static Pool<pthread_cond_t,relative_capacity*2> p{};return p;}
+ inline Pool<pthread_cond_t,absolute_capacity>& absolute_pool(){static Pool<pthread_cond_t,absolute_capacity> p{};return p;}
+-struct Configuration {const pthread_mutexattr_t* mutex;const pthread_condattr_t* relative;unsigned state,extended;};
++struct Configuration {const pthread_mutexattr_t* mutex;const pthread_condattr_t* relative;unsigned state,extended,extra_mutex;};
+ inline Configuration& configuration(){static Configuration c{};return c;}
+ // Bootstrap policy only: reject changes after initialization starts.
+ inline int set_extended_reserve(int enabled){
+  auto&c=configuration();if(__atomic_load_n(&c.state,__ATOMIC_ACQUIRE))return EBUSY;
+  c.extended=enabled!=0;return 0;
+ }
++inline int set_extra_mutex_reserve(int enabled){
++ auto& c=configuration();
++ if(__atomic_load_n(&c.state,__ATOMIC_ACQUIRE))return EBUSY;
++ c.extra_mutex=enabled!=0;
++ return 0;
++ }
+ struct PrimeResult {size_t mutexes,relative,absolute;};
+ inline PrimeResult prime(pthread_mutexattr_t* ma,pthread_condattr_t* ca){
+  auto&c=configuration();unsigned expected=0;
+  if(!__atomic_compare_exchange_n(&c.state,&expected,1u,false,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE))return {0,0,0};
+  c.mutex=ma;c.relative=ca;
+- PrimeResult result{mutex_pool().prime(pthread_mutex_init,ma,mutex_capacity*(c.extended?2:1)),relative_pool().prime(pthread_cond_init,ca,relative_capacity*(c.extended?2:1)),absolute_pool().prime(pthread_cond_init,static_cast<pthread_condattr_t*>(nullptr))};
++ PrimeResult result{mutex_pool().prime(pthread_mutex_init,ma,mutex_capacity*(c.extra_mutex?3:c.extended?2:1)),relative_pool().prime(pthread_cond_init,ca,relative_capacity*(c.extended?2:1)),absolute_pool().prime(pthread_cond_init,static_cast<pthread_condattr_t*>(nullptr))};
+  __atomic_store_n(&c.state,2u,__ATOMIC_RELEASE);return result;
+ }
+ class MutexLease {
+--- a/src/hotspot/os/posix/os_posix.cpp
++++ b/src/hotspot/os/posix/os_posix.cpp
+@@ -1389,3 +1389,4 @@
+ #ifdef __PROSPERO__
+ extern "C" int JVM_PS5SetExtendedSyncReserveEnabled(int enabled){return ps5_sync::set_extended_reserve(enabled);}
++extern "C" int JVM_PS5SetExtraMutexReserveEnabled(int enabled){return ps5_sync::set_extra_mutex_reserve(enabled);}
+ #endif
