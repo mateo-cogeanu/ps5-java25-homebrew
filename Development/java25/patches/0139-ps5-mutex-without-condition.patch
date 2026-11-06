@@ -1,0 +1,99 @@
+--- a/src/hotspot/os/posix/mutex_posix.hpp
++++ b/src/hotspot/os/posix/mutex_posix.hpp
+@@ -133,7 +133,11 @@
+   pthread_cond_t* cond() { return ps5_sync::address(_cond); }
+
+  public:
++#ifdef __PROSPERO__
++  explicit PlatformMonitor(bool needs_condition = true);
++#else
+   PlatformMonitor();
++#endif
+   ~PlatformMonitor();
+
+ #endif // PLATFORM_MONITOR_IMPL_INDIRECT
+--- a/src/hotspot/os/posix/os_posix.cpp
++++ b/src/hotspot/os/posix/os_posix.cpp
+@@ -2010,12 +2010,24 @@
+   PS5_PTHREAD_CHECK(status == 0, status, "mutex_destroy");
+ }
+
++#ifdef __PROSPERO__
++PlatformMonitor::PlatformMonitor(bool needs_condition) {
++  if (!needs_condition) {
++    return;
++  }
++#else
+ PlatformMonitor::PlatformMonitor() {
++#endif
+   int status = ps5_sync::cond_init(&_cond, _condAttr);
+   PS5_PTHREAD_CHECK(status == 0, status, "monitor cond_init");
+ }
+
+ PlatformMonitor::~PlatformMonitor() {
++#ifdef __PROSPERO__
++  if (!_cond.initialized()) {
++    return;
++  }
++#endif
+   int status = ps5_sync::cond_destroy(&_cond);
+   PS5_PTHREAD_CHECK(status == 0, status, "cond_destroy");
+ }
+--- a/src/hotspot/share/runtime/mutex.hpp
++++ b/src/hotspot/share/runtime/mutex.hpp
+@@ -137,6 +137,9 @@
+ #endif // ASSERT
+
+  protected:
++#ifdef __PROSPERO__
++  Mutex(Rank rank, const char* name, bool allow_vm_block, bool needs_condition);
++#endif
+   void set_owner_implementation(Thread* owner)                        NOT_DEBUG({ raw_set_owner(owner);});
+   void check_block_state       (Thread* thread)                       NOT_DEBUG_RETURN;
+   void check_safepoint_state   (Thread* thread)                       NOT_DEBUG_RETURN;
+@@ -225,10 +228,17 @@
+ class Monitor : public Mutex {
+  public:
+   Monitor(Rank rank, const char *name, bool allow_vm_block)  :
++#ifdef __PROSPERO__
++    Mutex(rank, name, allow_vm_block, true) {}
++
++  Monitor(Rank rank, const char *name) :
++    Monitor(rank, name, rank <= nosafepoint) {}
++#else
+     Mutex(rank, name, allow_vm_block) {}
+
+   Monitor(Rank rank, const char *name) :
+     Mutex(rank, name) {}
++#endif
+   // default destructor
+
+   // Wait until monitor is notified (or times out).
+--- a/src/hotspot/share/runtime/mutex.cpp
++++ b/src/hotspot/share/runtime/mutex.cpp
+@@ -284,7 +284,15 @@
+   os::free(const_cast<char*>(_name));
+ }
+
++#ifdef __PROSPERO__
++Mutex::Mutex(Rank rank, const char* name, bool allow_vm_block)
++  : Mutex(rank, name, allow_vm_block, false) {}
++
++Mutex::Mutex(Rank rank, const char* name, bool allow_vm_block, bool needs_condition)
++  : _owner(nullptr), _lock(needs_condition) {
++#else
+ Mutex::Mutex(Rank rank, const char * name, bool allow_vm_block) : _owner(nullptr) {
++#endif
+   assert(os::mutex_init_done(), "Too early!");
+   assert(name != nullptr, "Mutex requires a name");
+   _name = os::strdup(name, mtInternal);
+--- a/src/hotspot/share/runtime/ps5Synchronization.hpp
++++ b/src/hotspot/share/runtime/ps5Synchronization.hpp
+@@ -118,6 +118,7 @@
+   int result=kind==1?(relative_pool().release(active)?0:EINVAL):kind==2?(absolute_pool().release(active)?0:EINVAL):pthread_cond_destroy(active);
+   if(!result){active=nullptr;kind=0;}errno=saved;return result;
+  }
++ bool initialized() const { return active != nullptr; }
+  pthread_cond_t*get(){return active?active:&local;}
+  operator pthread_cond_t*(){return get();}
+ };

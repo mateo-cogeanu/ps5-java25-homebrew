@@ -12,6 +12,23 @@ inline void ps5_vm_trace_values(const char*label,unsigned long long a,const char
  if(std::strstr(label,"fallback config=")){seen_state=a;seen_match=b;seen_caller=c;}
 }
 ''')
+hotspot = R / '.tools/java25/openjdk/src/hotspot'
+posix = hotspot / 'os/posix'
+platform = (posix / 'mutex_posix.hpp').read_text()
+platform = platform[platform.index('class PlatformMutex'):]
+platform = platform[:platform.rindex('#endif')]
+constructors = (posix / 'os_posix.cpp').read_text()
+constructors = constructors[constructors.index('PlatformMutex::PlatformMutex() {\n  int status = ps5_sync::mutex_init'):]
+constructors = constructors[:constructors.index('#endif // PLATFORM_MONITOR_IMPL_INDIRECT')]
+(W / 'platform.hpp').write_text(
+    '#define PLATFORM_MONITOR_IMPL_INDIRECT 0\n'
+    '#define NONCOPYABLE(T) T(const T&) = delete; T& operator=(const T&) = delete\n'
+    '#define PS5_PTHREAD_CHECK(test, status, operation) assert(test)\n'
+    'enum { mtSynchronizer }; template<int> class CHeapObj {};\n'
+    'static pthread_mutexattr_t* _mutexAttr;\n'
+    'static pthread_condattr_t* _condAttr;\n'
+    + platform + constructors
+)
 cpp=r'''
 #include <pthread.h>
 #include <cassert>
@@ -31,6 +48,7 @@ int test_cond_init(pthread_cond_t*p,const pthread_condattr_t*a){if(a)++relative_
 #include "runtime/ps5Synchronization.hpp"
 #undef pthread_mutex_init
 #undef pthread_cond_init
+#include "platform.hpp"
 using namespace ps5_sync;
 int main(int argc,char**){
  bool expanded=argc>1,extra_mutex=argc>2;
@@ -41,6 +59,7 @@ int main(int argc,char**){
  pthread_mutexattr_t ma,other;pthread_condattr_t ca;assert(pthread_mutexattr_init(&ma)==0);assert(pthread_mutexattr_settype(&ma,PTHREAD_MUTEX_NORMAL)==0);assert(pthread_mutexattr_init(&other)==0);assert(pthread_condattr_init(&ca)==0);
  // Existing early/local objects remain native-owned, rather than copied.
  MutexLease early;assert(early.init(&ma)==0);auto*early_address=early.get();assert(pthread_mutex_lock(early.get())==0);assert(pthread_mutex_unlock(early.get())==0);
+ _mutexAttr=&ma;_condAttr=&ca;
  auto counts=prime(&ma,&ca);assert(counts.mutexes==mutex_limit&&counts.relative==relative_capacity*(expanded?2:1)&&counts.absolute==absolute_capacity);
  assert(set_extended_reserve(0)==EBUSY&&set_extra_mutex_reserve(0)==EBUSY);
  assert(early.get()==early_address&&early.destroy()==0);deny=true;
@@ -62,12 +81,24 @@ int main(int argc,char**){
   int capacity=domain==1?relative_capacity*(expanded?2:1):absolute_capacity;const pthread_condattr_t*attr=domain==1?&ca:nullptr;
   std::vector<std::unique_ptr<CondLease>> conditions;
   for(int i=0;i<capacity;++i){auto item=std::make_unique<CondLease>();assert(item->init(attr)==0);for(auto&prior:conditions)assert(prior->get()!=item->get());conditions.push_back(std::move(item));}
+  if(domain==1){
+   // The actual platform lock-only constructor works with every condition leased.
+   const auto leased_mutexes=mutex_pool().stats().leased;
+   const int init_calls=relative_calls;
+   {PlatformMonitor lock_only(false);assert(mutex_pool().stats().leased==leased_mutexes+1);}
+   assert(mutex_pool().stats().leased==leased_mutexes&&relative_calls==init_calls);
+  }
   CondLease overflow;errno=EDOM;assert(overflow.init(attr)==ENOMEM&&errno==EDOM);
   assert(seen_status==ENOMEM&&seen_leased==(unsigned)capacity&&seen_initialized==(unsigned)capacity&&seen_state==2&&seen_match==domain&&seen_caller);
   auto*returned=conditions.back()->get();assert(conditions.back()->destroy()==0);conditions.pop_back();assert(overflow.init(attr)==0&&overflow.get()==returned);assert(overflow.destroy()==0);
   for(auto&item:conditions)assert(item->destroy()==0);
  }
  assert(custom_cond.init(&different)==ENOMEM);assert(seen_match==0&&seen_leased==0&&seen_initialized==0&&seen_state==2&&seen_caller);
+ {
+  const auto leases=relative_pool().stats().leased;
+  {PlatformMonitor monitor;assert(relative_pool().stats().leased==leases+1);}
+  assert(relative_pool().stats().leased==leases);
+ }
  // Condition-pair syntax retains distinct relative/absolute resources.
  CondPair pair;assert(cond_init_at(pair,0,&ca)==0&&cond_init_at(pair,1,nullptr)==0);assert(&pair[0]!=&pair[1]);assert(cond_destroy_at(pair,0)==0&&cond_destroy_at(pair,1)==0);
  // Actual condition wait/signal exchange after initialization refusal.
