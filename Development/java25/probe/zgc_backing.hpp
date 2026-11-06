@@ -14,6 +14,7 @@ extern "C" int sceKernelAllocateDirectMemory(int64_t, int64_t, size_t, size_t, i
 extern "C" int sceKernelMapDirectMemory(void**, size_t, int, int, int64_t, size_t);
 extern "C" int sceKernelReleaseDirectMemory(int64_t, size_t);
 extern "C" int sceKernelMunmap(void*, size_t);
+extern "C" int sceKernelReserveVirtualRange(void**, size_t, int, size_t);
 
 namespace ps5_zgc {
 class Backing {
@@ -28,6 +29,7 @@ class Backing {
   size_t capacity_ = 0;
   int device_ = -1;
   std::atomic<int> map_result_{0};
+  std::atomic<int> restore_result_{0};
   std::atomic<int64_t> map_physical_{-1};
 
   class Guard {
@@ -92,6 +94,7 @@ class Backing {
     return released;
   }
 
+  int restore_result() const { return restore_result_.load(std::memory_order_relaxed); }
   int map_result() const { return map_result_.load(std::memory_order_relaxed); }
   int64_t map_physical() const { return map_physical_.load(std::memory_order_relaxed); }
 
@@ -147,11 +150,21 @@ class Backing {
   bool unmap(uintptr_t address, size_t length) {
     if (!address || address % granule || length % granule ||
         address > UINTPTR_MAX - length) return false;
-    // Restore a non-accessible reservation. The backing stays committed until
-    // ZGC returns its physical segments through uncommit.
-    return mmap(reinterpret_cast<void*>(address), length, PROT_NONE,
-                MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0) ==
-           reinterpret_cast<void*>(address);
+    Guard guard(*this);
+    // Detach this view only. Physical ownership stays with the backing.
+    int result = sceKernelMunmap(reinterpret_cast<void*>(address), length);
+    restore_result_.store(result, std::memory_order_relaxed);
+    if (result != 0) return false;
+    void* reserved = reinterpret_cast<void*>(address);
+    result = sceKernelReserveVirtualRange(&reserved, length, 0, granule);
+    restore_result_.store(result, std::memory_order_relaxed);
+    if (result != 0) return false;
+    if (reserved != reinterpret_cast<void*>(address)) {
+      const int cleanup = sceKernelMunmap(reserved, length);
+      restore_result_.store(cleanup ? cleanup : ERANGE, std::memory_order_relaxed);
+      return false;
+    }
+    return true;
   }
 };
 }

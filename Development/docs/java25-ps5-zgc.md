@@ -89,3 +89,17 @@ A direct-memory device mapping example is documented in this independent
 PS5 research source. It motivates the candidate and does not establish a
 ProsperoCraft console pass.
 https://github.com/ZigZagBoi1/PS5-14.10-Research/blob/master/docs/FINDINGS.md
+
+Consumer241 reached Vanilla26.3 gameplay, saved and then rejoined. The user
+reports strong first-run performance and quick saving, followed by stutter
+and a crash after rejoin. The retained fatal report identifies reservation
+restoration after detaching a physical view. GC logs also show allocation
+stalls near140..175ms before failure; their complete cause is unproven.
+
+Patch0147 replaces the remaining anonymous fixed mmap restoration with
+sceKernelMunmap followed by a checked native virtual reservation. Physical
+backing ownership and other aliases are retained. A moved reservation is
+released and treated as failure. Native detach/reserve/cleanup errors remain
+fatal and record their result. The host backing test covers detach refusal,
+native reserve refusal, moved-range cleanup and surviving-alias data.
+PS5 repeated collection, world save/rejoin and frame pacing remain pending.

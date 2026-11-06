@@ -25,7 +25,7 @@ static void* fixture_mmap(void*, size_t, int, int, int, off_t);
 #undef open
 
 static bool fail_allocate, fail_map, fail_release, fail_detach;
-static bool fail_device, fail_device_map, move_hint;
+static bool fail_device, fail_device_map, move_hint, fail_reserve, move_reserve;
 static int device_fd=-1;
 static unsigned device_maps;
 static std::vector<int> files;
@@ -84,6 +84,21 @@ extern "C" int sceKernelMapDirectMemory(void** address, size_t bytes, int protec
   *address = result;
   return 0;
 }
+extern "C" int sceKernelReserveVirtualRange(void** address, size_t bytes, int flags, size_t alignment) {
+  assert(flags == 0 && alignment == ps5_zgc::Backing::granule);
+  if (fail_reserve) return -6;
+  void* blocker = MAP_FAILED;
+  if (move_reserve) {
+    blocker=mmap(*address,bytes,PROT_NONE,MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED,-1,0);
+    assert(blocker==*address);
+  }
+  void* result = mmap(move_reserve ? nullptr : *address, bytes, PROT_NONE,
+                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (move_reserve) assert(munmap(blocker,bytes)==0);
+  if (result == MAP_FAILED) return -7;
+  *address=result;
+  return 0;
+}
 extern "C" int sceKernelMunmap(void* address, size_t bytes) {
   if (fail_detach) return -4;
   return munmap(address, bytes);
@@ -133,8 +148,25 @@ int main() {
   assert(backing.map(reinterpret_cast<uintptr_t>(a), 0, granule));
   assert(backing.map_result() == 0 && a[0] == 0x35);
   move_hint = false;
+  fail_detach = true;
+  assert(!backing.unmap(reinterpret_cast<uintptr_t>(a), 2 * granule));
+  assert(backing.restore_result() == -4 && a[0] == 0x35 && b[0] == 0x35);
+  fail_detach = false;
   assert(backing.unmap(reinterpret_cast<uintptr_t>(a), 2 * granule));
   assert(b[0] == 0x35);
+  auto* c = reserve(granule);
+  assert(backing.map(reinterpret_cast<uintptr_t>(c), 0, granule));
+  fail_reserve = true;
+  assert(!backing.unmap(reinterpret_cast<uintptr_t>(c), granule));
+  assert(backing.restore_result() == -6 && b[0] == 0x35);
+  fail_reserve = false;
+  void* restored=c;
+  assert(sceKernelReserveVirtualRange(&restored,granule,0,granule)==0 && restored==c);
+  assert(backing.map(reinterpret_cast<uintptr_t>(c), 0, granule));
+  move_reserve = true;
+  assert(!backing.unmap(reinterpret_cast<uintptr_t>(c),granule));
+  assert(backing.restore_result()==ERANGE && b[0]==0x35);
+  move_reserve = false;
   assert(backing.unmap(reinterpret_cast<uintptr_t>(b), 2 * granule));
   assert(backing.map(reinterpret_cast<uintptr_t>(a), 0, granule));
   assert(a[0] == 0x35);
