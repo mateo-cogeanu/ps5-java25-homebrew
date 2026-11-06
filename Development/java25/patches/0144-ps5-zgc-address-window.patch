@@ -1,0 +1,18 @@
+--- a/src/hotspot/cpu/x86/gc/z/zAddress_x86.cpp
++++ b/src/hotspot/cpu/x86/gc/z/zAddress_x86.cpp
+@@ -33,8 +33,15 @@
+ #ifdef ADDRESS_SANITIZER
+   return 44;
+ #else
++#ifdef __PROSPERO__
++  // A 1536 MiB heap needs 24 GiB of virtual space at ZGC's 16:1 ratio.
++  // Keep the full base-bit/offset separation in a lower PS5 address window.
++  const size_t min_address_offset_bits = 35; // 32 GiB
++  const size_t max_address_offset_bits = 37; // 128 GiB
++#else
+   const size_t min_address_offset_bits = 42; // 4TB
+   const size_t max_address_offset_bits = 44; // 16TB
++#endif
+   const size_t address_offset = ZGlobalsPointers::min_address_offset_request();
+   const size_t address_offset_bits = log2i_exact(address_offset);
+   return clamp(address_offset_bits, min_address_offset_bits, max_address_offset_bits);

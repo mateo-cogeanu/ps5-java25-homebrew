@@ -47,3 +47,16 @@ The host test uses the actual platform reservation body and checks refusal,
 moved-range cleanup and preservation of occupied bytes under ASan/UBSan.
 Target compilation and embedded application linking are scoped checks.
 Native PS5 reservation acceptance and all collector behavior remain pending.
+
+Consumer238 reports native reservation ENOMEM for a24GiB virtual heap window
+starting at4TiB. Patch0144 adjusts only the PS5 x86 address-offset limits to
+35..37bits. The current1536MiB maximum heap needs24GiB at16:1, so its selected
+heap base is32GiB with a32GiB offset window. Base and offset bits remain
+disjoint, and pointer color/phase layout stays the OpenJDK implementation.
+The desktop x86 defaults remain42..44bits.
+
+Host tests extract the actual platform selection and color/uncolor functions.
+ASan/UBSan verifies all four remap phases, metadata combinations and address
+boundaries, with desktop-default controls. This establishes arithmetic only.
+PS5 acceptance of the lower virtual window, generated barriers, concurrent
+collection and gameplay still need physical validation.
