@@ -1,0 +1,68 @@
+--- a/src/hotspot/share/runtime/ps5NativeHeap.hpp
++++ b/src/hotspot/share/runtime/ps5NativeHeap.hpp
+@@ -51,7 +51,8 @@
+ inline void release_libc(size_t bytes) {
+   __atomic_fetch_sub(libc_held_word(), bytes, __ATOMIC_RELAXED);
+ }
+-inline Slab** classes() { static Slab* heads[8] = {}; return heads; }
++constexpr unsigned slab_class_count = 9;
++inline Slab** classes() { static Slab* heads[slab_class_count] = {}; return heads; }
+ inline unsigned* mutex_word() { static unsigned lock = 0; return &lock; }
+ inline void lock() {
+   while (__atomic_exchange_n(mutex_word(), 1u, __ATOMIC_ACQUIRE)) {
+@@ -92,10 +93,10 @@
+   ps5_vm_trace_values("PS5 native libc held_bytes=", libc_held(), " budget_bytes=", libc_budget, " reserved=", 0);
+   ps5_native_direct::report();
+ }
+-// At most one empty slab per class stays warm (<=8*64KiB). Reclaim it
++// At most one empty slab per class stays warm (<=9*64KiB). Reclaim it
+ // before propagating mapping pressure. Live allocations are never displaced.
+ inline void trim_idle_locked() {
+-  for (unsigned index=0;index<8;++index) {
++  for (unsigned index=0;index<slab_class_count;++index) {
+     Slab** link=&classes()[index];
+     while (*link) {
+       Slab* slab=*link;
+@@ -120,7 +121,7 @@
+     }
+     release_libc(libc_bytes);
+   }
+-  if (size > 4096) {
++  if (size > 8192) {
+     size_t mapped;
+     if (!rounded(sizeof(Header) + size, &mapped)) { errno = ENOMEM; return nullptr; }
+     void* memory = map_pages(mapped);
+@@ -134,7 +135,7 @@
+     while (capacity < size) { ++index; capacity *= 2; }
+     const size_t stride = sizeof(Header) + capacity;
+     bool created = false, borrowed = false; size_t mapped = 0; int error = 0;
+-    size_t slab_bytes[8] = {}, slab_live[8] = {}, slab_free[8] = {};
++    size_t slab_bytes[slab_class_count] = {}, slab_live[slab_class_count] = {}, slab_free[slab_class_count] = {};
+     lock();
+     Slab* slab = classes()[index];
+     while (slab && !slab->available) slab = slab->next;
+@@ -170,13 +171,13 @@
+       // Mapping refusal does not mean that existing compatible storage is full.
+       // A slot in a larger class is safe: its header retains the owning slab,
+       // and release uses that slab's real index and mapping length.
+-      for (unsigned other = index + 1; other < 8 && !slab; ++other) {
++      for (unsigned other = index + 1; other < slab_class_count && !slab; ++other) {
+         slab = classes()[other];
+         while (slab && !slab->available) slab = slab->next;
+       }
+       borrowed = slab != nullptr;
+       if (!slab) {
+-        for (unsigned other = 0; other < 8; ++other) {
++        for (unsigned other = 0; other < slab_class_count; ++other) {
+           for (Slab* entry = classes()[other]; entry; entry = entry->next) {
+             slab_bytes[other] += entry->mapped;
+             slab_live[other] += entry->live;
+@@ -195,7 +196,7 @@
+     if (created || !slab) note("PS5 native heap slab: requested=", size, mapped, error);
+     if (borrowed) ps5_vm_trace_values("PS5 native heap borrowed: requested=", size, " capacity=", borrowed_capacity, " mapping_error=", error);
+     if (!slab) {
+-      for (unsigned other = 0; other < 8; ++other) {
++      for (unsigned other = 0; other < slab_class_count; ++other) {
+         ps5_vm_trace_values("PS5 slab capacity=", (size_t)32 << other,
+                             " mapped_bytes=", slab_bytes[other], " live_slots=", slab_live[other]);
+         ps5_vm_trace_values("PS5 slab capacity=", (size_t)32 << other,

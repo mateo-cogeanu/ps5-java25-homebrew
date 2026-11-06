@@ -64,7 +64,7 @@ int main(){
  deny_heap=true;p=heap::reallocate(p,1024);check(p,128,0x35);assert(heap_live==0&&map_live==1);
  p=heap::reallocate(p,8192);check(p,128,0x35);heap::trim_idle();assert(map_live==1);
  std::memset(p,0x79,8192);deny_maps=true;assert(!heap::reallocate(p,16384));check(p,8192,0x79);
- assert(!heap::allocate(128));assert(!heap::allocate(SIZE_MAX));check(p,8192,0x79);deny_maps=false;
+ void* borrowed=heap::allocate(128);assert(borrowed);heap::release(borrowed);assert(!heap::allocate(SIZE_MAX));check(p,8192,0x79);deny_maps=false;
  void* shrink=heap::reallocate(p,32);assert(shrink==p);check(p,32,0x79);heap::release(p);heap::trim_idle();assert(map_live==0);
  p=heap::allocate(0);assert(p);p=heap::reallocate(p,0);assert(p);heap::release(p);heap::release(nullptr);
  // Ten thousand full allocation/free lifetimes use just one warm slab.
@@ -124,9 +124,9 @@ int main(){
    size_t next=n+400;void* grown=heap::reallocate(q,next);check(grown,n,t+1);heap::release(grown);
   }
  });
- for(auto &thread:workers)thread.join();assert(map_live<=8);heap::trim_idle();assert(map_live==0&&heap_live==0&&notes>0);
+ for(auto &thread:workers)thread.join();assert(map_live<=heap::slab_class_count);heap::trim_idle();assert(map_live==0&&heap_live==0&&notes>0);
  deny_heap=false;p=heap::allocate(90);assert(p&&heap_live==1);heap::release(p);assert(heap_live==0);
- std::puts("PASS: real mapped storage, bounded idle slab reuse/pressure trimming, eight pooled classes, alignment, normal/mapped realloc migration, failed growth preserves bytes, overflow, concurrency and complete backend cleanup");
+ std::puts("PASS: real mapped storage, bounded idle slab reuse/pressure trimming, nine pooled classes, alignment, normal/mapped realloc migration, failed growth preserves bytes, overflow, concurrency and complete backend cleanup");
 }
 '''
 # Reuse the same actual raw allocator and stress test, then exercise the exact

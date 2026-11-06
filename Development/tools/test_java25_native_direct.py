@@ -98,12 +98,25 @@ int main(int argc,char**){
  p=heap::reallocate(p,65536);assert(p&&errno==EDOM);for(int i=0;i<32664;++i)assert(((unsigned char*)p)[i]==0x57);
  fail_alloc=true;void* old=p;assert(!heap::reallocate(p,131072)&&errno==ENOMEM);p=old;for(int i=0;i<32664;++i)assert(((unsigned char*)p)[i]==0x57);fail_alloc=false;
  errno=EDOM;heap::release(p);assert(errno==EDOM);empty();
+ // Thousands of ZGC-sized buffers share slabs rather than one mapping each.
+ std::vector<void*> zbuffers;
+ const auto maps_before=direct::state().mappings;
+ for(int i=0;i<8192;++i){
+   void* q=heap::allocate(4112);assert(q);
+   memset(q,i%251,4112);zbuffers.push_back(q);
+ }
+ assert(direct::state().mappings-maps_before<1200);
+ for(size_t i=0;i<zbuffers.size();++i){
+   assert(((unsigned char*)zbuffers[i])[4111]==i%251);
+   heap::release(zbuffers[i]);
+ }
+ empty();
  // Small allocation slabs use and release the same exact direct-memory owner.
  std::vector<void*> small;for(int i=0;i<300;++i){void* q=heap::allocate(4096);assert(q);memset(q,0x35,4096);small.push_back(q);}
  for(void* q:small){assert(((unsigned char*)q)[4095]==0x35);heap::release(q);}empty();
- size_t before=alloc_calls;mmap_error=EACCES;assert(!heap::allocate(8192)&&errno==EACCES&&alloc_calls==before);mmap_error=ENOMEM;
- fail_map=true;assert(!heap::allocate(8192)&&errno==ENOMEM);fail_map=false;empty();
- fail_map=true;fail_release=true;assert(!heap::allocate(8192)&&errno==ENOMEM);assert(live_physical==2&&live_mappings==0&&direct::state().held==32768);fail_map=false;fail_release=false;clean_retained_for_test();
+ size_t before=alloc_calls;mmap_error=EACCES;assert(!heap::allocate(8193)&&errno==EACCES&&alloc_calls==before);mmap_error=ENOMEM;
+ fail_map=true;assert(!heap::allocate(8193)&&errno==ENOMEM);fail_map=false;empty();
+ fail_map=true;fail_release=true;assert(!heap::allocate(8193)&&errno==ENOMEM);assert(live_physical==2&&live_mappings==0&&direct::state().held==32768);fail_map=false;fail_release=false;clean_retained_for_test();
  void* mapping=direct::map(16384);assert(mapping!=MAP_FAILED);memset(mapping,0x48,16384);
  int result=0;assert(direct::unmap(mapping,32768,&result)&&result==-1&&errno==EINVAL);assert(live_physical==1&&live_mappings==1);
  fail_unmap=true;before=release_calls;assert(direct::unmap(mapping,16384,&result)&&result==-1);assert(release_calls==before&&live_mappings==1&&((char*)mapping)[0]==0x48);fail_unmap=false;

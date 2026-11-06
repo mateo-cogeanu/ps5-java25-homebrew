@@ -136,3 +136,21 @@ the complete allocator/ledger diagnostics. An atomic event counter avoids
 racing concurrent writers. The host test extracts the actual trace function
 and checks default output, success sampling, all errors and concurrency under
 ASan/UBSan. Console frame pacing and remaining safepoint causes need retesting.
+
+Consumer245 Fabric26.2 reached gameplay and aborted on a4,112byte allocation
+in ZWorkerYoung. The direct mapping counters show4,096 net live mappings,
+approximately360MiB held under the512MiB byte budget, and policy rejections.
+The per-mapping table is the observed limiting resource. The full owner census
+and longer-term demand remain unresolved.
+
+Patch0150 adds an8KiB native allocator slab class, pooling requests through
+8,192bytes. Previously requests just above4KiB needed an independent mapping.
+The existing64KiB slab, larger-slot borrowing, ownership and idle trimming
+rules extend to the ninth class. At most nine empty slabs remain warm.
+Larger buffers retain their existing path.
+
+Actual allocator/direct-header ASan/UBSan tests keep8,192 simultaneous4,112byte
+buffers with fewer than1,200 mappings, verify every buffer and release all
+backing. Existing default/extended ledger fault tests remain. Native heap tests
+account for the new class and larger-slot borrowing. Target compilation and
+console Fabric26.2 play/save/rejoin/endurance validation are separate.
