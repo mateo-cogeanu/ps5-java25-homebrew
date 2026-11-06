@@ -35,3 +35,15 @@ shared/PIE selection. The compiled object set was merged with
 ProsperoCraft 237 application. Thus the embedded application link passes,
 while the standalone shared-library target remains unresolved. This distinction
 also applies when reproducing the build command above.
+
+Consumer237 reports check2 failure with "Failed to reserve1536M address space
+for Java heap", before physical heap commitment. Patch0143 selects the native
+sceKernelReserveVirtualRange hint API for PS5 ZGC reservations and checks exact
+placement. It releases a returned range at an unexpected address, without
+replacing occupied mappings. Native unreserve failures stop the VM. The first
+16 attempts and all successful native calls record address/size/result so an
+unsupported address window can be distinguished from other refusal on console.
+The host test uses the actual platform reservation body and checks refusal,
+moved-range cleanup and preservation of occupied bytes under ASan/UBSan.
+Target compilation and embedded application linking are scoped checks.
+Native PS5 reservation acceptance and all collector behavior remain pending.

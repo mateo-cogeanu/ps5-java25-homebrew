@@ -1,0 +1,66 @@
+--- a/src/hotspot/os/posix/gc/z/zVirtualMemoryManager_posix.cpp
++++ b/src/hotspot/os/posix/gc/z/zVirtualMemoryManager_posix.cpp
+@@ -29,6 +29,11 @@
+ #endif
+
+ #include <sys/mman.h>
++#ifdef __PROSPERO__
++#include "runtime/ps5StartupTrace.hpp"
++extern "C" int sceKernelReserveVirtualRange(void**, size_t, int, size_t);
++extern "C" int sceKernelMunmap(void*, size_t);
++#endif
+
+ void ZVirtualMemoryReserver::pd_register_callbacks(ZVirtualMemoryRegistry* registry) {
+   // Does nothing
+@@ -36,28 +41,45 @@
+
+ bool ZVirtualMemoryReserver::pd_reserve(zaddress_unsafe addr, size_t size) {
+ #ifdef __PROSPERO__
+-  const int flags = MAP_ANONYMOUS | MAP_PRIVATE;
++  void* res = reinterpret_cast<void*>(untype(addr));
++  const int result = sceKernelReserveVirtualRange(&res, size, 0, ZGranuleSize);
++  static unsigned attempts = 0;
++  const unsigned attempt = __atomic_fetch_add(&attempts, 1u, __ATOMIC_RELAXED);
++  if (result == 0 || attempt < 16) {
++    ps5_vm_trace_values("ZGC: reserve requested=",untype(addr)," bytes=",size," result=",(uint32_t)result);
++    ps5_vm_trace_values("ZGC: reserve returned=",reinterpret_cast<uintptr_t>(res)," attempt=",attempt," expected=",untype(addr));
++  }
++  if (result != 0) {
++    return false;
++  }
++  if (res != reinterpret_cast<void*>(untype(addr))) {
++    if (sceKernelMunmap(res, size) != 0) {
++      fatal("PS5 ZGC unexpected reservation could not be released");
++    }
++    return false;
++  }
+ #else
+   const int flags = MAP_ANONYMOUS|MAP_PRIVATE|MAP_NORESERVE LINUX_ONLY(|MAP_FIXED_NOREPLACE);
+-#endif
+-
+   void* const res = mmap((void*)untype(addr), size, PROT_NONE, flags, -1, 0);
+   if (res == MAP_FAILED) {
+-    // Failed to reserve memory
+     return false;
+   }
+-
+   if (res != (void*)untype(addr)) {
+-    // Failed to reserve memory at the requested address
+     munmap(res, size);
+     return false;
+   }
++#endif
+
+   // Success
+   return true;
+ }
+
+ void ZVirtualMemoryReserver::pd_unreserve(zaddress_unsafe addr, size_t size) {
++#ifdef __PROSPERO__
++  const int res = sceKernelMunmap(reinterpret_cast<void*>(untype(addr)), size);
++  guarantee(res == 0, "Failed to unreserve PS5 ZGC address space");
++#else
+   const int res = munmap((void*)untype(addr), size);
+   assert(res == 0, "Failed to unmap memory");
++#endif
+ }
