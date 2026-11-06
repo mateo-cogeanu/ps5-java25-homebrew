@@ -18,7 +18,11 @@ def main():
     parser.add_argument("--bootstrap", action="store_true", help="Apply opt-in PS5 patches and configure HotSpot/java.base scope")
     parser.add_argument("--build-hotspot", action="store_true", help="Attempt the experimental HotSpot target after bootstrap configure")
     parser.add_argument("--build-base", action="store_true", help="Build java.base classes and native libraries after bootstrap configure")
+    parser.add_argument("--zgc", action="store_true", help="Opt into the PS5 ZGC backend in a separate ps5-zgc configuration")
     args = parser.parse_args()
+    if args.zgc:
+        args.bootstrap = True
+    configuration = "ps5-zgc" if args.zgc else "ps5-bootstrap"
     pin = json.loads((ROOT / "java25/upstream.json").read_text())
     source = ROOT / pin["cache"]
     source.parent.mkdir(parents=True, exist_ok=True)
@@ -48,7 +52,7 @@ def main():
     boot = Path(os.environ.get("JAVA25_BOOT_JDK", "/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home"))
     if not (boot / "bin/javac").exists():
         raise SystemExit("Set JAVA25_BOOT_JDK to a host JDK 24 or 25 home")
-    log = ROOT / "build/java25" / ("bootstrap-configure.log" if args.bootstrap else "configure.log")
+    log = ROOT / "build/java25" / ("zgc-configure.log" if args.zgc else "bootstrap-configure.log" if args.bootstrap else "configure.log")
     log.parent.mkdir(parents=True, exist_ok=True)
     command = ["bash", "configure", "--openjdk-target=x86_64-unknown-freebsd",
                "--with-jvm-variants=server", f"--with-boot-jdk={boot}",
@@ -60,9 +64,11 @@ def main():
         wrapper = ROOT / "tools/java25_cc.py"
         wrapper.chmod(0o755)
         command = [arg if not arg.startswith("CC=") else f"CC={wrapper}" for arg in command]
-        command += ["--enable-ps5-bootstrap", "--with-conf-name=ps5-bootstrap", "--with-jobs=4",
+        command += ["--enable-ps5-bootstrap", f"--with-conf-name={configuration}", "--with-jobs=4",
                     f"--with-sysroot={sdk}", "--with-stdc++lib=dynamic",
                     "--with-extra-cxxflags=-fno-stack-protector", "--with-jvm-features=-dtrace"]
+    if args.zgc:
+        command.append("--enable-jvm-feature-zgc")
     env = dict(os.environ)
     env.setdefault("LLVM_CONFIG", "/opt/homebrew/opt/llvm/bin/llvm-config")
     with log.open("w") as output:
@@ -72,13 +78,13 @@ def main():
     if result.returncode == 0 and args.build_hotspot:
         build_log = ROOT / "build/java25/hotspot-build.log"
         with build_log.open("w") as output:
-            result = subprocess.run(["gmake", "CONF=ps5-bootstrap", "hotspot"], cwd=source, env=env,
+            result = subprocess.run(["gmake", f"CONF={configuration}", "hotspot"], cwd=source, env=env,
                                     stdout=output, stderr=subprocess.STDOUT)
         print(f"HotSpot build exit {result.returncode}; diagnostics: {build_log}")
     if result.returncode == 0 and args.build_base:
         build_log = ROOT / "build/java25/base-build.log"
         with build_log.open("w") as output:
-            result = subprocess.run(["gmake", "CONF=ps5-bootstrap", "java.base-java", "java.base-libs"],
+            result = subprocess.run(["gmake", f"CONF={configuration}", "java.base-java", "java.base-libs"],
                                     cwd=source, env=env, stdout=output, stderr=subprocess.STDOUT)
         print(f"java.base build exit {result.returncode}; diagnostics: {build_log}")
     raise SystemExit(result.returncode)

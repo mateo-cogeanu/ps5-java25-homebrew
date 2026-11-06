@@ -1,0 +1,210 @@
+--- /dev/null
++++ b/src/hotspot/share/gc/z/ps5ZBacking.hpp
+@@ -0,0 +1,114 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#pragma once
++#include <atomic>
++#include <cerrno>
++#include <cstddef>
++#include <cstdint>
++#include <cstring>
++#include <sys/mman.h>
++
++extern "C" size_t sceKernelGetDirectMemorySize();
++extern "C" int sceKernelAllocateDirectMemory(int64_t, int64_t, size_t, size_t, int, int64_t*);
++extern "C" int sceKernelMapDirectMemory(void**, size_t, int, int, int64_t, size_t);
++extern "C" int sceKernelReleaseDirectMemory(int64_t, size_t);
++extern "C" int sceKernelMunmap(void*, size_t);
++
++namespace ps5_zgc {
++class Backing {
++ public:
++  static constexpr size_t granule = 2 * 1024 * 1024;
++  static constexpr size_t maximum_granules = 4096;
++
++ private:
++  struct Entry { int64_t physical; bool owned; bool ready; };
++  Entry entries_[maximum_granules]{};
++  std::atomic_flag guard_ = ATOMIC_FLAG_INIT;
++  size_t capacity_ = 0;
++
++  class Guard {
++    Backing& backing_;
++   public:
++    explicit Guard(Backing& backing) : backing_(backing) {
++      while (backing_.guard_.test_and_set(std::memory_order_acquire)) {}
++    }
++    ~Guard() { backing_.guard_.clear(std::memory_order_release); }
++  };
++
++  bool valid(size_t offset, size_t length) const {
++    return offset % granule == 0 && length % granule == 0 &&
++           offset <= capacity_ && length <= capacity_ - offset;
++  }
++
++ public:
++  bool initialize(size_t capacity) {
++    if (capacity_ || !capacity || capacity % granule ||
++        capacity / granule > maximum_granules) return false;
++    capacity_ = capacity;
++    return true;
++  }
++
++  size_t commit(size_t offset, size_t length) {
++    if (!valid(offset, length)) return 0;
++    Guard guard(*this);
++    size_t committed = 0;
++    const size_t pool = sceKernelGetDirectMemorySize();
++    if (pool < granule || pool > INT64_MAX) return 0;
++    for (; committed < length; committed += granule) {
++      auto& entry = entries_[(offset + committed) / granule];
++      if (entry.owned) break;
++      int64_t result = -1;
++      if (sceKernelAllocateDirectMemory(0, static_cast<int64_t>(pool),
++                                       granule, granule, 12, &result) != 0) break;
++      entry = {result, true, false};
++      if (result < 0 || result % granule) break;
++      void* temporary = nullptr;
++      if (sceKernelMapDirectMemory(&temporary, granule, PROT_READ | PROT_WRITE,
++                                   0, result, granule) != 0) break;
++      if (!temporary || temporary == MAP_FAILED ||
++          reinterpret_cast<uintptr_t>(temporary) % granule) break;
++      std::memset(temporary, 0, granule);
++      if (sceKernelMunmap(temporary, granule) != 0) break;
++      entry.ready = true;
++    }
++    return committed;
++  }
++
++  size_t uncommit(size_t offset, size_t length) {
++    if (!valid(offset, length)) return 0;
++    Guard guard(*this);
++    size_t released = 0;
++    for (; released < length; released += granule) {
++      auto& entry = entries_[(offset + released) / granule];
++      if (!entry.owned || sceKernelReleaseDirectMemory(entry.physical, granule) != 0) break;
++      entry = {};
++    }
++    return released;
++  }
++
++  // The caller supplies an address range reserved exclusively for this ZGC heap.
++  bool map(uintptr_t address, size_t offset, size_t length) {
++    if (!address || address % granule || address > UINTPTR_MAX - length ||
++        !valid(offset, length)) return false;
++    Guard guard(*this);
++    for (size_t done = 0; done < length; done += granule) {
++      const auto& entry = entries_[(offset + done) / granule];
++      if (!entry.ready) return false;
++      void* mapped = reinterpret_cast<void*>(address + done);
++      if (sceKernelMapDirectMemory(&mapped, granule, PROT_READ | PROT_WRITE,
++                                   MAP_FIXED, entry.physical, granule) != 0 ||
++          mapped != reinterpret_cast<void*>(address + done)) return false;
++    }
++    return true;
++  }
++
++  bool unmap(uintptr_t address, size_t length) {
++    if (!address || address % granule || length % granule ||
++        address > UINTPTR_MAX - length) return false;
++    // Restore a non-accessible reservation. The backing stays committed until
++    // ZGC returns its physical segments through uncommit.
++    return mmap(reinterpret_cast<void*>(address), length, PROT_NONE,
++                MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0) ==
++           reinterpret_cast<void*>(address);
++  }
++};
++}
+--- a/src/hotspot/os/bsd/gc/z/zPhysicalMemoryBacking_bsd.hpp
++++ b/src/hotspot/os/bsd/gc/z/zPhysicalMemoryBacking_bsd.hpp
+@@ -25,10 +25,17 @@
+ #define OS_BSD_GC_Z_ZPHYSICALMEMORYBACKING_BSD_HPP
+
+ #include "gc/z/zAddress.hpp"
++#ifdef __PROSPERO__
++#include "gc/z/ps5ZBacking.hpp"
++#endif
+
+ class ZPhysicalMemoryBacking {
+ private:
++#ifdef __PROSPERO__
++  ps5_zgc::Backing _backing;
++#else
+   uintptr_t _base;
++#endif
+   bool      _initialized;
+
+   bool commit_inner(zbacking_offset offset, size_t length) const;
+--- a/src/hotspot/os/bsd/gc/z/zPhysicalMemoryBacking_bsd.cpp
++++ b/src/hotspot/os/bsd/gc/z/zPhysicalMemoryBacking_bsd.cpp
+@@ -33,6 +33,38 @@
+ #include "utilities/align.hpp"
+ #include "utilities/debug.hpp"
+
++#ifdef __PROSPERO__
++#include "runtime/ps5StartupTrace.hpp"
++
++ZPhysicalMemoryBacking::ZPhysicalMemoryBacking(size_t max_capacity)
++  : _initialized(_backing.initialize(max_capacity)) {
++  if (!_initialized) {
++    ZInitialize::error("Unsupported PS5 ZGC physical backing capacity");
++  }
++}
++bool ZPhysicalMemoryBacking::is_initialized() const { return _initialized; }
++void ZPhysicalMemoryBacking::warn_commit_limits(size_t) const {}
++bool ZPhysicalMemoryBacking::commit_inner(zbacking_offset offset, size_t length) const {
++  return const_cast<ps5_zgc::Backing&>(_backing).commit(untype(offset), length) == length;
++}
++size_t ZPhysicalMemoryBacking::commit(zbacking_offset offset, size_t length, uint32_t) const {
++  return const_cast<ps5_zgc::Backing&>(_backing).commit(untype(offset), length);
++}
++size_t ZPhysicalMemoryBacking::uncommit(zbacking_offset offset, size_t length) const {
++  return const_cast<ps5_zgc::Backing&>(_backing).uncommit(untype(offset), length);
++}
++void ZPhysicalMemoryBacking::map(zaddress_unsafe addr, size_t length, zbacking_offset offset) const {
++  if (!const_cast<ps5_zgc::Backing&>(_backing).map(untype(addr), untype(offset), length)) {
++    ps5_vm_trace_values("ZGC: direct map failed address=",untype(addr)," offset=",untype(offset)," bytes=",length);
++    fatal("PS5 ZGC direct mapping failed");
++  }
++}
++void ZPhysicalMemoryBacking::unmap(zaddress_unsafe addr, size_t length) const {
++  if (!const_cast<ps5_zgc::Backing&>(_backing).unmap(untype(addr), length)) {
++    fatal("PS5 ZGC reservation restore failed");
++  }
++}
++#else
+ #include <mach/mach.h>
+ #include <mach/mach_vm.h>
+ #include <sys/mman.h>
+@@ -178,3 +210,5 @@
+     fatal("Failed to map memory (%s)", err.to_string());
+   }
+ }
++
++#endif // __PROSPERO__
+--- a/make/autoconf/jvm-features.m4
++++ b/make/autoconf/jvm-features.m4
+@@ -318,7 +318,8 @@
+     if test "x$OPENJDK_TARGET_CPU" = "xx86_64"; then
+       if test "x$OPENJDK_TARGET_OS" = "xlinux" || \
+           test "x$OPENJDK_TARGET_OS" = "xwindows" || \
+-          test "x$OPENJDK_TARGET_OS" = "xmacosx"; then
++          test "x$OPENJDK_TARGET_OS" = "xmacosx" || \
++          (test "x$OPENJDK_TARGET_OS" = "xbsd" && test "x$enable_ps5_bootstrap" = "xyes" && test "x$enable_jvm_feature_zgc" = "xyes"); then
+         AC_MSG_RESULT([yes])
+       else
+         AC_MSG_RESULT([no, $OPENJDK_TARGET_OS-$OPENJDK_TARGET_CPU])
+--- a/src/hotspot/os/posix/gc/z/zVirtualMemoryManager_posix.cpp
++++ b/src/hotspot/os/posix/gc/z/zVirtualMemoryManager_posix.cpp
+@@ -35,7 +35,11 @@
+ }
+
+ bool ZVirtualMemoryReserver::pd_reserve(zaddress_unsafe addr, size_t size) {
++#ifdef __PROSPERO__
++  const int flags = MAP_ANONYMOUS | MAP_PRIVATE;
++#else
+   const int flags = MAP_ANONYMOUS|MAP_PRIVATE|MAP_NORESERVE LINUX_ONLY(|MAP_FIXED_NOREPLACE);
++#endif
+
+   void* const res = mmap((void*)untype(addr), size, PROT_NONE, flags, -1, 0);
+   if (res == MAP_FAILED) {
