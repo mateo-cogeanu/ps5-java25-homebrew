@@ -103,3 +103,22 @@ released and treated as failure. Native detach/reserve/cleanup errors remain
 fatal and record their result. The host backing test covers detach refusal,
 native reserve refusal, moved-range cleanup and surviving-alias data.
 PS5 repeated collection, world save/rejoin and frame pacing remain pending.
+
+Consumer242 Fabric26.3 exhausted all12,288 primed HotSpot mutexes during
+compilation of an LWJGL generated binding. Its fatal report lists14,718
+compiled methods. ZNMethodData embeds two ZReentrantLock instances per method,
+each previously backed by a native PlatformMutex. This is a substantial
+source of native synchronization demand; the report is not a complete census
+of native owners.
+
+Patch0148 gives PS5 ZReentrantLock a distinct atomic lock word, retaining its
+existing per-object owner and recursive count. A contended acquire uses bounded
+pause iterations then native yield. Release publishes prior writes before the
+word becomes available. Other ZGC lock classes and other platforms retain
+their native implementation. No shared stripes or new lock ordering are used.
+
+The actual class and inline bodies pass host ASan/UBSan checks with32,768
+identities, recursion, publication, contention and400,000 concurrent updates.
+A desktop control still constructs the original lock member. Target builds
+check the PS5 atomic/yield calls. Fabric startup, GC, saving and contention/frame
+pacing remain physical-console validation.

@@ -1,0 +1,56 @@
+--- a/src/hotspot/share/gc/z/zLock.hpp
++++ b/src/hotspot/share/gc/z/zLock.hpp
+@@ -39,7 +39,11 @@
+
+ class ZReentrantLock {
+ private:
++#ifdef __PROSPERO__
++  volatile int     _lock;
++#else
+   ZLock            _lock;
++#endif
+   Thread* volatile _owner;
+   uint64_t         _count;
+
+--- a/src/hotspot/share/gc/z/zLock.inline.hpp
++++ b/src/hotspot/share/gc/z/zLock.inline.hpp
+@@ -44,7 +44,11 @@
+ }
+
+ inline ZReentrantLock::ZReentrantLock()
++#ifdef __PROSPERO__
++  : _lock(0),
++#else
+   : _lock(),
++#endif
+     _owner(nullptr),
+     _count(0) {}
+
+@@ -53,7 +57,16 @@
+   Thread* const owner = Atomic::load(&_owner);
+
+   if (owner != thread) {
++#ifdef __PROSPERO__
++    // These two locks are embedded in every compiled method's ZGC data.
++    // Keep distinct ownership without leasing one native mutex per lock.
++    while (Atomic::cmpxchg(&_lock, 0, 1) != 0) {
++      for (int spin = 0; spin < 64; ++spin) SpinPause();
++      os::naked_yield();
++    }
++#else
+     _lock.lock();
++#endif
+     Atomic::store(&_owner, thread);
+   }
+
+@@ -68,6 +81,10 @@
+
+   if (_count == 0) {
+     Atomic::store(&_owner, (Thread*)nullptr);
++#ifdef __PROSPERO__
++    Atomic::release_store(&_lock, 0);
++#else
+     _lock.unlock();
++#endif
+   }
+ }
