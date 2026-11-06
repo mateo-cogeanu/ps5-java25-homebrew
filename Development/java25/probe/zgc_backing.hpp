@@ -24,6 +24,8 @@ class Backing {
   Entry entries_[maximum_granules]{};
   std::atomic_flag guard_ = ATOMIC_FLAG_INIT;
   size_t capacity_ = 0;
+  std::atomic<int> map_result_{0};
+  std::atomic<int64_t> map_physical_{-1};
 
   class Guard {
     Backing& backing_;
@@ -85,6 +87,9 @@ class Backing {
     return released;
   }
 
+  int map_result() const { return map_result_.load(std::memory_order_relaxed); }
+  int64_t map_physical() const { return map_physical_.load(std::memory_order_relaxed); }
+
   // The caller supplies an address range reserved exclusively for this ZGC heap.
   bool map(uintptr_t address, size_t offset, size_t length) {
     if (!address || address % granule || address > UINTPTR_MAX - length ||
@@ -92,11 +97,22 @@ class Backing {
     Guard guard(*this);
     for (size_t done = 0; done < length; done += granule) {
       const auto& entry = entries_[(offset + done) / granule];
-      if (!entry.ready) return false;
+      map_physical_.store(entry.physical, std::memory_order_relaxed);
+      if (!entry.ready) {
+        map_result_.store(ENOENT, std::memory_order_relaxed);
+        return false;
+      }
       void* mapped = reinterpret_cast<void*>(address + done);
-      if (sceKernelMapDirectMemory(&mapped, granule, PROT_READ | PROT_WRITE,
-                                   MAP_FIXED, entry.physical, granule) != 0 ||
-          mapped != reinterpret_cast<void*>(address + done)) return false;
+      const int result = sceKernelMapDirectMemory(
+          &mapped, granule, PROT_READ | PROT_WRITE, 0, entry.physical, granule);
+      map_result_.store(result, std::memory_order_relaxed);
+      if (result != 0) return false;
+      if (mapped != reinterpret_cast<void*>(address + done)) {
+        // An accepted hint must exactly match this collector-owned reservation.
+        const int cleanup = sceKernelMunmap(mapped, granule);
+        map_result_.store(cleanup ? cleanup : ERANGE, std::memory_order_relaxed);
+        return false;
+      }
     }
     return true;
   }

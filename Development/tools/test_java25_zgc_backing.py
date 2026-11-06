@@ -48,7 +48,8 @@ extern "C" int sceKernelMapDirectMemory(void** address, size_t bytes, int protec
   assert(alignment == bytes && physical >= 0);
   size_t index = physical / ps5_zgc::Backing::granule;
   assert(index < files.size() && files[index] >= 0);
-  void* target = flags & MAP_FIXED ? *address : reserve(bytes);
+  assert(flags == 0);
+  void* target = *address ? *address : reserve(bytes);
   void* result = mmap(target, bytes, protection, MAP_SHARED | MAP_FIXED, files[index], 0);
   if (result == MAP_FAILED) return -3;
   *address = result;
@@ -88,6 +89,7 @@ int main() {
   assert(b[0] == 0x35 && a[granule + 99] == 0x72);
   fail_map = true;
   assert(!backing.map(reinterpret_cast<uintptr_t>(a), 0, granule));
+  assert(backing.map_result() == -2 && backing.map_physical() >= 0);
   fail_map = false;
   assert(backing.unmap(reinterpret_cast<uintptr_t>(a), 2 * granule));
   assert(b[0] == 0x35);

@@ -60,3 +60,12 @@ ASan/UBSan verifies all four remap phases, metadata combinations and address
 boundaries, with desktop-default controls. This establishes arithmetic only.
 PS5 acceptance of the lower virtual window, generated barriers, concurrent
 collection and gameplay still need physical validation.
+
+Consumer239 passed virtual reservation and initial physical commitment, then
+aborted while mapping128MiB at0x818000000. Patch0145 maps each2MiB granule with
+a checked native hint inside the collector's owned reservation. It verifies the
+returned address and releases a successfully returned mapping at an unexpected
+address. Native result and physical offset are retained for the fatal diagnostic.
+It does not continue with a missing heap mapping. The host shared-alias fixture
+requires flags0 and covers native mapping refusal/result preservation.
+PS5 hint placement and subsequent GC operation remain pending.
