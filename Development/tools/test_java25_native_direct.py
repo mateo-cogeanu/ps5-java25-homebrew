@@ -80,13 +80,20 @@ static void empty(){heap::trim_idle();assert(live_physical==0&&live_mappings==0&
 static void clean_retained_for_test(){
  // Production intentionally retains ownership on kernel cleanup failure. The
  // fixture clears that injected failure and explicitly cleans its owned storage.
- for(unsigned i=0;i<direct::entry_count;++i){auto& e=direct::state().entries[i];if(e.occupied){assert(e.address==nullptr);assert(sceKernelReleaseDirectMemory(e.physical,e.bytes)==0);direct::abandon(i);}}
+ for(unsigned i=0;i<direct::maximum_entry_count;++i){auto& e=direct::state().entries[i];if(e.occupied){assert(e.address==nullptr);assert(sceKernelReleaseDirectMemory(e.physical,e.bytes)==0);direct::abandon(i);}}
  empty();
 }
-int main(){
+int main(int argc,char**){
+ assert(direct::set_extended_budget(0)==0);
+ const bool extended=argc>1;
+ if(extended)assert(direct::set_extended_budget(1)==0);
+ const size_t selected_budget=direct::native_budget();
+ const unsigned selected_capacity=direct::capacity();
+ assert(selected_budget==(extended?512ULL:256ULL)*1024*1024);
+ assert(selected_capacity==(extended?4096u:2048u));
  errno=EDOM;void* p=heap::allocate(100);assert(p&&errno==EDOM&&alloc_calls==0);heap::release(p);
  deny_heap=true;
- p=heap::allocate(32664);assert(p&&errno==EDOM&&direct::state().held==32768);memset(p,0x57,32664);
+ p=heap::allocate(32664);assert(p&&errno==EDOM&&direct::state().held==32768);memset(p,0x57,32664);assert(direct::set_extended_budget(0)==EBUSY);
  p=heap::reallocate(p,65536);assert(p&&errno==EDOM);for(int i=0;i<32664;++i)assert(((unsigned char*)p)[i]==0x57);
  fail_alloc=true;void* old=p;assert(!heap::reallocate(p,131072)&&errno==ENOMEM);p=old;for(int i=0;i<32664;++i)assert(((unsigned char*)p)[i]==0x57);fail_alloc=false;
  errno=EDOM;heap::release(p);assert(errno==EDOM);empty();
@@ -107,16 +114,16 @@ int main(){
  constexpr size_t old_cap=128ULL*1024*1024, meta_bytes=4ULL*1024*1024;
  void* data=direct::map(old_cap);assert(data!=MAP_FAILED);
  void* meta=direct::map(meta_bytes,16384,true);assert(meta!=MAP_FAILED&&direct::metadata_range(meta,meta_bytes));
- void* rest=direct::map(direct::budget_bytes-old_cap-meta_bytes);assert(rest!=MAP_FAILED);
+ void* rest=direct::map(selected_budget-old_cap-meta_bytes);assert(rest!=MAP_FAILED);
  size_t rejected=direct::state().policy_rejections;before=alloc_calls;
  assert(direct::map(16384)==MAP_FAILED&&errno==ENOMEM&&alloc_calls==before&&direct::state().policy_rejections==rejected+1);
  assert(direct::unmap(meta,meta_bytes,&result)&&result==0);
  meta=direct::map(meta_bytes,16384,true);assert(meta!=MAP_FAILED);
- assert(direct::unmap(rest,direct::budget_bytes-old_cap-meta_bytes,&result)&&result==0);
+ assert(direct::unmap(rest,selected_budget-old_cap-meta_bytes,&result)&&result==0);
  assert(direct::unmap(meta,meta_bytes,&result)&&result==0);
  assert(direct::unmap(data,old_cap,&result)&&result==0);empty();
- mapping=direct::map(direct::budget_bytes);assert(mapping!=MAP_FAILED);before=alloc_calls;assert(direct::map(16384)==MAP_FAILED&&alloc_calls==before);assert(direct::unmap(mapping,direct::budget_bytes,&result)&&result==0);empty();
- std::vector<void*> slots;for(unsigned i=0;i<direct::entry_count;++i){void* q=direct::map(16384);assert(q!=MAP_FAILED);slots.push_back(q);}before=alloc_calls;assert(direct::map(16384)==MAP_FAILED&&alloc_calls==before);for(void* q:slots)assert(direct::unmap(q,16384,&result)&&result==0);empty();
+ mapping=direct::map(selected_budget);assert(mapping!=MAP_FAILED);before=alloc_calls;assert(direct::map(16384)==MAP_FAILED&&alloc_calls==before);assert(direct::unmap(mapping,selected_budget,&result)&&result==0);empty();
+ std::vector<void*> slots;for(unsigned i=0;i<selected_capacity;++i){void* q=direct::map(16384);assert(q!=MAP_FAILED);slots.push_back(q);}before=alloc_calls;assert(direct::map(16384)==MAP_FAILED&&alloc_calls==before);for(void* q:slots)assert(direct::unmap(q,16384,&result)&&result==0);empty();
  parallel=true;std::vector<std::thread> threads;for(int t=0;t<4;++t)threads.emplace_back([t]{for(int i=0;i<1000;++i){size_t n=1+(i*137+t*17)%9000;void* q=heap::allocate(n);assert(q);memset(q,t+1,n);void* grown=heap::reallocate(q,n+500);assert(grown);for(size_t j=0;j<n;++j)assert(((unsigned char*)grown)[j]==t+1);heap::release(grown);}});for(auto& t:threads)t.join();parallel=false;empty();
  assert(direct::state().mappings==direct::state().releases+1); // One mapped-release fault was explicitly cleaned by the fixture.
  puts("PASS: actual native allocator/direct ledger; exact32KiB refusal fallback, data-preserving growth, slabs, rollback/unmap/release failures, budget/slot caps and4000 concurrent lifetimes; ASan/UBSan");
@@ -125,3 +132,4 @@ int main(){
 exe=work/'test'
 subprocess.run(['clang++','-std=c++17','-O1','-g','-fsanitize=address,undefined','-pthread','-I'+str(work),'-I'+str(root/'.tools/java25/openjdk/src/hotspot/share'),str(source),'-o',str(exe)],check=True)
 subprocess.run([str(exe)],check=True,timeout=120)
+subprocess.run([str(exe),'extended'],check=True,timeout=120)
