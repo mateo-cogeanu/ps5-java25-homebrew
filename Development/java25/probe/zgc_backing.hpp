@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <cstring>
 #include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 extern "C" size_t sceKernelGetDirectMemorySize();
 extern "C" int sceKernelAllocateDirectMemory(int64_t, int64_t, size_t, size_t, int, int64_t*);
@@ -24,6 +26,7 @@ class Backing {
   Entry entries_[maximum_granules]{};
   std::atomic_flag guard_ = ATOMIC_FLAG_INIT;
   size_t capacity_ = 0;
+  int device_ = -1;
   std::atomic<int> map_result_{0};
   std::atomic<int64_t> map_physical_{-1};
 
@@ -42,6 +45,8 @@ class Backing {
   }
 
  public:
+  ~Backing() { if (device_ >= 0) ::close(device_); }
+
   bool initialize(size_t capacity) {
     if (capacity_ || !capacity || capacity % granule ||
         capacity / granule > maximum_granules) return false;
@@ -106,13 +111,35 @@ class Backing {
       const int result = sceKernelMapDirectMemory(
           &mapped, granule, PROT_READ | PROT_WRITE, 0, entry.physical, granule);
       map_result_.store(result, std::memory_order_relaxed);
-      if (result != 0) return false;
-      if (mapped != reinterpret_cast<void*>(address + done)) {
+      if (result == 0 && mapped == reinterpret_cast<void*>(address + done)) continue;
+      if (result == 0) {
         // An accepted hint must exactly match this collector-owned reservation.
         const int cleanup = sceKernelMunmap(mapped, granule);
-        map_result_.store(cleanup ? cleanup : ERANGE, std::memory_order_relaxed);
+        if (cleanup != 0) {
+          map_result_.store(cleanup, std::memory_order_relaxed);
+          return false;
+        }
+      }
+      // Mapping a direct-memory device offset uses the collector's existing
+      // reservation. It never requests physical memory or changes its owner.
+      if (device_ < 0) device_ = ::open("/dev/dmem0", O_RDWR);
+      if (device_ < 0) {
+        map_result_.store(errno, std::memory_order_relaxed);
         return false;
       }
+      void* target = reinterpret_cast<void*>(address + done);
+      void* exact = ::mmap(target, granule, PROT_READ | PROT_WRITE,
+                           MAP_SHARED | MAP_FIXED, device_, entry.physical);
+      if (exact == MAP_FAILED) {
+        map_result_.store(errno, std::memory_order_relaxed);
+        return false;
+      }
+      if (exact != target) {
+        const int cleanup = ::munmap(exact, granule);
+        map_result_.store(cleanup ? errno : ERANGE, std::memory_order_relaxed);
+        return false;
+      }
+      map_result_.store(0, std::memory_order_relaxed);
     }
     return true;
   }

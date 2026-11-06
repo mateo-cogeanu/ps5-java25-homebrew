@@ -9,16 +9,45 @@ assert (root / "java25/probe/zgc_backing.hpp").read_bytes() == (
     root / ".tools/java25/openjdk/src/hotspot/share/gc/z/ps5ZBacking.hpp"
 ).read_bytes()
 source = r'''
-#include "zgc_backing.hpp"
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/mman.h>
+static int fixture_open(const char*, int, ...);
+static void* fixture_mmap(void*, size_t, int, int, int, off_t);
+#define open fixture_open
+#define mmap fixture_mmap
+#include "zgc_backing.hpp"
+#undef mmap
+#undef open
 
 static bool fail_allocate, fail_map, fail_release, fail_detach;
+static bool fail_device, fail_device_map, move_hint;
+static int device_fd=-1;
+static unsigned device_maps;
 static std::vector<int> files;
+static int fixture_open(const char* path, int flags, ...) {
+  assert(std::strcmp(path, "/dev/dmem0") == 0 && flags == O_RDWR);
+  if (fail_device) { errno=EACCES; return -1; }
+  device_fd=dup(STDERR_FILENO);
+  return device_fd;
+}
+static void* fixture_mmap(void* address, size_t size, int prot, int flags, int fd, off_t offset) {
+  if (fd == device_fd && fd >= 0) {
+    if (fail_device_map) { errno=EIO; return MAP_FAILED; }
+    assert(flags == (MAP_SHARED | MAP_FIXED));
+    assert(offset >= 0 && size == ps5_zgc::Backing::granule);
+    const size_t index=offset/size;
+    assert(index < files.size() && files[index] >= 0);
+    ++device_maps;
+    return mmap(address,size,prot,flags,files[index],0);
+  }
+  return mmap(address,size,prot,flags,fd,offset);
+}
+
 extern "C" size_t sceKernelGetDirectMemorySize() { return 8ULL << 30; }
 extern "C" int sceKernelAllocateDirectMemory(int64_t, int64_t, size_t bytes,
                                              size_t alignment, int type, int64_t* physical) {
@@ -49,7 +78,7 @@ extern "C" int sceKernelMapDirectMemory(void** address, size_t bytes, int protec
   size_t index = physical / ps5_zgc::Backing::granule;
   assert(index < files.size() && files[index] >= 0);
   assert(flags == 0);
-  void* target = *address ? *address : reserve(bytes);
+  void* target = *address && !move_hint ? *address : reserve(bytes);
   void* result = mmap(target, bytes, protection, MAP_SHARED | MAP_FIXED, files[index], 0);
   if (result == MAP_FAILED) return -3;
   *address = result;
@@ -69,6 +98,7 @@ extern "C" int sceKernelReleaseDirectMemory(int64_t physical, size_t bytes) {
 }
 int main() {
   const size_t granule = ps5_zgc::Backing::granule;
+  {
   ps5_zgc::Backing backing;
   assert(!backing.initialize(1));
   assert(backing.initialize(4 * granule));
@@ -88,9 +118,21 @@ int main() {
   b[granule + 99] = 0x72;
   assert(b[0] == 0x35 && a[granule + 99] == 0x72);
   fail_map = true;
+  fail_device = true;
   assert(!backing.map(reinterpret_cast<uintptr_t>(a), 0, granule));
-  assert(backing.map_result() == -2 && backing.map_physical() >= 0);
+  assert(backing.map_result() == EACCES && backing.map_physical() >= 0);
+  fail_device = false;
+  fail_device_map = true;
+  assert(!backing.map(reinterpret_cast<uintptr_t>(a), 0, granule));
+  assert(backing.map_result() == EIO);
+  fail_device_map = false;
+  assert(backing.map(reinterpret_cast<uintptr_t>(a), 0, granule));
+  assert(backing.map_result() == 0 && a[0] == 0x35);
   fail_map = false;
+  move_hint = true;
+  assert(backing.map(reinterpret_cast<uintptr_t>(a), 0, granule));
+  assert(backing.map_result() == 0 && a[0] == 0x35);
+  move_hint = false;
   assert(backing.unmap(reinterpret_cast<uintptr_t>(a), 2 * granule));
   assert(b[0] == 0x35);
   assert(backing.unmap(reinterpret_cast<uintptr_t>(b), 2 * granule));
@@ -109,7 +151,9 @@ int main() {
   assert(backing.uncommit(2 * granule, granule) == granule);
   assert(munmap(a, 2 * granule) == 0 && munmap(b, 2 * granule) == 0);
   for (int fd : files) assert(fd == -1);
-  puts("PASS PS5 ZGC backing: real shared aliases, initial zeroes, remap preservation, bounds, allocation/map/release failure and retained ownership");
+  }
+  assert(device_maps == 2 && device_fd >= 0 && fcntl(device_fd,F_GETFD) == -1 && errno == EBADF);
+  puts("PASS PS5 ZGC device fallback/refusal/descriptor teardown and backing: real shared aliases, initial zeroes, remap preservation, bounds, allocation/map/release failure and retained ownership");
 }
 '''
 with tempfile.TemporaryDirectory() as directory:

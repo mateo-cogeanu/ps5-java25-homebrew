@@ -69,3 +69,23 @@ address. Native result and physical offset are retained for the fatal diagnostic
 It does not continue with a missing heap mapping. The host shared-alias fixture
 requires flags0 and covers native mapping refusal/result preservation.
 PS5 hint placement and subsequent GC operation remain pending.
+
+Recovered consumer240 reports ERANGE from the exact-placement check: the
+native mapping succeeded but returned a different address. Patch0146 retains
+the existing direct-memory allocation and, after safely cleaning an unexpected
+mapping, falls back to a shared fixed mapping of its physical offset through
+/dev/dmem0. Only the existing collector-owned reservation may be replaced.
+The device descriptor is opened lazily under the backing lock and closed with
+the backing. Device open and mapping refusal retain the physical allocation
+and stop heap initialization with the recorded error.
+
+The actual helper's host tests verify fallback aliases, preserved bytes,
+unexpected hint cleanup, device-open and device-map refusal, and descriptor
+teardown under ASan/UBSan. They model the device with shared backing files,
+so native device access and GC still need PS5 validation. Native FTP inventory
+confirms that the console exposes /dev/dmem0; title access is unverified.
+
+A direct-memory device mapping example is documented in this independent
+PS5 research source. It motivates the candidate and does not establish a
+ProsperoCraft console pass.
+https://github.com/ZigZagBoi1/PS5-14.10-Research/blob/master/docs/FINDINGS.md
