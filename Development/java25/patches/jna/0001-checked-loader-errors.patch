@@ -1,0 +1,44 @@
+--- a/native/dispatch.c
++++ b/native/dispatch.c
+@@ -72,8 +72,13 @@
+ #define LOAD_LIBRARY(NAME,OPTS) dlopen(NAME, OPTS)
+ static inline char * LOAD_ERROR() {
+     const char* message = dlerror();
++    if (message == NULL) {
++        message = "Native library operation failed without loader error text";
++    }
+     char* buf = (char*) malloc(strlen(message) + 1 /* null */);
+-    strcpy(buf, message);
++    if (buf != NULL) {
++        strcpy(buf, message);
++    }
+     return buf;
+ }
+ static inline char * STR_ERROR(int code) {
+@@ -2283,7 +2288,7 @@
+ #endif
+     if (!handle) {
+       char* buf = LOAD_ERROR();
+-      throwByName(env, EUnsatisfiedLink, buf);
++      throwByName(env, EUnsatisfiedLink, buf != NULL ? buf : "Native library operation failed; error text allocation refused");
+       free(buf);
+     }
+     if (libname != NULL) {
+@@ -2302,7 +2307,7 @@
+ {
+   if (FREE_LIBRARY(L2A(handle))) {
+     char* buf = LOAD_ERROR();
+-    throwByName(env, EError, buf);
++    throwByName(env, EError, buf != NULL ? buf : "Native library operation failed; error text allocation refused");
+     free(buf);
+   }
+ }
+@@ -2324,7 +2329,7 @@
+       func = (void *)FIND_ENTRY(handle, funname);
+       if (!func) {
+         char* buf = LOAD_ERROR();
+-        throwByName(env, EUnsatisfiedLink, buf);
++        throwByName(env, EUnsatisfiedLink, buf != NULL ? buf : "Native library operation failed; error text allocation refused");
+         free(buf);
+       }
+       free((void *)funname);

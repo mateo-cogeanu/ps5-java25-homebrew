@@ -11,7 +11,7 @@ REPOSITORY='https://github.com/java-native-access/jna.git'
 COMMIT='1a91122853f6ab6f1fb2a4a284a6cf2ed8af0a4d'
 JDK=Path('/Library/Java/JavaVirtualMachines/openjdk-25.jdk/Contents/Home')
 LLVM=Path('/opt/homebrew/opt/llvm/bin')
-def build(ffi_include,host=False,source=None,offline=False):
+def build(ffi_include,host=False,source=None,offline=False,safe_loader_errors=False):
  cache=Path(source).resolve()if source else ROOT/'.tools/jna-5.19.1'
  if not cache.exists():
   if offline:raise FileNotFoundError(cache)
@@ -21,8 +21,13 @@ def build(ffi_include,host=False,source=None,offline=False):
   subprocess.run(['git','-C',str(cache),'fetch','--depth','1',REPOSITORY,COMMIT],check=True)
  out=ROOT/'build/java25'/('jna-host'if host else'jna-target');out.mkdir(parents=True,exist_ok=True)
  src=out/'source';shutil.rmtree(src,ignore_errors=True);src.mkdir()
- archive=subprocess.check_output(['git','-C',str(cache),'archive',COMMIT])
+ archive=subprocess.check_output(['git','-C',str(cache),'archive',COMMIT,'common.xml','src','native','LICENSE','AL2.0','LGPL2.1'])
  with tarfile.open(fileobj=io.BytesIO(archive))as tar:tar.extractall(src,filter='data')
+ patches={}
+ if safe_loader_errors:
+  patch=ROOT/'java25/patches/jna/0001-checked-loader-errors.patch'
+  subprocess.run(['patch','-p1','--batch','--forward','-i',str(patch)],cwd=src,check=True)
+  patches[patch.relative_to(ROOT).as_posix()]=hashlib.sha256(patch.read_bytes()).hexdigest()
  properties=dict(re.findall(r'<property name="([^"]+)" value="([^"]+)"', (src/'common.xml').read_text()))
  version='.'.join(properties['jni.'+part]for part in ['major','minor','revision']);checksum=properties['jni.md5']
  jna_version='.'.join(properties['jna.'+part]for part in ['major','minor','revision'])
@@ -44,6 +49,7 @@ def build(ffi_include,host=False,source=None,offline=False):
  symbols=subprocess.check_output([str(LLVM/'llvm-nm'),'--defined-only','--extern-only',str(output)],text=True)
  exports=sorted(l.split()[-1].lstrip('_')if host else l.split()[-1]for l in symbols.splitlines()if l.split()and 'Java_com_sun_jna_'in l)
  audit={'repository':REPOSITORY,'commit':COMMIT,'jna_version':'5.19.1','native_version':version,'native_api_checksum':checksum,'host':host,'output_sha256':sha(output),'jni_exports':exports,'native_sources_sha256':{name:sha(src/'native'/name)for name in ['dispatch.c','callback.c','dispatch.h','protect.h']},'ffi_header_sha256':sha(Path(ffi_include)/'ffi.h'),'jni_header_sha256':{p.name:sha(p)for p in headers.glob('*.h')},'options':{'jawt':False,'signal_protection':False,'nio_buffers':True},'scope':'Original JNA native dispatch/callback sources and generated JNI headers. No game/Java class replacement. Target uses caller-supplied existing libffi; arbitrary external ELF loading is not added.','console':'Target bootstrap/memory/calls/callbacks remain pending; host tests do not establish PS5 behavior.'}
+ audit['patches_sha256']=patches
  (out/'audit.json').write_text(json.dumps(audit,indent=2)+'\n');print('PASS genuine JNA dispatch JNI',len(exports),'exports',sha(output));return output
 if __name__=='__main__':
- p=argparse.ArgumentParser(description=__doc__);p.add_argument('--ffi-include',type=Path,required=True);p.add_argument('--host',action='store_true');p.add_argument('--source',type=Path);p.add_argument('--offline',action='store_true');a=p.parse_args();build(a.ffi_include,a.host,a.source,a.offline)
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('--ffi-include',type=Path,required=True);p.add_argument('--host',action='store_true');p.add_argument('--source',type=Path);p.add_argument('--offline',action='store_true');p.add_argument('--safe-loader-errors',action='store_true');a=p.parse_args();build(a.ffi_include,a.host,a.source,a.offline,a.safe_loader_errors)

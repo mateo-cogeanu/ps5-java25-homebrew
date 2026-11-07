@@ -23,3 +23,22 @@ python3 tools/test_java25_jna.py --jna-jar /path/to/original/jna-5.19.1.jar
 The test pins the original Java artifact and forces the freshly built host dispatch through its boot path, with classpath native fallback disabled. It checks actual native sizes, last-error state, allocated memory/string round trips and real libffi strlen/abs calls. A host pass does not establish PS5 calls, callbacks, thread attachment or dynamic library compatibility. The user reports consumer119working after its snapshot6bootstrap repair. This confirms that startup path; standalone target memory/call/callback coverage remains pending. Do not advertise universal JNA compatibility or use the absence of a native-load crash as proof that every API works.
 
 Upstream JNA is dual Apache2.0/LGPL2.1-or-later. Retain its LICENSE/AL2.0/LGPL2.1 and source pins. Current consumer integration and game-specific validation live in [ProsperoCraft](https://github.com/mateo-cogeanu/ProsperoCraft); reusable runtime build tooling remains here. Frozen milestones and compiled passing snapshots are untouched.
+
+## Checked loader errors
+
+The optional `--safe-loader-errors` build applies
+`java25/patches/jna/0001-checked-loader-errors.patch` to the pinned native source.
+Unix loader errors check both missing `dlerror()` text and refused error-buffer
+allocation. The real JNI open, close and symbol lookup operations retain their
+Java error types and use a fixed failure message when the buffer is unavailable.
+The temporary buffer is freed only through the existing ownership path.
+Default builds retain the original source. The build audit records the patch
+digest. Source extraction includes the actual build inputs and licenses, avoiding
+upstream precompiled distribution and dependency directories.
+
+`python3 tools/test_java25_jna_loader_errors.py` exercises the extracted original
+JNI operations with controlled loader failure and error-buffer allocation refusal.
+The historical allocation-refusal case faults under ASan. Patched open/close/symbol
+lookup safely report errors for normal text, missing text and refused allocation.
+This is scoped native fault-injection evidence. Physical console startup and
+native allocation pressure still require validation in the consuming app.
