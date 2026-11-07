@@ -55,3 +55,26 @@ the previous published generator on identical inputs. Actual PS5 dual native
 generations, lookup/classloader ownership, callbacks, teardown and consumer
 behavior remain pending. Adoption/pins belong in the owning consumer repository.
 No release, frozen milestone or console pass follows from these checks.
+
+## Scoped handles without symbol renaming
+
+An explicit `--library-scoped-handle external_group` selects the same existing
+builtin-handle hook for a known external group whose definitions need no rename.
+The group's aliases inherit its handle restriction. Unknown, duplicate, core and
+alias selections are refused. The original JNI loader, initializer, symbols,
+native objects and resident lifetime stay in place. This option adds no code or
+native ABI adapter. Definitions with conflicting linker names still require a
+symbol namespace.
+
+This matters when several libraries share a Java class loader. A library using
+the process handle can otherwise satisfy a native method from any resident group
+before the correct scoped group is consulted. The option limits that library's
+JNI lookup to its actual exports. Explicit namespaced groups already have that
+restriction. Empty options preserve the generated defaults.
+
+The namespace test also executes actual generated tables with an explicitly
+scoped unrenamed group and its alias, checks refusal of another group's loader
+entry, and verifies the audit selection. The existing actual patched
+NativeLibraries JNI tests exercise handle publication, initializer errors and
+default/nonbuiltin cases. Physical application callback ownership remains a
+consumer validation requirement.

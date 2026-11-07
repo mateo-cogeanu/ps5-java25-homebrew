@@ -48,6 +48,15 @@ def read_aliases(values, names):
     return result
 
 
+def read_scoped_handle_groups(values, external_names):
+    selected = set()
+    for name in values:
+        if name not in external_names or name in selected:
+            raise ValueError('Scoped JNI handle requires a unique external group: ' + str(name))
+        selected.add(name)
+    return selected
+
+
 def read_symbol_prefixes(values, external_names):
     """Namespace a selected external group's real definitions, not its lookup ABI."""
     result = {}

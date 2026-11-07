@@ -13,7 +13,7 @@ import subprocess
 import struct
 import tempfile
 
-from java25_resident_libraries import read_symbol_prefixes, symbol_prefix_map
+from java25_resident_libraries import read_symbol_prefixes, symbol_prefix_map, read_scoped_handle_groups
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -35,6 +35,10 @@ def main():
     args = parser.parse_args()
     jdk, llvm = args.java_home.resolve(), args.llvm_home.resolve() / 'bin'
     assert read_symbol_prefixes([], {'consumer'}) == {}
+    assert read_scoped_handle_groups([], {'consumer'}) == set()
+    assert read_scoped_handle_groups(['consumer'], {'consumer'}) == {'consumer'}
+    for values in (['missing'], ['java'], ['consumer', 'consumer'], ['ConsumerAlias'], ['../consumer']):
+        rejects(lambda: read_scoped_handle_groups(values, {'consumer'}))
     assert read_symbol_prefixes(['consumer=isolated_'], {'consumer'}) == {'consumer': 'isolated_'}
     for values in (['missing=ok_'], ['java=ok_'], ['consumer=x'], ['consumer=../x_'],
                    ['consumer=JNI_OnLoad'], ['consumer=bad;code_'], ['consumer=1x_'],
@@ -123,6 +127,44 @@ int main(){
 '''
         source = work / 'table.cpp'
         source.write_text(generated)
+        subprocess.run([args.cxx, '-std=c++20', '-fsanitize=address,undefined',
+                        str(source), '-o', str(work / 'table')], check=True)
+        subprocess.run([str(work / 'table')], check=True)
+        # A second selected library must not turn JNI lookup into process lookup
+        # merely because its actual definitions do not require a namespace.
+        subprocess.run(['python3', str(ROOT / 'tools/java25_builtin_runtime.py'),
+                        '--external-libraries', str(manifest), '--library-symbol-prefix',
+                        'scoped_fixture=isolated_', '--library-alias', 'ScopedAlias=scoped_fixture',
+                        '--library-scoped-handle', 'plain_fixture',
+                        '--library-alias', 'PlainAlias=plain_fixture'], check=True)
+        checked = (build / 'builtin-libraries.cpp').read_text()
+        checked = re.sub(r'extern "C" void (embedded_symbol_\d+)\(\) __asm__\("([^"]+)"\);', mock, checked)
+        checks = generated[generated.index('int main(){'):].replace(
+            'assert(!JVM_PS5ScopedBuiltinHandle("plain_fixture"));',
+            'assert(JVM_PS5ScopedBuiltinHandle("plain_fixture")==plain);\n'
+            'assert(JVM_PS5ScopedBuiltinHandle("PlainAlias")==__dlopen("libPlainAlias.so",0));\n'
+            'assert(!__dlsym(plain,"JNI_OnLoad_scoped_fixture"));')
+        source.write_text('#define RTLD_SELF ((void*)-3)\n#include <cassert>\n'
+                          'static int loads=0,load_version=0x10008;\n' + checked + checks)
+        subprocess.run([args.cxx, '-std=c++20', '-fsanitize=address,undefined',
+                        str(source), '-o', str(work / 'table')], check=True)
+        subprocess.run([str(work / 'table')], check=True)
+        assert json.loads((build / 'builtin-resident-audit.json').read_text())['library_scoped_handles'] == ['plain_fixture']
+        subprocess.run(['python3', str(ROOT / 'tools/java25_builtin_runtime.py'),
+                        '--external-libraries', str(manifest),
+                        '--library-scoped-handle', 'plain_fixture'], check=True)
+        checked = (build / 'builtin-libraries.cpp').read_text()
+        checked = re.sub(r'extern "C" void (embedded_symbol_\d+)\(\) __asm__\("([^"]+)"\);', mock, checked)
+        source.write_text('#define RTLD_SELF ((void*)-3)\n#include <cassert>\n'
+                          'static int loads=0,load_version=0x10008;\n' + checked + r'''
+int main(){
+ void *plain=__dlopen("libplain_fixture.so",0);
+ assert(JVM_PS5ScopedBuiltinHandle("plain_fixture")==plain);
+ assert(!JVM_PS5ScopedBuiltinHandle("scoped_fixture"));
+ assert(!__dlsym(plain,"JNI_OnLoad_scoped_fixture"));
+ assert(__dlsym(__dlopen(nullptr,0),"JNI_OnLoad_scoped_fixture"));
+}
+''')
         subprocess.run([args.cxx, '-std=c++20', '-fsanitize=address,undefined',
                         str(source), '-o', str(work / 'table')], check=True)
         subprocess.run([str(work / 'table')], check=True)

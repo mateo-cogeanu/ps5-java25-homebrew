@@ -10,7 +10,8 @@ import re
 import argparse
 import hashlib
 from java25_resident_libraries import (read_libraries, read_aliases, read_alias_symbols,
-                                      alias_symbol_entries, read_symbol_prefixes, symbol_prefix_map)
+                                      alias_symbol_entries, read_symbol_prefixes, symbol_prefix_map,
+                                      read_scoped_handle_groups)
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / '.tools/java25/openjdk/build/ps5-bootstrap'
@@ -30,6 +31,7 @@ def main():
     parser.add_argument("--library-alias",action="append",default=[],help="Explicit resident alias=library; same symbols and ownership, no new loader")
     parser.add_argument("--alias-symbol",action="append",default=[],help="Opt-in alias:export=resident_symbol lookup; both exports must exist in that same group")
     parser.add_argument("--library-symbol-prefix",action="append",default=[],help="Opt-in external_group=prefix_: namespace definitions, retain original handle-scoped JNI lookup names")
+    parser.add_argument("--library-scoped-handle",action="append",default=[],help="Restrict builtin JNI lookup to a unique known external group without renaming its definitions")
     args=parser.parse_args()
     if args.management_extensions:args.management=True
     if args.imageio:
@@ -37,6 +39,8 @@ def main():
         build()
     external=read_libraries(args.external_libraries,LIBRARIES+["jvm","management","management_ext","ps5probe","awt","lcms"]) if args.external_libraries else []
     prefixes=read_symbol_prefixes(args.library_symbol_prefix,{name for name,_ in external})
+    explicit_scopes=read_scoped_handle_groups(args.library_scoped_handle,{name for name,_ in external})
+    scoped_groups=set(prefixes)|explicit_scopes
     scoped_handles=[]
     declarations=[]; tables=[]; mapped=[]; links=[]; alias_index=0; builtin_loaders=[]
     libraries=[('jvm',WORK/'embedded-jvm.o')]
@@ -139,11 +143,11 @@ def main():
             for alias,target in aliases.items():
                 if target==name:entries.append('{"JNI_OnLoad_'+alias+'", reinterpret_cast<void *>(&'+loader+')}')
         tables.append('static const Symbol symbols_'+name+'[]={\n'+',\n'.join(entries)+'\n};')
-        if name in prefixes:scoped_handles.append((name,len(mapped)))
+        if name in scoped_groups:scoped_handles.append((name,len(mapped)))
         mapped.append('{"lib'+name+'.so", symbols_'+name+', sizeof(symbols_'+name+')/sizeof(Symbol)}')
         for alias,target in aliases.items():
             if target==name:
-                if name in prefixes:scoped_handles.append((alias,len(mapped)))
+                if name in scoped_groups:scoped_handles.append((alias,len(mapped)))
                 if alias in alias_symbols:
                     table='symbols_alias_'+str(len(tables))
                     tables.append('static const Symbol '+table+'[]={\n'+',\n'.join(alias_symbol_entries(entries,alias_symbols[alias]))+'\n};')
@@ -151,7 +155,7 @@ def main():
                 else:
                     mapped.append('{"lib'+alias+'.so", symbols_'+name+', sizeof(symbols_'+name+')/sizeof(Symbol)}')
     scoped_resolver=''
-    if prefixes:
+    if scoped_groups:
         # OpenJDK normally assigns the process handle to builtins. A selected
         # group must retain its real handle so duplicate JNI names stay scoped.
         scoped_resolver='extern "C" void *JVM_PS5ScopedBuiltinHandle(const char *name) {\n if(!name) return nullptr;\n'
@@ -210,6 +214,7 @@ extern "C" int __dladdr(const void *address,Dl_info *info) {
     (WORK/'builtin-link-inputs.json').write_text(json.dumps(links,indent=2)+'\n')
     audit={'external_resident_libraries':external_audit,'library_aliases':aliases,'alias_symbol_overrides':alias_symbols,'scope':'Build-time resident objects only; no arbitrary ELF loader'}
     if prefixes:audit['library_symbol_prefixes']=prefixes
+    if explicit_scopes:audit['library_scoped_handles']=sorted(explicit_scopes)
     (WORK/'builtin-resident-audit.json').write_text(json.dumps(audit,indent=2)+'\n')
     print('Generated embedded lookup table:',alias_index,'real function addresses')
 
