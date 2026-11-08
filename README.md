@@ -14,7 +14,7 @@ An experimental native **OpenJDK 25 runtime for PlayStation 5 homebrew**. This i
 
 Nine frozen Java25 runtime milestones received **ALL PASS on a real PS5, firmware 13.60**, in interpreter mode. Tested scopes include VM startup/shutdown, Java threads and file I/O, ZIP/JAR loading, manifest-linked dependencies, service/resource discovery, system class paths, resident JNI, HTTPS and IPv4/IPv6 networking. These passes apply to the exact recorded milestone builds; they do not establish full Java API, JIT, arbitrary native ELF loading or general application compatibility.
 
-**Java17 Startup 01.000.002 also received ALL PASS on 2026-11-08** for interpreter VM creation, Java/JNI/thread execution and clean destruction. [Exact release and checksums](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Java17_Startup-v01.000.002) · [Frozen source](https://github.com/mateo-cogeanu/ps5-homebrew-history/tree/279f6b84352064dd646864d3f59cd29c80422fee/runtime/Java17_Startup). This does not establish C2, Minecraft or performance acceptance. Java21 startup001 is a separate local candidate awaiting PS5 testing.
+**Java17 Startup 01.000.002 also received ALL PASS on 2026-11-08** for interpreter VM creation, Java/JNI/thread execution and clean destruction. [Exact release and checksums](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Java17_Startup-v01.000.002) · [Frozen source](https://github.com/mateo-cogeanu/ps5-homebrew-history/tree/279f6b84352064dd646864d3f59cd29c80422fee/runtime/Java17_Startup). This does not establish C2, Minecraft or performance acceptance. **Java21 Startup 01.000.001 also received ALL PASS on 2026-11-08** for the same four-row interpreter startup scope. [Exact release and checksums](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Java21_Startup-v01.000.001) · [Frozen source](https://github.com/mateo-cogeanu/ps5-homebrew-history/tree/2468e3d5034b4c5122e14bf5a461fdc0db27ce0a/runtime/Java21_Startup).
 
 Active development remains in `Development/`. All compatibility patches, optional policies, diagnostic probes and regression tests remain there, including work awaiting console validation:
 
@@ -54,6 +54,7 @@ Completed runtime source changes are published through `tools/sync_github.py`. I
 | Separate LTS milestone | Exact passing package | Frozen source |
 | --- | --- | --- |
 | Java17 Startup 01.000.002, PPSA99876 | [Release, complete source and checksums](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Java17_Startup-v01.000.002) | [Java17_Startup](https://github.com/mateo-cogeanu/ps5-homebrew-history/tree/279f6b84352064dd646864d3f59cd29c80422fee/runtime/Java17_Startup) |
+| Java21 Startup 01.000.001, PPSA99877 | [Release, complete source and checksums](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Java21_Startup-v01.000.001) | [Java21_Startup](https://github.com/mateo-cogeanu/ps5-homebrew-history/tree/2468e3d5034b4c5122e14bf5a461fdc0db27ce0a/runtime/Java21_Startup) |
 
 The latest passing Java25 acceptance probe is **Dependency_Probe**, title **PPSA99873**, version **01.000.001**: [original release and checksums](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Dependency_Probe-v01.000.001). Extract the entire app title folder, install it through your existing homebrew workflow, and run its six rows in order using D-pad and X. Close through the PS menu. It needs no network helper.
 
@@ -78,6 +79,6 @@ Built on OpenJDK, the FreeBSD OpenJDK port, the community PS5 Payload SDK and ps
 
 Separate pinned PS5 cross-build baselines now compile genuine HotSpot server
 (C1/C2), core Java classes and native libraries for Java17 and21. These are
-initial build results. Java17 startup002 now has an exact physical-console pass; Java21 startup001 and consumer integration remain pending.
+initial build results. Java17 startup002 now has an exact physical-console pass; Java21 startup001 has also passed on the physical console; consumer integration remains pending.
 See the [build instructions and scope](Development/docs/java-lts-runtimes.md).
 The working Java25 runtime remains unchanged.

@@ -14,7 +14,7 @@ Java 17's bundled fdlibm archive exports were checked. The class-only core image
 are 12,593,381 and 14,350,852 bytes; these sizes exclude native runtime/application
 code and do not establish game memory use or a performance improvement.
 
-The original build record describes **initial cross-build baselines**. Subsequently Java17 startup002 received ALL PASS on the physical PS5; Java21 startup001 is packaged for testing. Neither establishes Minecraft compatibility.
+The original build record describes **initial cross-build baselines**. Subsequently Java17 startup002 received ALL PASS on the physical PS5; Java21 startup001 subsequently received ALL PASS too. Neither establishes Minecraft compatibility.
 Some SDK-linked shared libraries produce `llvm-readelf` warnings about nonstandard
 PT_DYNAMIC sizes. These are recorded in local audits; a header check does not
 validate dynamic loading. Separate startup packages use matched statically resident native objects, not arbitrary shared-library loading.
@@ -112,5 +112,5 @@ lives in the separate history archive. No C2/game/performance claim follows.
 
 [Java21 startup001](java21-startup-probe.md), PPSA99877, uses an independently
 rebased bootstrap boundary and its own matching class image/core objects. Host
-checks and packaging pass; physical-console startup remains pending. The working
+checks and packaging pass; the maintainer also reported exact-build ALL PASS for its four interpreter startup rows. The working
 Java25 consumer remains unchanged. Consumer launchers require separate integration.

@@ -427,3 +427,17 @@ PPSA99877, is a separate local candidate with matching21 classes/core objects;
 physical startup pending. Shared helpers default17 and require explicit --major21
 for21. Preserve Java25 consumer and original JARs; consumer integration and exact
 hardware/shader release gates remain separate. See docs/java21-startup-probe.md.
+
+
+## Java21 startup acceptance —2026-11-08
+
+Exact standalone Java21 PPSA99877/01.000.001 received user ALL PASS for all four
+interpreter startup/JNI/worker/destruction rows. Preserve package SHA256
+33598afb949733eedfc328695d4fffcc81091ed46d1ff92654dc3611cc5d2260,
+source051cbf7e22583d7c11010710d854685f3fb1e731 and archive snapshot
+runtime/Java21_Startup at2468e3d5034b4c5122e14bf5a461fdc0db27ce0a. Verified release contains unchanged passing
+package, complete original upstream+frozen port source, build/console records and
+checksums. This supersedes pending startup status only; C2, general API/FFM/virtual
+threads, Minecraft, shaders, performance and endurance remain unvalidated. Keep
+both17/21 frozen bytes and working25 consumer. Consumer bootstrap/bindings and
+physical game/release gates remain separate; see docs/java21-startup-probe.md.

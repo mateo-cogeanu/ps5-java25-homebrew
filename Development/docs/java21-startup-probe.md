@@ -4,12 +4,12 @@ The standalone native test title is **PPSA99877**, separate from Java17 PPSA9987
 and ProsperoCraft. Its four ordered rows initialize the matched native core,
 create the genuine Java21 VM, execute Java/JNI/worker-thread checks, then destroy
 the VM. Use D-pad and X to run each row in order. Report ALL PASS or the first
-failed/hanging row. Physical-console testing is **pending**.
+failed/hanging row. The maintainer reported **ALL PASS** for this exact build on 2026-11-08. See the [console record](validation/java21-startup-001-console-2026-11-08.json).
 
 The local signed package is `dist/PPSA99877.zip`, SHA256
 `33598afb949733eedfc328695d4fffcc81091ed46d1ff92654dc3611cc5d2260`.
 See the [build record](validation/java21-startup-001-build-2026-11-08.json).
-There is no unvalidated release or Store publication.
+The [passing release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Java21_Startup-v01.000.001) preserves the unchanged package, complete source archive and verified checksums. The [frozen source](https://github.com/mateo-cogeanu/ps5-homebrew-history/tree/2468e3d5034b4c5122e14bf5a461fdc0db27ce0a/runtime/Java21_Startup) records original source commit051cbf7e22583d7c11010710d854685f3fb1e731. No Store publication is involved.
 
 This independently pinned Java21 generation rebases the Java17 bootstrap boundary:
 matched core classes/native exports, bounded VM text identity, staged constructors,

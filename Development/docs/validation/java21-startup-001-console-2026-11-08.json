@@ -1,0 +1,28 @@
+{
+  "title_id": "PPSA99877",
+  "version": "01.000.001",
+  "tested_date": "2026-11-08",
+  "console": "Physical PS5; firmware not restated for this exact build",
+  "evidence": "Maintainer replied ALL PASS immediately after the standalone Java21 startup001 handoff requesting all four ordered rows. No current-run logs were retrieved in this acceptance turn.",
+  "source_repository": "https://github.com/mateo-cogeanu/ps5-java25-homebrew",
+  "source_commit": "051cbf7e22583d7c11010710d854685f3fb1e731",
+  "tested_full_package_sha256": "33598afb949733eedfc328695d4fffcc81091ed46d1ff92654dc3611cc5d2260",
+  "symbols_sha256": "0f2b0d372ad4f9f8f663d943fb3d1cc1f87204ee598ae74b325916ac454b1841",
+  "class_image_sha256": "94feeaddd624dfee8dcf2039b939732e66fab9cc99c39ade1423c0867d1a1590",
+  "results": {
+    "matched_core_constructors": "PASS",
+    "JNI_CreateJavaVM_interpreter_128MiB_max_heap": "PASS",
+    "Java_arithmetic_UTF16_StrictMath_caught_exception": "PASS",
+    "registered_JNI_main_and_worker_thread_join": "PASS",
+    "DestroyJavaVM": "PASS"
+  },
+  "limits": [
+    "User-reported four-row startup pass only; no independently retrieved logs or endurance measurement",
+    "C1/C2 compiled but not exercised by this -Xint probe",
+    "SerialGC small startup workload only; no collector/performance acceptance",
+    "No Minecraft/mod/shader/virtual-thread/FFM/general API compatibility claim"
+  ],
+  "release_url": "https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Java21_Startup-v01.000.001",
+  "snapshot_repository": "https://github.com/mateo-cogeanu/ps5-homebrew-history",
+  "snapshot_path": "runtime/Java21_Startup"
+}
