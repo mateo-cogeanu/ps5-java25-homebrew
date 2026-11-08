@@ -12,7 +12,9 @@ An experimental native **OpenJDK 25 runtime for PlayStation 5 homebrew**. This i
 
 ## Current status
 
-Nine frozen runtime milestones received **ALL PASS on a real PS5, firmware 13.60**, in interpreter mode. Tested scopes include VM startup/shutdown, Java threads and file I/O, ZIP/JAR loading, manifest-linked dependencies, service/resource discovery, system class paths, resident JNI, HTTPS and IPv4/IPv6 networking. These passes apply to the exact recorded milestone builds; they do not establish full Java API, JIT, arbitrary native ELF loading or general application compatibility.
+Nine frozen Java25 runtime milestones received **ALL PASS on a real PS5, firmware 13.60**, in interpreter mode. Tested scopes include VM startup/shutdown, Java threads and file I/O, ZIP/JAR loading, manifest-linked dependencies, service/resource discovery, system class paths, resident JNI, HTTPS and IPv4/IPv6 networking. These passes apply to the exact recorded milestone builds; they do not establish full Java API, JIT, arbitrary native ELF loading or general application compatibility.
+
+**Java17 Startup 01.000.002 also received ALL PASS on 2026-11-08** for interpreter VM creation, Java/JNI/thread execution and clean destruction. [Exact release and checksums](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Java17_Startup-v01.000.002) · [Frozen source](https://github.com/mateo-cogeanu/ps5-homebrew-history/tree/279f6b84352064dd646864d3f59cd29c80422fee/runtime/Java17_Startup). This does not establish C2, Minecraft or performance acceptance. Java21 startup001 is a separate local candidate awaiting PS5 testing.
 
 Active development remains in `Development/`. All compatibility patches, optional policies, diagnostic probes and regression tests remain there, including work awaiting console validation:
 
@@ -49,7 +51,11 @@ Completed runtime source changes are published through `tools/sync_github.py`. I
 
 ## Passing downloads and source history
 
-The latest passing runtime acceptance probe is **Dependency_Probe**, title **PPSA99873**, version **01.000.001**: [original release and checksums](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Dependency_Probe-v01.000.001). Extract the entire app title folder, install it through your existing homebrew workflow, and run its six rows in order using D-pad and X. Close through the PS menu. It needs no network helper.
+| Separate LTS milestone | Exact passing package | Frozen source |
+| --- | --- | --- |
+| Java17 Startup 01.000.002, PPSA99876 | [Release, complete source and checksums](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Java17_Startup-v01.000.002) | [Java17_Startup](https://github.com/mateo-cogeanu/ps5-homebrew-history/tree/279f6b84352064dd646864d3f59cd29c80422fee/runtime/Java17_Startup) |
+
+The latest passing Java25 acceptance probe is **Dependency_Probe**, title **PPSA99873**, version **01.000.001**: [original release and checksums](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Dependency_Probe-v01.000.001). Extract the entire app title folder, install it through your existing homebrew workflow, and run its six rows in order using D-pad and X. Close through the PS menu. It needs no network helper.
 
 All nine frozen runtime sources, including **JVM_Startup 01.000.023**, now live in the [runtime archive index](https://github.com/mateo-cogeanu/ps5-homebrew-history/tree/aa7db35ee9aa5cc6515f49b23ebda6d1ecfcf91d/runtime). The [archive README and manifest](https://github.com/mateo-cogeanu/ps5-homebrew-history/tree/aa7db35ee9aa5cc6515f49b23ebda6d1ecfcf91d) record original commits, title IDs, versions, console evidence, file checksums and historical build instructions. ProsperoCraft snapshots have a separate archive section.
 
@@ -72,6 +78,6 @@ Built on OpenJDK, the FreeBSD OpenJDK port, the community PS5 Payload SDK and ps
 
 Separate pinned PS5 cross-build baselines now compile genuine HotSpot server
 (C1/C2), core Java classes and native libraries for Java17 and21. These are
-initial build results; PS5 startup and consumer integration remain pending.
+initial build results. Java17 startup002 now has an exact physical-console pass; Java21 startup001 and consumer integration remain pending.
 See the [build instructions and scope](Development/docs/java-lts-runtimes.md).
 The working Java25 runtime remains unchanged.

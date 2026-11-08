@@ -1,0 +1,28 @@
+{
+  "title_id": "PPSA99876",
+  "version": "01.000.002",
+  "tested_date": "2026-11-08",
+  "console": "Physical PS5; firmware not restated for this exact build",
+  "evidence": "Maintainer replied ALL PASS immediately after the standalone Java17 startup002 handoff with four ordered rows. No current-run logs were retrieved in this acceptance turn.",
+  "source_repository": "https://github.com/mateo-cogeanu/ps5-java25-homebrew",
+  "source_commit": "d503c8336d1b4e55faf9e4dc5f147ce596d3ab1d",
+  "tested_full_package_sha256": "c2241e10bb8c0cb895c7fc02a8490cdd50b2be670e54bc561c90e98c43776c29",
+  "symbols_sha256": "5f2ee9decc06ed8f58e35276d6d837a7590f20cccf2bbc261bbc38a8c280d296",
+  "class_image_sha256": "23ea3fe98cc4530ae41a014c8d7b843dba07fb13db8338ef42af1a44aaa3464b",
+  "results": {
+    "matched_core_constructors": "PASS",
+    "JNI_CreateJavaVM_interpreter_128MiB_max_heap": "PASS",
+    "Java_arithmetic_UTF16_StrictMath_caught_exception": "PASS",
+    "registered_JNI_main_and_worker_thread_join": "PASS",
+    "DestroyJavaVM": "PASS"
+  },
+  "limits": [
+    "User-reported four-row startup pass only; no independently retrieved log or endurance measurement",
+    "C2 is compiled into the VM but this probe uses -Xint and does not validate JIT",
+    "SerialGC small startup workload only; no general GC/performance acceptance",
+    "No Minecraft/mod/shader/controller-game compatibility or Java21 result"
+  ],
+  "release_url": "https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Java17_Startup-v01.000.002",
+  "snapshot_repository": "https://github.com/mateo-cogeanu/ps5-homebrew-history",
+  "snapshot_path": "runtime/Java17_Startup"
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run actual Java17 PS5 JIMAGE OS code with host read/map/protect failure injection."""
+"""Run actual Java17/21 PS5 JIMAGE OS code with host read/map/protect failure injection."""
 import argparse
 from pathlib import Path
 import os
@@ -14,11 +14,12 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--llvm-home', required=True, type=Path)
     p.add_argument('--boot-jdk', required=True, type=Path)
+    p.add_argument('--major', type=int, choices=(17,21), default=17)
     a = p.parse_args()
     boot = a.boot_jdk.resolve()
-    verify_boot(boot, 17)
-    source = ROOT / '.tools/java17/openjdk'
-    work = ROOT / 'build/java-lts/startup17-image-host'
+    verify_boot(boot, a.major)
+    source = ROOT / ('.tools/java' + str(a.major) + '/openjdk')
+    work = ROOT / ('build/java-lts/startup' + str(a.major) + '-image-host')
     work.mkdir(parents=True, exist_ok=True)
     bindings = work / 'bindings.hpp'
     bindings.write_text(r'''
@@ -77,7 +78,7 @@ int main(int argc,char**argv){
  close(fd);unlink(argv[1]);
  puts("PASS actual Java17 JIMAGE OS implementation: original file size/content, non-page-aligned file offset, partial reads/EINTR, zero/overflow refusal, allocation/protection/read/truncation failure cleanup and matched unmapping; ASan/UBSan");
 }
-''')
+'''.replace('Java17', 'Java' + str(a.major)))
     platform = 'darwin' if os.uname().sysname == 'Darwin' else 'linux'
     flags = [str(tool(a.llvm_home.resolve(), 'clang++')), '-std=c++17', '-O1', '-g', '-fsanitize=address,undefined',
              '-I' + str(boot / 'include'), '-I' + str(boot / 'include' / platform),
@@ -91,7 +92,7 @@ int main(int argc,char**argv){
                             timeout=20, env={**os.environ, 'UBSAN_OPTIONS': 'halt_on_error=1'})
     output = result.stdout + result.stderr
     (work / 'result.log').write_text(output)
-    if result.returncode or 'PASS actual Java17 JIMAGE' not in output:
+    if result.returncode or ('PASS actual Java' + str(a.major) + ' JIMAGE') not in output:
         raise RuntimeError(output[-6000:])
     print(output)
 

@@ -412,3 +412,18 @@ Untested001 retained, superseded after final fpstate audit. Do not freeze/publis
 any release before exact console confirmation. Source publication remains required.
 See docs/java17-startup-probe.md and matching build record. No NAS writes or changes
 to supported Minecraft instances. Existing frozen snapshots and releases preserved.
+
+
+## Java17 startup acceptance and separate Java21 candidate —2026-11-08
+
+Java17 Startup PPSA99876/01.000.002 received exact-build user ALL PASS for its
+four interpreter startup/JNI/thread/destruction rows. Preserve package SHA256
+c2241e10bb8c0cb895c7fc02a8490cdd50b2be670e54bc561c90e98c43776c29,
+source d503c8336d1b4e55faf9e4dc5f147ce596d3ab1d and the frozen archive snapshot
+runtime/Java17_Startup at279f6b84352064dd646864d3f59cd29c80422fee. Its verified
+release contains exact package, complete original upstream+port source and checksums.
+No C2/game/performance/collector/endurance pass is implied. Java21 startup001,
+PPSA99877, is a separate local candidate with matching21 classes/core objects;
+physical startup pending. Shared helpers default17 and require explicit --major21
+for21. Preserve Java25 consumer and original JARs; consumer integration and exact
+hardware/shader release gates remain separate. See docs/java21-startup-probe.md.

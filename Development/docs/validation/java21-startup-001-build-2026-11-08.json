@@ -1,0 +1,46 @@
+{
+  "titleId": "PPSA99877",
+  "version": "01.000.001",
+  "packageSha256": "33598afb949733eedfc328695d4fffcc81091ed46d1ff92654dc3611cc5d2260",
+  "packageBytes": 28124839,
+  "symbolsSha256": "0f2b0d372ad4f9f8f663d943fb3d1cc1f87204ee598ae74b325916ac454b1841",
+  "classImageSha256": "94feeaddd624dfee8dcf2039b939732e66fab9cc99c39ade1423c0867d1a1590",
+  "sourceSha256": {
+    "java25/lts/probe21/param.json": "32cafe01ba0dbc84091cf1b43e3f3f0e825975f3119044ca347e3fb4b123f83d",
+    "java25/lts/probe21/HelloLts.java": "6035f4e39760bd3ba2c7852044b0b08ad303e99fed2aee10b1a6ac56141796c5",
+    "java25/lts/probe21/jni_checks.hpp": "f10719042b8d8aa5923b99bf2cfd1d38f674efb993d1eabe341fc12a3c21ea32",
+    "java25/lts/probe21/startup.cpp": "0c2bf7740a31aef032960b7f7acae2d66e48528816954b139460a255e016fb1a"
+  },
+  "console": "NOT RUN",
+  "release": "Local test only; no release or Store publication",
+  "scope": "Genuine21 interpreter startup/arithmetic/StrictMath/exceptions/JNI/thread/destruction probe",
+  "nativeResident": {
+    "major": 21,
+    "groupObjectsSha256": {
+      "jvm": "533d5baa1e9661a4a3bafe7ae115c25be40cb1efe25e05dd36e81822bf0c4742",
+      "java": "714c4ff29c9c5af32444b935b2e2ce2b464640f3157b8e8fc5449a35e2c244db",
+      "zip": "283565731d20a72154bc8c0a155c6491c1327b8aa0b36181ad47c30212f91add",
+      "jimage": "f9fd268d26bf78eb1abb2cc3996c84a3d669295eacaf197ba5e5d9dbea936cff",
+      "net": "cd76c1bb4e0190006ae12a00b0c33cb6dcd23ca866a493a2ef3f5f5eb9afdc2b",
+      "nio": "57d59d26ec2213705bcbe081321453928eba594be52f060da24b1d30a943569c",
+      "verify": "ff86823f8bb7c35a7974cfc20b7cdef5d679d548b16e9318992d8edb690cecd8"
+    },
+    "registrySourceSha256": "8c0a54b5d65489718a835a68433afffc83a781baa15226fcc9e3a1a62dced63f",
+    "registryObjectSha256": "a717d192ef09c2d5ade3bedee38599297ac4246329602308e07d24458b022a4a",
+    "console": "NOT RUN",
+    "scope": "Matched Java21 core groups only; no arbitrary ELF loading or Java25 replacement"
+  },
+  "checks": [
+    "Pinned source complete patch replay/idempotence and conflict preservation",
+    "Target C1/C2 core build and native ELF audit",
+    "Actual host Java21 exact JNI/Java probe with UBSan and -Xcheck:jni",
+    "Actual21 JIMAGE ASan/UBSan read/map/protect/refusal controls",
+    "PS5 SDK signal-context captured offsets and target IR",
+    "Actual generated21 resident registry scoped/load/error/address/concurrency checks",
+    "Package CRC, matching image, staged constructors, VM ownership range and signed app/companion integrity"
+  ],
+  "limitations": [
+    "Physical PS5 four-row result pending",
+    "Interpreter-only probe; no C2/game/performance/shader/endurance pass"
+  ]
+}

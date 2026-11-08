@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Real Java17 VM runs the exact probe JNI/Java checks on the host; no PS5 claim."""
+"""Real Java17/21 VM runs the exact probe JNI/Java checks on the host; no PS5 claim."""
 import argparse
 from pathlib import Path
 import os
@@ -14,13 +14,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--boot-jdk', required=True, type=Path)
     parser.add_argument('--llvm-home', required=True, type=Path)
-    parser.add_argument('--output-dir', type=Path, default=ROOT / 'build/java-lts/startup17-host')
+    parser.add_argument('--output-dir', type=Path, default=None)
+    parser.add_argument('--major', type=int, choices=(17,21), default=17)
     a = parser.parse_args()
+    a.output_dir = a.output_dir or ROOT / ('build/java-lts/startup' + str(a.major) + '-host')
+    probe = ROOT / ('java25/lts/probe' if a.major == 17 else 'java25/lts/probe21')
     boot, work = a.boot_jdk.resolve(), a.output_dir.resolve()
-    verify_boot(boot, 17)
+    verify_boot(boot, a.major)
     work.mkdir(parents=True, exist_ok=True)
-    subprocess.run([str(boot / 'bin/javac'), '--release', '17', '-d', str(work),
-                    str(ROOT / 'java25/lts/probe/HelloLts.java')], check=True)
+    subprocess.run([str(boot / 'bin/javac'), '--release', str(a.major), '-d', str(work),
+                    str(probe / 'HelloLts.java')], check=True)
     source = work / 'host.cpp'
     source.write_text(r'''
 #include "jni_checks.hpp"
@@ -47,19 +50,19 @@ int main(int argc,char**argv){
  assert(vm->DestroyJavaVM()==JNI_OK);
  puts("PASS actual Java17 probe: VM creation, original probe class, Java arithmetic/UTF16/StrictMath/exceptions, RegisterNatives, JNI on a Java worker, joined thread, genuine VM destruction; wrong class major refused");
 }
-''')
+'''.replace('Java17', 'Java' + str(a.major)))
     platform = 'darwin' if os.uname().sysname == 'Darwin' else 'linux'
     executable = work / 'probe-host'
     subprocess.run([str(tool(a.llvm_home.resolve(), 'clang++')), '-std=c++17', '-O1', '-g',
                     '-fsanitize=undefined', '-fno-sanitize=function', '-I' + str(boot / 'include'),
-                    '-I' + str(boot / 'include' / platform), '-I' + str(ROOT / 'java25/lts/probe'),
+                    '-I' + str(boot / 'include' / platform), '-I' + str(probe),
                     str(source), '-L' + str(boot / 'lib/server'), '-Wl,-rpath,' + str(boot / 'lib/server'),
                     '-ljvm', '-o', str(executable)], check=True)
     result = subprocess.run([str(executable), str(work / 'HelloLts.class')], capture_output=True,
                             text=True, timeout=40, env={**os.environ, 'UBSAN_OPTIONS': 'halt_on_error=1'})
     output = result.stdout + result.stderr
     (work / 'result.log').write_text(output)
-    if result.returncode or 'PASS actual Java17 probe:' not in output or any(n in output for n in
+    if result.returncode or ('PASS actual Java' + str(a.major) + ' probe:') not in output or any(n in output for n in
             ('runtime error:', 'WARNING in native method', 'FATAL ERROR in native method')):
         raise RuntimeError(output[-8000:])
     print(output)

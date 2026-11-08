@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare isolated genuine Java17 core resident objects for the startup probe."""
+"""Prepare isolated genuine Java17/21 core resident objects for the startup probe."""
 import argparse
 import json
 from pathlib import Path
@@ -12,7 +12,9 @@ from java25_embedded_hotspot import embed_hotspot
 GROUPS = ('java', 'zip', 'jimage', 'net', 'nio', 'verify')
 
 
-def registry(libraries, *, asm_prefix=''):
+def registry(libraries, *, major=17, asm_prefix=''):
+    if major not in (17, 21):
+        raise ValueError('Unsupported runtime major')
     if asm_prefix not in ('', '_'):
         raise ValueError('Unsupported object-format symbol prefix')
     declarations, tables, loaders, rows = [], [], [], []
@@ -91,7 +93,7 @@ extern "C" int __dladdr(const void*address,Dl_info*info){
  *info={};info->dli_fname="/app0/assets/java17/lib/server/libjvm.so";
  info->dli_fbase=__lts_jvm_text_start;return 1;
 }
-'''
+'''.replace('Java17', 'Java' + str(major)).replace('/java17/', '/java' + str(major) + '/')
 
 
 def main():
@@ -99,11 +101,12 @@ def main():
     p.add_argument('--llvm-home', required=True, type=Path)
     p.add_argument('--lld', required=True, type=Path)
     p.add_argument('--output-dir', required=True, type=Path)
+    p.add_argument('--major', type=int, choices=(17, 21), default=17)
     a = p.parse_args()
     llvm = a.llvm_home.resolve()
     output = a.output_dir.resolve()
     output.mkdir(parents=True, exist_ok=True)
-    build = ROOT / '.tools/java17/openjdk/build/ps5-bootstrap'
+    build = ROOT / ('.tools/java' + str(a.major) + '/openjdk/build/ps5-bootstrap')
     sdk = ROOT / '.tools/native-sdk/ps5-payload-sdk'
     groups = {}
     inputs = {}
@@ -148,7 +151,7 @@ def main():
         text = subprocess.check_output([str(tool(llvm, 'llvm-nm')), '--defined-only', '--extern-only', str(obj)], text=True)
         exports[name] = [line.split()[-1] for line in text.splitlines() if len(line.split()) >= 3]
     source = output / 'builtin-libraries.cpp'
-    source.write_text(registry(exports))
+    source.write_text(registry(exports, major=a.major))
     obj = output / 'builtin-libraries.o'
     subprocess.run([str(tool(llvm, 'clang++')), '-target', 'x86_64-sie-ps5', '-std=c++20', '-O2',
                     '-fvisibility-nodllstorageclass=default', '-isysroot', str(sdk),
@@ -156,10 +159,10 @@ def main():
                     '-femulated-tls', '-fno-stack-protector', '-fno-plt', '-fno-exceptions', '-fno-rtti',
                     '-c', str(source), '-o', str(obj)], check=True)
     (output / 'link-inputs.json').write_text(json.dumps([str(p) for p in groups.values()] + [str(obj)], indent=2) + '\n')
-    (output / 'audit.json').write_text(json.dumps({'major': 17, 'groupObjectsSha256': {n: sha(p) for n, p in groups.items()},
+    (output / 'audit.json').write_text(json.dumps({'major': a.major, 'groupObjectsSha256': {n: sha(p) for n, p in groups.items()},
         'inputObjectsSha256': inputs, 'registrySourceSha256': sha(source), 'registryObjectSha256': sha(obj),
-        'console': 'NOT RUN', 'scope': 'Matched17 core groups only; no arbitrary ELF loading or Java25 registry replacement'}, indent=2) + '\n')
-    print('Built matched Java17 resident core objects and generated exact-export lookup')
+        'console': 'NOT RUN', 'scope': 'Matched' + str(a.major) + ' core groups only; no arbitrary ELF loading or Java25 registry replacement'}, indent=2) + '\n')
+    print('Built matched Java' + str(a.major) + ' resident core objects and generated exact-export lookup')
 
 
 if __name__ == '__main__':

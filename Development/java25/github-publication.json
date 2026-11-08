@@ -23,5 +23,17 @@
       "ZIP_JAR_Probe"
     ]
   },
-  "milestone_index": "https://github.com/mateo-cogeanu/ps5-homebrew-history/tree/aa7db35ee9aa5cc6515f49b23ebda6d1ecfcf91d/runtime"
+  "milestone_index": "https://github.com/mateo-cogeanu/ps5-homebrew-history/tree/aa7db35ee9aa5cc6515f49b23ebda6d1ecfcf91d/runtime",
+  "additional_runtime_milestones": [
+    {
+      "name": "Java17_Startup",
+      "archive_commit": "279f6b84352064dd646864d3f59cd29c80422fee",
+      "archive_path": "runtime/Java17_Startup",
+      "title_id": "PPSA99876",
+      "version": "01.000.002",
+      "console": "ALL PASS reported 2026-11-08, interpreter startup scope",
+      "release": "https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Java17_Startup-v01.000.002",
+      "package_sha256": "c2241e10bb8c0cb895c7fc02a8490cdd50b2be670e54bc561c90e98c43776c29"
+    }
+  ]
 }

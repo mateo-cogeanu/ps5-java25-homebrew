@@ -15,11 +15,12 @@ def main():
         raise RuntimeError('Run registry checks without Python optimization')
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--llvm-home', required=True, type=Path)
+    p.add_argument('--major', type=int, choices=(17,21), default=17)
     a = p.parse_args()
     generated = registry({'jvm': ['JVM_Fixture', 'not_jvm_export'],
                           'java': ['Java_Fixture', 'lts_java_JNI_OnLoad'],
                           'net': ['Java_NetFixture', 'lts_net_JNI_OnLoad']},
-                         asm_prefix='_' if os.uname().sysname == 'Darwin' else '')
+                         major=a.major, asm_prefix='_' if os.uname().sysname == 'Darwin' else '')
     with tempfile.TemporaryDirectory(prefix='java17-registry-') as folder:
         root = Path(folder)
         (root / 'registry.cpp').write_text(generated)
@@ -69,7 +70,7 @@ int main(){
  for(auto&t:threads)t.join();assert(__dlerror()&&!__dlerror());
  puts("PASS generated Java17 resident registry: actual exports, process/scoped handles, no foreign module, unknown/null refusal, real JNI_OnLoad success/error, resident close semantics, bounded dladdr refusal,16threads/16000lookups and independent error state");
 }
-''')
+'''.replace('/java17/', '/java' + str(a.major) + '/').replace('Java17', 'Java' + str(a.major)))
         executable = root / 'test'
         subprocess.run([str(tool(a.llvm_home.resolve(), 'clang++')), '-std=c++17', '-O1', '-g',
                         '-fsanitize=address,undefined', '-fno-sanitize=function', str(root / 'registry.cpp'),
@@ -78,7 +79,7 @@ int main(){
         result = subprocess.run([str(executable)], capture_output=True, text=True, timeout=20,
                                 env={**os.environ, 'UBSAN_OPTIONS': 'halt_on_error=1'})
         output = result.stdout + result.stderr
-        if result.returncode or 'PASS generated Java17 resident registry' not in output:
+        if result.returncode or ('PASS generated Java' + str(a.major) + ' resident registry') not in output:
             raise RuntimeError(output[-6000:])
         print(output)
 

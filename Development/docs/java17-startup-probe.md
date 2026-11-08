@@ -1,15 +1,15 @@
 # Java 17 standalone startup probe 01.000.002
 
-This is the first local hardware candidate for the separate Java 17 port. It uses
+This is the first passing hardware milestone for the separate Java 17 port. It uses
 title **PPSA99876**, distinct from ProsperoCraft, and has no Minecraft, account,
 world, shader, mod or NAS operations. It does not replace the Java 25 launcher.
-No physical-console result or release approval has been recorded.
+The maintainer reported **ALL PASS** for this exact build on 2026-11-08. See the [console record](validation/java17-startup-002-console-2026-11-08.json).
 
 The signed local package is `dist/PPSA99876.zip` (about 25 MiB), SHA-256
 `c2241e10bb8c0cb895c7fc02a8490cdd50b2be670e54bc561c90e98c43776c29`.
 The [build record](validation/java17-startup-002-build-2026-11-08.json) identifies
 its matching symbols, source/patches, native object groups and scoped checks.
-Compiled packages and raw reports remain local; no GitHub release or Store action.
+The exact package, complete upstream/port source and checksums are preserved in the [passing release](https://github.com/mateo-cogeanu/ps5-java25-homebrew/releases/tag/Java17_Startup-v01.000.002). Raw reports remain local; there is no Store action.
 
 ## Console check
 
@@ -102,4 +102,4 @@ target IR. These tests do not execute the PS5 kernel, a target VM or graphics.
 Local untested 001 remains retained as superseded. A final audit found its one
 remaining SDK-offset floating-point context member before hardware testing;002
 routes that member through the actual PS5 view too. The first handoff is002.
-No frozen milestone is created until exact-build console acceptance.
+After exact-build acceptance, the source closure was frozen in [Java17_Startup](https://github.com/mateo-cogeanu/ps5-homebrew-history/tree/279f6b84352064dd646864d3f59cd29c80422fee/runtime/Java17_Startup). The original signed package remains unchanged.

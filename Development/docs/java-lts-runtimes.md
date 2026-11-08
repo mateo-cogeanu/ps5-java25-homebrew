@@ -14,11 +14,10 @@ Java 17's bundled fdlibm archive exports were checked. The class-only core image
 are 12,593,381 and 14,350,852 bytes; these sizes exclude native runtime/application
 code and do not establish game memory use or a performance improvement.
 
-These are **initial cross-build baselines**, not console-ready runtimes. No PS5
-execution, installable test application or Minecraft compatibility is claimed.
+The original build record describes **initial cross-build baselines**. Subsequently Java17 startup002 received ALL PASS on the physical PS5; Java21 startup001 is packaged for testing. Neither establishes Minecraft compatibility.
 Some SDK-linked shared libraries produce `llvm-readelf` warnings about nonstandard
 PT_DYNAMIC sizes. These are recorded in local audits; a header check does not
-validate dynamic loading. Our final embedded-native packaging remains pending.
+validate dynamic loading. Separate startup packages use matched statically resident native objects, not arbitrary shared-library loading.
 
 The [build record](validation/java-lts-build-2026-11-08.json) includes exact
 commits, patch hashes, target artifact hashes, image checks and limitations.
@@ -104,11 +103,14 @@ This does not replace matching native-image/resident-registry integration.
 
 Existing exact-build console, shader and publication gates remain in force.
 
-## First Java17 startup candidate —2026-11-08
+## Startup milestones —2026-11-08
 
-The separate [Java17 startup probe](java17-startup-probe.md) now packages a reviewed
-initial sandbox adaptation and matched resident VM/core libraries as local
-PPSA99876 version01.000.002. Interpreter startup, Java/JNI/thread execution and VM
-destruction require physical PS5 testing. The host fixture passes, but no console
-result, Minecraft compatibility or performance improvement is inferred. Java21's
-baseline and the working Java25 runtime are unchanged.
+[Java17 startup002](java17-startup-probe.md), PPSA99876, received exact-build
+**ALL PASS** for interpreter startup, Java/JNI/worker checks and destruction.
+The signed package and complete source are released with checksums; frozen source
+lives in the separate history archive. No C2/game/performance claim follows.
+
+[Java21 startup001](java21-startup-probe.md), PPSA99877, uses an independently
+rebased bootstrap boundary and its own matching class image/core objects. Host
+checks and packaging pass; physical-console startup remains pending. The working
+Java25 consumer remains unchanged. Consumer launchers require separate integration.

@@ -2,8 +2,8 @@
 """Actual context accessor against console register bytes and pinned SDK offsets."""
 from pathlib import Path
 import re,subprocess,os,argparse
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('--source-major',choices=(17,25),type=int,default=25);a=p.parse_args()
-r=Path(__file__).resolve().parents[1];source=r/('.tools/java'+str(a.source_major)+'/openjdk');w=r/('build/java25/signal-context-test' if a.source_major==25 else 'build/java-lts/startup17-signal-context-test');w.mkdir(parents=True,exist_ok=True)
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('--source-major',choices=(17,21,25),type=int,default=25);a=p.parse_args()
+r=Path(__file__).resolve().parents[1];source=r/('.tools/java'+str(a.source_major)+'/openjdk');w=r/('build/java25/signal-context-test' if a.source_major==25 else 'build/java-lts/startup'+str(a.source_major)+'-signal-context-test');w.mkdir(parents=True,exist_ok=True)
 s=(r/'.tools/native-sdk/ps5-payload-sdk/target/include/x86/ucontext.h').read_text();a=s.index('typedef struct __mcontext {',s.index('#ifdef __amd64__'));b=s.index('} mcontext_t;',a)+len('} mcontext_t;');struct=s[a:b]
 struct=struct.replace('__register_t','uint64_t').replace('__uint32_t','uint32_t').replace('__uint16_t','uint16_t').replace('__aligned(16)','__attribute__((aligned(16)))')
 p=w/'test.cpp';p.write_text('#include <cstdint>\n#include <cstring>\n#include <cassert>\n#include <cstdio>\n'+struct+r'''

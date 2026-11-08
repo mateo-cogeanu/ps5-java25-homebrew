@@ -68,10 +68,19 @@
         "make/autoconf/libraries.m4": "32f6064e17e16e46954b0546a0511c49eb83ef7a10a69408bbb64c27e025a719",
         "make/autoconf/spec.gmk.in": "c0ffc77f0b2e5c8801ceaa16fbba9c11fdf393044c33fd6c318b49add8281462",
         "make/common/NativeCompilation.gmk": "ca6080afb91034b9d0abc4bb332ab82474bd5b8e1542e4df8eb67d2b154f6365",
+        "src/hotspot/cpu/x86/vm_version_x86.cpp": "155dc63d5dd8ff0b49bb0d67689054903adace5f3d97f259617396cdac4c9a28",
         "src/hotspot/os/bsd/attachListener_bsd.cpp": "cc5ddac1d93eb581de30d4b24a730eee256a667e6ad40fc727ba130bd600771a",
-        "src/hotspot/os/bsd/os_bsd.cpp": "d65b82322a19069590bec09c6ef215a773933f08698ee208320a3c953b09a785",
+        "src/hotspot/os/bsd/os_bsd.cpp": "85affb5b9831c0a93b45dd5e7f3ae3e1140dbdb7b4e26e5a28e78b225156f45f",
         "src/hotspot/os/posix/os_posix.cpp": "d50a4e24bd686c489976123220fa42a58052e80cda2fea585fb09c0196df5828",
+        "src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp": "c03fb74c14b85a548bce033e7429e13d305bb4e34fa2c5a274fcca2d92f15c60",
+        "src/hotspot/share/classfile/classLoader.cpp": "bb7297f6fe57e14ec896528a65bc9529b531c3d4d9bc33bea29f1df94b63feb1",
+        "src/hotspot/share/prims/jni.cpp": "7ff675ff437923e697b785b5c7769108e7393132dff5de120afc06d29d1c9818",
+        "src/hotspot/share/runtime/arguments.cpp": "54abff481bbb17058ef7952c7c2c0174bdad32bbd88218b9dd7195d99ac92dce",
+        "src/hotspot/share/runtime/ps5LtsBootstrap.hpp": "148ae365c465effedfe30e07323dfb8abcce23c2b478872c8f679c67832e1a75",
+        "src/hotspot/share/runtime/ps5SignalContext.hpp": "652cff823d69ed03a8b9d7caaeed6b969ff7b294cac8c0e8f51e258d63f61e0b",
         "src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c": "32babd78ca771020e763ab72b2a756d413046ec8a89425739cc38be2bafb66bf",
+        "src/java.base/unix/native/libjava/java_props_md.c": "0ebb2af9441a38707417ac37667a07bfd3f148b47ac33a68d9aea3f86b880b30",
+        "src/java.base/unix/native/libjimage/osSupport_unix.cpp": "d1afa2b78ede3b9fc0d91a96aa3820304a542113df6db9dac93141eeebcecce8",
         "src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c": "08124b4a7a33a7ffee904e64563d5353e29b16bd76889643db9cf597156c216a"
       }
     }
