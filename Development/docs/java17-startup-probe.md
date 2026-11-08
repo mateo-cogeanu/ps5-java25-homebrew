@@ -32,8 +32,7 @@ client-IP filter. A failed VM creation is not retried within the same process.
 The probe deliberately uses `-Xint`, Serial GC, two active processors and a small
 heap. This establishes a bootstrap test boundary, not production game settings.
 C2 is present in the target VM but is not exercised. No Java 17 performance or
-collector advantage is inferred. Java 21 still has only the earlier cross-build
-baseline; it has not received this startup integration.
+collector advantage is inferred. Java21 now has a separate [startup candidate](java21-startup-probe.md), awaiting physical testing.
 
 ## Startup adaptations
 
