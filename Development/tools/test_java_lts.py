@@ -17,6 +17,8 @@ def reject(action, expected=ValueError):
 
 
 def main():
+    if not __debug__:
+        raise RuntimeError('Run LTS checks without Python optimization')
     with tempfile.TemporaryDirectory(prefix='java-lts-check-') as folder:
         work = Path(folder)
         source = work / 'source'

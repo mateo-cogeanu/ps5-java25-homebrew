@@ -209,6 +209,9 @@ def main():
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=source, text=True).strip()
     if commit != spec['commit']:
         raise ValueError('LTS source differs from pinned commit; source preserved')
+    changed = subprocess.check_output(['git', 'diff', '--name-only', 'HEAD'], cwd=source, text=True).splitlines()
+    if set(changed) - set(spec['patchedFilesSha256']):
+        raise ValueError('Unreviewed source changes preserved; use an isolated pinned source tree')
     port = ROOT / ('java25/lts/' + str(args.major) + '/patches')
     # Minimal-context patches preserve upstream tab recipes and are restricted
     # to exact pristine or exact previously patched file bytes at the pinned
