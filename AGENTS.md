@@ -378,3 +378,20 @@ start freezes selection, including after failure/stop; late EBUSY. Default,
 refusal/actual HTTP bytes/session and existing collector/64KiB stack regressions
 pass. Consumer216 all-data/report/tmp migration and fallback belongs in
 ProsperoCraft; physical console validation pending. See docs/probe-report-root.md.
+
+
+## Separate Java17 and21 baseline builds —2026-11-08
+
+The maintainer prioritizes a genuine Java17 runtime before Vanilla1.20 and also
+requests Java21 for1.21.x comparison. Version-pinned FreeBSD/OpenJDK source,
+bootstrap pins and rebased patches live under java25/lts; tools/java_lts.py builds
+isolated HotSpot C1+C2/java.base baselines and class-only images. DefaultJava25
+source/images/configuration and frozen milestones remain unchanged. These builds
+are not console-ready runtimes: image/resident lookup, sandbox CPU/signal/memory/
+thread/TLS services, native packaging and consumer bootstrap need explicit
+porting/validation. Preserve genuine classes/native generation ownership and
+original game JARs; never relabel an existing runtime or claim lower overhead
+without matched measurements. Reusable implementation here; consumer selection/
+graphics/mods/worlds/shaders in ProsperoCraft. Follow docs/java-lts-runtimes.md
+and existing physical-console/release/shader gates. Host image/ELF audits are
+scoped build evidence, not a PS5 pass.

@@ -1,0 +1,147 @@
+diff --git a/make/autoconf/basic.m4 b/make/autoconf/basic.m4
+index 08a547966..f72a2ecee 100644
+--- a/make/autoconf/basic.m4
++++ b/make/autoconf/basic.m4
+@@ -233,0 +234,4 @@ AC_DEFUN_ONCE([BASIC_SETUP_DEVKIT],
++    if test "x$OPENJDK_TARGET_OS" != "xmacosx"; then
++      ps5_target_sysroot="$SYSROOT"
++      SYSROOT=
++    fi
+@@ -304,0 +309,4 @@ AC_DEFUN_ONCE([BASIC_SETUP_DEVKIT],
++    if test "x$OPENJDK_TARGET_OS" != "xmacosx"; then
++      BUILD_SYSROOT="$SYSROOT"
++      SYSROOT="$ps5_target_sysroot"
++    fi
+diff --git a/make/autoconf/libraries.m4 b/make/autoconf/libraries.m4
+index 91c152a1b..435b512a8 100644
+--- a/make/autoconf/libraries.m4
++++ b/make/autoconf/libraries.m4
+@@ -83,0 +84,26 @@ AC_DEFUN_ONCE([LIB_DETERMINE_DEPENDENCIES],
++  # PS5 bootstrap excludes java.desktop; it is not a complete JDK image.
++  AC_ARG_ENABLE([ps5-bootstrap], [AS_HELP_STRING([--enable-ps5-bootstrap],
++      [configure only for experimental PS5 HotSpot/java.base bootstrap])],
++      [PS5_BOOTSTRAP="$enableval"], [PS5_BOOTSTRAP=no])
++  if test "x$PS5_BOOTSTRAP" = xyes; then
++    if test "x$OPENJDK_TARGET_OS_ENV" != xbsd.freebsd ||
++        test "x$ENABLE_HEADLESS_ONLY" != xtrue; then
++      AC_MSG_ERROR([PS5 bootstrap requires a headless FreeBSD target])
++    fi
++    AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
++#ifndef __PROSPERO__
++#error PS5 bootstrap requires the PS5 compiler
++#endif
++int ps5_bootstrap;
++    ]])], [], [AC_MSG_ERROR([PS5 bootstrap requires the PS5 compiler])])
++    NEEDS_LIB_X11=false
++    NEEDS_LIB_ALSA=false
++    NEEDS_LIB_CUPS=false
++    NEEDS_LIB_FONTCONFIG=false
++    NEEDS_LIB_FREETYPE=false
++    AC_MSG_WARN([PS5 bootstrap: build only HotSpot and java.base; desktop is unsupported])
++  elif test "x$PS5_BOOTSTRAP" != xno; then
++    AC_MSG_ERROR([--enable-ps5-bootstrap accepts only yes or no])
++  fi
++  AC_SUBST(PS5_BOOTSTRAP)
++
+@@ -181 +207,4 @@ AC_DEFUN_ONCE([LIB_SETUP_MISC_LIBS],
+-  if test "x$OPENJDK_TARGET_OS" != "xwindows"; then
++  if test "x$PS5_BOOTSTRAP" = xyes; then
++    AC_CHECK_FUNC([cos], [], [AC_MSG_ERROR([PS5 SDK math imports unavailable])])
++    LIBM=""
++  elif test "x$OPENJDK_TARGET_OS" != "xwindows"; then
+diff --git a/make/autoconf/spec.gmk.in b/make/autoconf/spec.gmk.in
+index 23e858737..ae79b2a34 100644
+--- a/make/autoconf/spec.gmk.in
++++ b/make/autoconf/spec.gmk.in
+@@ -317,0 +318 @@ ENABLE_HEADLESS_ONLY := @ENABLE_HEADLESS_ONLY@
++PS5_BOOTSTRAP := @PS5_BOOTSTRAP@
+diff --git a/make/common/NativeCompilation.gmk b/make/common/NativeCompilation.gmk
+index 14970f852..afea922ec 100644
+--- a/make/common/NativeCompilation.gmk
++++ b/make/common/NativeCompilation.gmk
+@@ -1238,0 +1239 @@ define SetupNativeCompilationBody
++                ifneq ($(PS5_BOOTSTRAP),yes)
+@@ -1242,0 +1244 @@ define SetupNativeCompilationBody
++                endif
+diff --git a/src/hotspot/os/bsd/attachListener_bsd.cpp b/src/hotspot/os/bsd/attachListener_bsd.cpp
+index a79df5dbd..adca1d9a9 100644
+--- a/src/hotspot/os/bsd/attachListener_bsd.cpp
++++ b/src/hotspot/os/bsd/attachListener_bsd.cpp
+@@ -179,0 +180,4 @@ int BsdAttachListener::init() {
++#ifdef __PROSPERO__
++  log_debug(attach)("External attach is unsupported on PS5");
++  return -1;
++#endif
+@@ -360 +364,7 @@ BsdAttachOperation* BsdAttachListener::dequeue() {
+-    if (::getpeereid(s, &puid, &pgid) != 0) {
++    if (
++#ifdef __PROSPERO__
++        true
++#else
++        ::getpeereid(s, &puid, &pgid) != 0
++#endif
++        ) {
+diff --git a/src/hotspot/os/bsd/os_bsd.cpp b/src/hotspot/os/bsd/os_bsd.cpp
+index 361bafdc0..4c866c2be 100644
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -1430 +1430,4 @@ int os::get_loaded_modules_info(os::LoadedModulesCallbackFunc callback, void *pa
+-#ifdef __FreeBSD__
++#ifdef __PROSPERO__
++  // The native SDK has no dl_iterate_phdr; preserve the unsupported result.
++  return 1;
++#elif defined(__FreeBSD__)
+diff --git a/src/hotspot/os/posix/os_posix.cpp b/src/hotspot/os/posix/os_posix.cpp
+index 284732bc0..aa8f03d72 100644
+--- a/src/hotspot/os/posix/os_posix.cpp
++++ b/src/hotspot/os/posix/os_posix.cpp
+@@ -484,0 +485,3 @@ void os::Posix::print_uptime_info(outputStream* st) {
++#ifdef __PROSPERO__
++  st->print_cr("OS uptime: unavailable in the PS5 sandbox");
++#else
+@@ -498,0 +502 @@ void os::Posix::print_uptime_info(outputStream* st) {
++#endif
+diff --git a/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c b/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c
+index 8b900dcf6..50c3f6edb 100644
+--- a/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c
++++ b/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c
+@@ -254,0 +255,7 @@ Java_java_lang_ProcessHandleImpl_waitForProcessExit0(JNIEnv* env,
++#ifdef __PROSPERO__
++        // The SDK has waitpid but no waitid. Reaping here would violate
++        // this operation's contract; fail explicitly instead.
++        JNU_ThrowByName(env, "java/lang/UnsupportedOperationException",
++                       "Non-reaping process waits are unsupported on PS5");
++        return -1;
++#else
+@@ -285,0 +293 @@ Java_java_lang_ProcessHandleImpl_waitForProcessExit0(JNIEnv* env,
++#endif // __PROSPERO__
+diff --git a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+index 8cd723ecc..18cd726ae 100644
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -524,0 +525,20 @@ Java_sun_nio_fs_UnixNativeDispatcher_getlinelen(JNIEnv* env, jclass this, jlong
++    int saved_errno;
++#ifdef __PROSPERO__
++    // Only the length is needed here. The SDK has fgetc but no getline;
++    // consume through newline without allocating or interpreting NUL bytes.
++    ssize_t res = 0;
++    int ch;
++    while ((ch = fgetc(fp)) != EOF) {
++        if (res == SSIZE_MAX) {
++            errno = EOVERFLOW;
++            res = -1;
++            break;
++        }
++        ++res;
++        if (ch == '\n')
++            break;
++    }
++    if (ch == EOF && (res == 0 || ferror(fp)))
++        res = -1;
++    saved_errno = errno;
++#else
+@@ -527,2 +546,0 @@ Java_sun_nio_fs_UnixNativeDispatcher_getlinelen(JNIEnv* env, jclass this, jlong
+-    int saved_errno;
+-
+@@ -534,0 +553 @@ Java_sun_nio_fs_UnixNativeDispatcher_getlinelen(JNIEnv* env, jclass this, jlong
++#endif

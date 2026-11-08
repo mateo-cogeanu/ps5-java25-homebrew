@@ -1,0 +1,180 @@
+{
+  "date": "2026-11-08",
+  "scope": "Initial isolated PS5/FreeBSD cross-build baselines; not console-ready Java17/21 runtime integration",
+  "console": "NOT RUN",
+  "defaultJava25Changed": false,
+  "runtimes": [
+    {
+      "major": 17,
+      "sourceRepository": "https://github.com/battleblow/jdk17u.git",
+      "sourceCommit": "7d679b0486460f9f534e5e955dd192993d1ff5ef",
+      "patchesSha256": {
+        "0001-ps5-bootstrap-build.patch": "44c7ddf34dfd72c844baea7d9f49cceeceaf755d41f29f1c0d1864cd49d8905b"
+      },
+      "jvmFeatures": [
+        "cds",
+        "compiler1",
+        "compiler2",
+        "epsilongc",
+        "g1gc",
+        "jfr",
+        "jni-check",
+        "jvmci",
+        "jvmti",
+        "management",
+        "nmt",
+        "parallelgc",
+        "serialgc",
+        "services",
+        "shenandoahgc",
+        "vm-structs"
+      ],
+      "classMajor": 61,
+      "classFiles": 6487,
+      "nativeLibraries": {
+        "support/modules_libs/java.base/server/libjvm.so": {
+          "bytes": 22172880,
+          "sha256": "3ff494121f53ec1c4edf5b71c2c713aa6e6476846045bc42cf3ddd9aaae46d8e"
+        },
+        "support/modules_libs/java.base/libjava.so": {
+          "bytes": 259960,
+          "sha256": "4da4205672c0843818d84b47075c52ae02f7b2d345836588bf22a2ae15ed2cae"
+        },
+        "support/modules_libs/java.base/libverify.so": {
+          "bytes": 85376,
+          "sha256": "6123357e9acc22f7d9f94186accf32b9aa62b0406063ea08626fa76e2bdb9ede"
+        },
+        "support/modules_libs/java.base/libzip.so": {
+          "bytes": 157304,
+          "sha256": "ca2f0d25a55ccaee63795ffdf7dd58e758cafc4335134ed6640d107cc705ee39"
+        },
+        "support/modules_libs/java.base/libjimage.so": {
+          "bytes": 483224,
+          "sha256": "02915e37b6430c1d7c0ce298fa4ca656f47b9ba680e1959d9843f47a0c8e8c52"
+        },
+        "support/modules_libs/java.base/libnet.so": {
+          "bytes": 152008,
+          "sha256": "69bbd5e698fcdb5dcccde901085fcfc30668965f6dae46c8ef8aa6d47fdbc7db"
+        },
+        "support/modules_libs/java.base/libnio.so": {
+          "bytes": 143952,
+          "sha256": "dc8039cae1f1233c3d1359c218a33cba82cd6c6a286abed1c329dbbf32de364e"
+        }
+      },
+      "classImage": {
+        "major": 17,
+        "classImageSha256": "23ea3fe98cc4530ae41a014c8d7b843dba07fb13db8338ef42af1a44aaa3464b",
+        "classImageBytes": 12593381,
+        "targetGeneratedData": {
+          "tzdb.dat": "a02e3a23d67255782b11ab81070902235ab564080f0f65ffe2a989cdaa86fe89",
+          "security/cacerts": "cc5fa20e4aea6c77f6472393e80b2c5da2bea9010bf5c83363b91578bff9d961"
+        },
+        "jmodTransportTag": "linux-amd64; classes/config only, no Linux native artifacts",
+        "targetClassReadBack": [
+          "Object",
+          "Runtime",
+          "StrictMath"
+        ],
+        "modules": [
+          "java.base"
+        ],
+        "nativeLibrariesIncluded": false,
+        "console": "NOT RUN; native packaging/startup integration pending"
+      },
+      "linkedElfDiagnostics": "llvm-readelf reports nonstandard PT_DYNAMIC table sizes in some SDK-linked shared libraries. ELF machine/header and JNI/class-generation checks passed; dynamic loading and final native packaging are not validated."
+    },
+    {
+      "major": 21,
+      "sourceRepository": "https://github.com/battleblow/jdk21u.git",
+      "sourceCommit": "ee731f1ce73a64040f8b6b02af656b7aff01b6bd",
+      "patchesSha256": {
+        "0001-ps5-bootstrap-build.patch": "9ca1298c4c764a54a71aa2a5940b96674ca5fdc052f4a84c40ab78287c2c9d73"
+      },
+      "jvmFeatures": [
+        "cds",
+        "compiler1",
+        "compiler2",
+        "epsilongc",
+        "g1gc",
+        "jfr",
+        "jni-check",
+        "jvmci",
+        "jvmti",
+        "management",
+        "parallelgc",
+        "serialgc",
+        "services",
+        "shenandoahgc",
+        "vm-structs"
+      ],
+      "classMajor": 65,
+      "classFiles": 7544,
+      "nativeLibraries": {
+        "support/modules_libs/java.base/server/libjvm.so": {
+          "bytes": 23778648,
+          "sha256": "669a702e207ff2393bd819ed5866af63b60abc29b2007bf510afd9714d93e540"
+        },
+        "support/modules_libs/java.base/libjava.so": {
+          "bytes": 226208,
+          "sha256": "f24cd0843d15c1886b72c2ff0999b0c93ddd2a45c161e2d24a7443fc08ca587c"
+        },
+        "support/modules_libs/java.base/libverify.so": {
+          "bytes": 85368,
+          "sha256": "b97d14bf2dc66640af296da983b028656400b0f264906bf42b259caa55cc2a53"
+        },
+        "support/modules_libs/java.base/libzip.so": {
+          "bytes": 157160,
+          "sha256": "f5fea705cc306b8efdb2ae48185c84246194a51f288746e4962b4f3bb170724f"
+        },
+        "support/modules_libs/java.base/libjimage.so": {
+          "bytes": 499800,
+          "sha256": "efd005a004dc7d0749acff24d101bee0de8ec0f0ab289b39add56162ce2da306"
+        },
+        "support/modules_libs/java.base/libnet.so": {
+          "bytes": 95536,
+          "sha256": "663a4fb68c9eb02e2e8c62514d119c2e5d7b5ef7e9410b71a2dbbfe91dee649f"
+        },
+        "support/modules_libs/java.base/libnio.so": {
+          "bytes": 143680,
+          "sha256": "a7f0c4f2635c730339b743daddc1e62bbb237ca4b3b90f9a7613fca3e81717a7"
+        }
+      },
+      "classImage": {
+        "major": 21,
+        "classImageSha256": "94feeaddd624dfee8dcf2039b939732e66fab9cc99c39ade1423c0867d1a1590",
+        "classImageBytes": 14350852,
+        "targetGeneratedData": {
+          "tzdb.dat": "5906b44e25a8a730131d7ba1beb5d15af27043f6536f1a169ca8a5d8b8bed8f8",
+          "security/cacerts": "2675a0aa6e7c158bbccf1181383ee794319e362df9a6bc88e1a5f8469a4c1dd7"
+        },
+        "jmodTransportTag": "linux-amd64; classes/config only, no Linux native artifacts",
+        "targetClassReadBack": [
+          "Object",
+          "Runtime",
+          "StrictMath"
+        ],
+        "modules": [
+          "java.base"
+        ],
+        "nativeLibrariesIncluded": false,
+        "console": "NOT RUN; native packaging/startup integration pending"
+      },
+      "linkedElfDiagnostics": "llvm-readelf reports nonstandard PT_DYNAMIC table sizes in some SDK-linked shared libraries. ELF machine/header and JNI/class-generation checks passed; dynamic loading and final native packaging are not validated."
+    }
+  ],
+  "hostChecks": [
+    "Complete ordered patch sets apply to pinned original preimages and reverse-check idempotently",
+    "Conflicting source edits remain unchanged; missing/corrupt boot input refused",
+    "Target ELF64 x86_64, genuine JNI_CreateJavaVM and C1/C2 feature selection",
+    "Original Java17 fdlibm exports present in target archive",
+    "Target class major61/65 and exact Object/Runtime/StrictMath image read-back"
+  ],
+  "notEstablished": [
+    "PS5 VM startup or Java threading/memory/signals",
+    "Resident library/image path integration",
+    "C2 compilation or any garbage collector executing on PS5",
+    "Launcher/game/mod/controller/shader compatibility",
+    "Performance or native memory improvement",
+    "An installable test package or any release approval"
+  ]
+}

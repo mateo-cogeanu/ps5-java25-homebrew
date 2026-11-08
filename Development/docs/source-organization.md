@@ -59,3 +59,12 @@ For recovery, clone the pinned archive, run `python3 verify.py`, then use its ma
 See [migration validation](validation/source-history-migration-2026-10-30.json) for measured build results and remaining limitations. Compilation and host testing do not establish PS5 gameplay acceptance.
 
 The consumer includes a hash-pinned subset of upstream toolkit documentation. Its 81 pre-existing relative links to omitted sample/runtime files remain byte-preserved with that upstream source input; consult the [complete pinned toolkit tree](https://github.com/mihawk-99/PS5_VKHomebrewUI/tree/2188642afbcc8d84d36149124f3d9e39dc1b1a05). These are distinct from maintained project/archive links, which resolve.
+
+
+## Isolated Java17/21 development —2026-11-08
+
+New reusable runtime baseline pins/patches live under `java25/lts`, with explicit
+`tools/java_lts.py` entrypoints and separate ignored version caches. This does not
+replace the working Java25 build or freeze a milestone. See
+[Java17/21 runtime work](java-lts-runtimes.md) for reproducible builds and pending
+platform/console/consumer integration.

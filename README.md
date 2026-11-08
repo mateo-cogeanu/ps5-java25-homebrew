@@ -67,3 +67,11 @@ Game, graphics and mod-loader plans belong to [ProsperoCraft](https://github.com
 ## Credits and licenses
 
 Built on OpenJDK, the FreeBSD OpenJDK port, the community PS5 Payload SDK and ps5-native-app-boilerplate. The interface uses Inter typography. Sources retain their upstream licenses and per-file notices; see [third-party notices](Development/THIRD_PARTY_NOTICES.md) and [embedded runtime notices](Development/java25/EMBEDDED-RUNTIME-NOTICES.md). Historical notices remain with their archived snapshots. Passing binaries remain release assets, with matching validation and checksums.
+
+### Java 17 and Java 21 investigation
+
+Separate pinned PS5 cross-build baselines now compile genuine HotSpot server
+(C1/C2), core Java classes and native libraries for Java17 and21. These are
+initial build results; PS5 startup and consumer integration remain pending.
+See the [build instructions and scope](Development/docs/java-lts-runtimes.md).
+The working Java25 runtime remains unchanged.

@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "scope": "Explicit separate OpenJDK17/21 HotSpot and java.base PS5 cross-build baselines; not console-ready runtimes or changes to default Java25",
+  "runtimes": {
+    "17": {
+      "repository": "https://github.com/battleblow/jdk17u.git",
+      "tag": "jdk-17.0.21.0.2+1-1",
+      "commit": "7d679b0486460f9f534e5e955dd192993d1ff5ef",
+      "bootJdks": {
+        "Darwin-arm64": {
+          "url": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.21%2B9/OpenJDK17U-jdk_aarch64_mac_hotspot_17.0.21_9.tar.gz",
+          "sha256": "78b08c7f5a0598242d5719c022e19479cb4a3aa45c37c19726a757a469ed1c15",
+          "size": 186192554,
+          "file": "OpenJDK17U-jdk_aarch64_mac_hotspot_17.0.21_9.tar.gz",
+          "home": "jdk-17.0.21+9/Contents/Home"
+        }
+      },
+      "targets": [
+        "hotspot",
+        "java.base-java",
+        "java.base-libs"
+      ],
+      "jvmVariant": "server",
+      "console": "Not tested; platform services and consumer integration pending",
+      "patchedFilesSha256": {
+        "make/autoconf/basic.m4": "f97b8e35e9e050c8080fbba878dd9f74430fcae53156a8397a49e14b606ea043",
+        "make/autoconf/libraries.m4": "e78d03a62b8dc11f7bf9ceb0e0c5b957368ad2258f402bb771357c9b65ae68b8",
+        "make/autoconf/spec.gmk.in": "69498c671e8742ac46f5bb24edcca918d6aabefb7ca1fde5aecbdac820c45bca",
+        "make/common/NativeCompilation.gmk": "3e5b5fde37c412e3549edd19020ac5ba7ba24ece6b0c6ee21ba89c59244fc44c",
+        "src/hotspot/os/bsd/attachListener_bsd.cpp": "21271faeb61d44029239c28dd26fbdf9157d7a8764cfb9487cd8058142286556",
+        "src/hotspot/os/bsd/os_bsd.cpp": "5d70718b57ee45baae2ef7944ffa43906a55d185c205216805994aa59d955609",
+        "src/hotspot/os/posix/os_posix.cpp": "f403c92358276a4b4e58565aa6ade15d42f91660339b49647928d392a280ca4c",
+        "src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c": "a9e2d6779352f9516cdf9b0f056d60210ae3ccb81941c1e65ec1fa111c4171b4",
+        "src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c": "13cbf73289418b7aeaa46a4a3b5cec69da1d462ab8334a5857718455de3fb801"
+      }
+    },
+    "21": {
+      "repository": "https://github.com/battleblow/jdk21u.git",
+      "tag": "jdk-21.0.12+8-2",
+      "commit": "ee731f1ce73a64040f8b6b02af656b7aff01b6bd",
+      "bootJdks": {
+        "Darwin-arm64": {
+          "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.13%2B9/OpenJDK21U-jdk_aarch64_mac_hotspot_21.0.13_9.tar.gz",
+          "sha256": "bf036b35b071bfb2f54f2c0af8ee8d88afa95ee6eb3dce02c0f94cfc2524d04a",
+          "size": 199754598,
+          "file": "OpenJDK21U-jdk_aarch64_mac_hotspot_21.0.13_9.tar.gz",
+          "home": "jdk-21.0.13+9/Contents/Home"
+        }
+      },
+      "targets": [
+        "hotspot",
+        "java.base-java",
+        "java.base-libs"
+      ],
+      "jvmVariant": "server",
+      "console": "Not tested; platform services and consumer integration pending",
+      "patchedFilesSha256": {
+        "make/autoconf/basic.m4": "cbe904cad5a29e1434fa609de8c6be0d63f3f37c095362df217aabe2533edbf7",
+        "make/autoconf/libraries.m4": "32f6064e17e16e46954b0546a0511c49eb83ef7a10a69408bbb64c27e025a719",
+        "make/autoconf/spec.gmk.in": "c0ffc77f0b2e5c8801ceaa16fbba9c11fdf393044c33fd6c318b49add8281462",
+        "make/common/NativeCompilation.gmk": "ca6080afb91034b9d0abc4bb332ab82474bd5b8e1542e4df8eb67d2b154f6365",
+        "src/hotspot/os/bsd/attachListener_bsd.cpp": "cc5ddac1d93eb581de30d4b24a730eee256a667e6ad40fc727ba130bd600771a",
+        "src/hotspot/os/bsd/os_bsd.cpp": "d65b82322a19069590bec09c6ef215a773933f08698ee208320a3c953b09a785",
+        "src/hotspot/os/posix/os_posix.cpp": "d50a4e24bd686c489976123220fa42a58052e80cda2fea585fb09c0196df5828",
+        "src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c": "32babd78ca771020e763ab72b2a756d413046ec8a89425739cc38be2bafb66bf",
+        "src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c": "08124b4a7a33a7ffee904e64563d5353e29b16bd76889643db9cf597156c216a"
+      }
+    }
+  }
+}
