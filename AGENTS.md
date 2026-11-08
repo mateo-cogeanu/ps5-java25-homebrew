@@ -395,3 +395,20 @@ without matched measurements. Reusable implementation here; consumer selection/
 graphics/mods/worlds/shaders in ProsperoCraft. Follow docs/java-lts-runtimes.md
 and existing physical-console/release/shader gates. Host image/ELF audits are
 scoped build evidence, not a PS5 pass.
+
+
+## Java17 isolated startup candidate002 —2026-11-08
+
+The maintainer requests startup integration. Java17's reviewed patch adds actual
+packaged17 paths, explicit options, native system queries, reservation commit,
+PS5 register/fpstate view, native sandbox properties and JIMAGE read-only copies.
+Default25 and21baseline remain unchanged. Local PPSA99876/01.000.002 is a separate
+startup probe, not ProsperoCraft: staged constructors, genuine17VM/-Xint/SerialGC,
+Java arithmetic/StrictMath/exception/registered JNI/worker/join and destruction.
+These are probe limits only; C2/game/shader/performance not established. Native
+lookup is actual matched17 symbols with bounded VM text dladdr; no arbitrary ELF.
+Host exactJNI/JIMAGE/registry/signal/source controls pass; physical4rows pending.
+Untested001 retained, superseded after final fpstate audit. Do not freeze/publish
+any release before exact console confirmation. Source publication remains required.
+See docs/java17-startup-probe.md and matching build record. No NAS writes or changes
+to supported Minecraft instances. Existing frozen snapshots and releases preserved.

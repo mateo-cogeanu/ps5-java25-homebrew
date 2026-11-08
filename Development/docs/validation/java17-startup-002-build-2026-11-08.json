@@ -1,0 +1,64 @@
+{
+  "titleId": "PPSA99876",
+  "version": "01.000.002",
+  "packageSha256": "c2241e10bb8c0cb895c7fc02a8490cdd50b2be670e54bc561c90e98c43776c29",
+  "packageBytes": 25752299,
+  "symbolsSha256": "5f2ee9decc06ed8f58e35276d6d837a7590f20cccf2bbc261bbc38a8c280d296",
+  "classImageSha256": "23ea3fe98cc4530ae41a014c8d7b843dba07fb13db8338ef42af1a44aaa3464b",
+  "sourceSha256": {
+    "java25/lts/probe/param.json": "bd327f916f1eac08316bf0ae58ab12ca460ec54e102f280499d2c5d58cdfb4d2",
+    "java25/lts/probe/HelloLts.java": "f9d7b36af3cf68c6d3aea48d469401e104076491afa0dec7dbaf5b5492b02c8e",
+    "java25/lts/probe/jni_checks.hpp": "8c59b32acc5af02a973de12f9f71ecf2c2da9b551ee6ddf0441e860010b0b6b4",
+    "java25/lts/probe/startup.cpp": "d6f0911e26ff9b0389daf94d3d02ff3fd35b04fac9474103085b3394725e4dd2"
+  },
+  "scope": "Genuine17 interpreter startup/arithmetic/StrictMath/exceptions/JNI/thread/destruction probe",
+  "date": "2026-11-08",
+  "sourceCommit": "7d679b0486460f9f534e5e955dd192993d1ff5ef",
+  "upstream": "https://github.com/battleblow/jdk17u.git",
+  "patchesSha256": {
+    "0001-ps5-bootstrap-build.patch": "9e849ece7e97ccd541a06e096f81759b8350b3605d9556f988c3b41e387c59d7"
+  },
+  "nativeGroupSha256": {
+    "jvm": "206487893764706e3446905a3aade531866d196fed3448b3435bde471a1f048d",
+    "java": "f4875eb4589aa6ed9dfbb899d315da2e2093ae031773ef8689f32b6f4024c946",
+    "zip": "2071dcc7654d8182e8929777b51a877bf742d85c6172b630271290d41c12ee76",
+    "jimage": "c401813d208e2bacee716fc7fc1fda4bbc48fdc489ac324d49ee74f4c2c7d8ec",
+    "net": "07f9aaf14f1ef1c2720a15aff884dcaeca192575500f03172bc7a013dcf0da15",
+    "nio": "25ddd547135bcdb0c07a70569af6775cc6c0c7b439b228ebdcba42c7ea04fe71",
+    "verify": "b6f68b24fa021efb28f40d4effe7f3e8282e1f7e73ebd00277de981295455fde"
+  },
+  "nativeGroupInputCounts": {
+    "jvm": 988,
+    "java": 115,
+    "zip": 20,
+    "jimage": 6,
+    "net": 21,
+    "nio": 20,
+    "verify": 1
+  },
+  "registrySourceSha256": "6b3bce98ccb7de36c0feab3b66fb33682d5faf05086943e280de2de0c3801794",
+  "registryObjectSha256": "4870470c7bc35abebf22b2f4f9862741f9c2de247133b27b57ff23e322d28768",
+  "console": "NOT RUN; no exact console acceptance",
+  "release": "Local test only; no GitHub release or Store action",
+  "hostChecks": [
+    "Target17 HotSpot/java.base rebuild, same-generation ELF/header/class audit",
+    "Generated resident registry: scoped/process lookup, success/error JNI_OnLoad,16000concurrentlookups/TLS error isolation;ASan/UBSan",
+    "Actual17 JIMAGE OS functions: short reads/EINTR,non-page offset,zero/overflow/truncation and mmap/protect/pread failure cleanup;ASan/UBSan",
+    "Exact probe Java/JNI helper on real host17 VM:-Xint,-Xcheck:jni,arithmetic/UTF16/StrictMath/exceptions/RegisterNatives/thread join/DestroyJavaVM;UBSan",
+    "Actual17 register accessor,pinned SDK types/captured fixture,targetIR224 RIP offset,no remaining raw uc members",
+    "ExistingJava25 signal fixture/targetIR regression unchanged",
+    "Pinned-source complete patch replay/idempotence/conflicting-source preservation",
+    "Native signed app/companion integrity,ZIP CRC,identity,class image,staged constructors and actual JNI symbols"
+  ],
+  "notEstablished": [
+    "PhysicalPS5 creation/execution/destruction",
+    "C2 execution,collector behavior or performance",
+    "Minecraft,Fabric,Controlify,Sodium,Iris/shaders",
+    "Java21 startup integration"
+  ],
+  "supersededLocalProbe": {
+    "version": "01.000.001",
+    "console": "NOT RUN",
+    "reason": "Final audit found one old SDK-offset fpstate access;002 corrects it before physical acceptance"
+  }
+}

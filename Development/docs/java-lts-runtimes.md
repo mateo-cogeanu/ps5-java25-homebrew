@@ -103,3 +103,12 @@ This does not replace matching native-image/resident-registry integration.
    overhead. No older Java collector support is inferred from a build feature list.
 
 Existing exact-build console, shader and publication gates remain in force.
+
+## First Java17 startup candidate —2026-11-08
+
+The separate [Java17 startup probe](java17-startup-probe.md) now packages a reviewed
+initial sandbox adaptation and matched resident VM/core libraries as local
+PPSA99876 version01.000.002. Interpreter startup, Java/JNI/thread execution and VM
+destruction require physical PS5 testing. The host fixture passes, but no console
+result, Minecraft compatibility or performance improvement is inferred. Java21's
+baseline and the working Java25 runtime are unchanged.

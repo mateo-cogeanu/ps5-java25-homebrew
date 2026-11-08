@@ -218,8 +218,13 @@ def main():
     # source commit. Never merge them into unexplained local modifications.
     for name, expected in spec['patchedFilesSha256'].items():
         path = source / name
-        original = subprocess.check_output(['git', 'show', 'HEAD:' + name], cwd=source)
-        if not path.is_file() or sha(path) not in (hashlib.sha256(original).hexdigest(), expected):
+        original = subprocess.run(['git', 'show', 'HEAD:' + name], cwd=source, capture_output=True)
+        if original.returncode and not path.exists():
+            continue  # Reviewed new port file will be created by the patch.
+        allowed = {expected}
+        if original.returncode == 0:
+            allowed.add(hashlib.sha256(original.stdout).hexdigest())
+        if not path.is_file() or sha(path) not in allowed:
             raise ValueError('Modified LTS source preserved; review file before patching: ' + name)
     print('Java', args.major, 'patches:', apply_patches(source, list(port.glob('*.patch'))), flush=True)
     for name, expected in spec['patchedFilesSha256'].items():

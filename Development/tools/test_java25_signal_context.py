@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Actual context accessor against console register bytes and pinned SDK offsets."""
 from pathlib import Path
-import re,subprocess,os
-r=Path(__file__).resolve().parents[1];w=r/'build/java25/signal-context-test';w.mkdir(parents=True,exist_ok=True)
+import re,subprocess,os,argparse
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('--source-major',choices=(17,25),type=int,default=25);a=p.parse_args()
+r=Path(__file__).resolve().parents[1];source=r/('.tools/java'+str(a.source_major)+'/openjdk');w=r/('build/java25/signal-context-test' if a.source_major==25 else 'build/java-lts/startup17-signal-context-test');w.mkdir(parents=True,exist_ok=True)
 s=(r/'.tools/native-sdk/ps5-payload-sdk/target/include/x86/ucontext.h').read_text();a=s.index('typedef struct __mcontext {',s.index('#ifdef __amd64__'));b=s.index('} mcontext_t;',a)+len('} mcontext_t;');struct=s[a:b]
 struct=struct.replace('__register_t','uint64_t').replace('__uint32_t','uint32_t').replace('__uint16_t','uint16_t').replace('__aligned(16)','__attribute__((aligned(16)))')
 p=w/'test.cpp';p.write_text('#include <cstdint>\n#include <cstring>\n#include <cassert>\n#include <cstdio>\n'+struct+r'''
@@ -24,8 +25,8 @@ int main(){
  uint64_t rip;memcpy(&rip,raw+0xe0,8);assert(rip==0x12345678);
  puts("PASS: actual accessor and SDK machine fields; console PC/SP/FP/BCP/trap/flags fixture; old misread reproduced; continuation write changes only true RIP bytes");
 }
-''');inc=str(r/'.tools/java25/openjdk/src/hotspot/share');subprocess.run(['/usr/bin/clang++','-std=c++17','-O1','-g','-fsanitize=address,undefined','-I'+inc,str(p),'-o',str(w/'test')],check=True);subprocess.run([str(w/'test')],check=True)
+''');inc=str(source/'src/hotspot/share');subprocess.run(['/usr/bin/clang++','-std=c++17','-O1','-g','-fsanitize=address,undefined','-I'+inc,str(p),'-o',str(w/'test')],check=True);subprocess.run([str(w/'test')],check=True)
 p=w/'target.cpp';p.write_text('#include <ucontext.h>\n#include "runtime/ps5SignalContext.hpp"\nextern "C" unsigned long getpc(const ucontext_t*u){return ps5_signal_context(u)->uc_mcontext.mc_rip;}\nextern "C" void setpc(ucontext_t*u,unsigned long p){ps5_signal_context(u)->uc_mcontext.mc_rip=p;}\n')
 env=os.environ.copy();env.setdefault('LLVM_CONFIG','/opt/homebrew/opt/llvm/bin/llvm-config');subprocess.run([str(r/'.tools/native-sdk/ps5-payload-sdk/bin/prospero-clang++'),'-std=c++17','-O2','-S','-emit-llvm','-I'+inc,str(p),'-o',str(w/'target.ll')],env=env,check=True);ir=(w/'target.ll').read_text();assert 'i64 224' in ir and '__emutls' not in ir and '__cxa_guard' not in ir
-s=(r/'.tools/java25/openjdk/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp').read_text();assert not re.search(r'\buc->',s)
+s=(source/'src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp').read_text();assert not re.search(r'\buc->',s)
 print('PASS: target SDK layout assertions, RIP read/write offset224 and all BSD x86 context member accesses routed through adapter')

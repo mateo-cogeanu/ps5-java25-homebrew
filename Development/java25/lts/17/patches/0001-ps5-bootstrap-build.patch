@@ -63,6 +63,16 @@ index 14970f852..afea922ec 100644
 +                ifneq ($(PS5_BOOTSTRAP),yes)
 @@ -1242,0 +1244 @@ define SetupNativeCompilationBody
 +                endif
+diff --git a/src/hotspot/cpu/x86/vm_version_x86.cpp b/src/hotspot/cpu/x86/vm_version_x86.cpp
+index dfe867fa6..149e967f3 100644
+--- a/src/hotspot/cpu/x86/vm_version_x86.cpp
++++ b/src/hotspot/cpu/x86/vm_version_x86.cpp
+@@ -371,0 +372,5 @@ class VM_Version_StubGenerator: public StubCodeGenerator {
++#ifdef __PROSPERO__
++    // The probe disables AVX explicitly. Avoid the deliberate SIMD fault test
++    // in that mode; normal feature filtering still disables unsupported AVX.
++    if (UseAVX == 0) __ jmp(wrapup);
++#endif
 diff --git a/src/hotspot/os/bsd/attachListener_bsd.cpp b/src/hotspot/os/bsd/attachListener_bsd.cpp
 index a79df5dbd..adca1d9a9 100644
 --- a/src/hotspot/os/bsd/attachListener_bsd.cpp
@@ -82,15 +92,65 @@ index a79df5dbd..adca1d9a9 100644
 +#endif
 +        ) {
 diff --git a/src/hotspot/os/bsd/os_bsd.cpp b/src/hotspot/os/bsd/os_bsd.cpp
-index 361bafdc0..4c866c2be 100644
+index 361bafdc0..e6e3b6b97 100644
 --- a/src/hotspot/os/bsd/os_bsd.cpp
 +++ b/src/hotspot/os/bsd/os_bsd.cpp
-@@ -1430 +1430,4 @@ int os::get_loaded_modules_info(os::LoadedModulesCallbackFunc callback, void *pa
+@@ -26,0 +27 @@
++#include "runtime/ps5LtsBootstrap.hpp"
+@@ -279,0 +281,3 @@ static char cpu_arch[] = "ppc64";
++#ifdef __PROSPERO__
++extern "C" unsigned long long sceKernelGetDirectMemorySize();
++#endif
+@@ -280,0 +285,11 @@ void os::Bsd::initialize_system_info() {
++#ifdef __PROSPERO__
++  const long processors = ::sysconf(_SC_NPROCESSORS_ONLN);
++  set_processor_count(processors > 0 ? static_cast<int>(processors) : 1);
++  const unsigned long long memory = sceKernelGetDirectMemorySize();
++  if (memory == 0 || memory > static_cast<unsigned long long>(max_jlong)) {
++    vm_exit_during_initialization("Cannot query PS5 direct memory size");
++  }
++  _physical_memory = memory;
++  ps5_lts_trace("PS5 native system information ready");
++  return;
++#endif
+@@ -357,0 +373,11 @@ void os::init_system_properties_values() {
++#ifdef __PROSPERO__
++  Arguments::set_dll_dir("/app0/assets/java17/lib");
++  Arguments::set_java_home("/app0/assets/java17");
++  Arguments::set_library_path("/app0/assets/java17/lib");
++  Arguments::set_ext_dirs("");
++  if (!set_boot_path('/', ':')) {
++    vm_exit_during_initialization("Failed setting PS5 Java17 boot path");
++  }
++  ps5_lts_trace("PS5 Java17 packaged image properties ready");
++  return;
++#endif
+@@ -1430 +1456,4 @@ int os::get_loaded_modules_info(os::LoadedModulesCallbackFunc callback, void *pa
 -#ifdef __FreeBSD__
 +#ifdef __PROSPERO__
 +  // The native SDK has no dl_iterate_phdr; preserve the unsupported result.
 +  return 1;
 +#elif defined(__FreeBSD__)
+@@ -1683,0 +1713,9 @@ void os::jvm_path(char *buf, jint buflen) {
++#ifdef __PROSPERO__
++  const char *path = "/app0/assets/java17/lib/server/libjvm.so";
++  const size_t length = strlen(path);
++  if (buflen > 0) {
++    if (length < static_cast<size_t>(buflen)) memcpy(buf, path, length + 1);
++    else buf[0] = '\0';
++  }
++  return;
++#endif
+@@ -1824,0 +1863,4 @@ bool os::pd_commit_memory(char* addr, size_t size, bool exec) {
++#ifdef __PROSPERO__
++    // Retain the original owned reservation rather than replace its mapping.
++    const bool committed = (::mprotect(addr, size, prot) == 0);
++#else
+@@ -1827 +1869,3 @@ bool os::pd_commit_memory(char* addr, size_t size, bool exec) {
+-    if (res != (uintptr_t) MAP_FAILED) {
++    const bool committed = (res != (uintptr_t) MAP_FAILED);
++#endif
++    if (committed) {
 diff --git a/src/hotspot/os/posix/os_posix.cpp b/src/hotspot/os/posix/os_posix.cpp
 index 284732bc0..aa8f03d72 100644
 --- a/src/hotspot/os/posix/os_posix.cpp
@@ -100,6 +160,188 @@ index 284732bc0..aa8f03d72 100644
 +  st->print_cr("OS uptime: unavailable in the PS5 sandbox");
 +#else
 @@ -498,0 +502 @@ void os::Posix::print_uptime_info(outputStream* st) {
++#endif
+diff --git a/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp b/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
+index 73854a01f..7b5482f87 100644
+--- a/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
++++ b/src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp
+@@ -95,0 +96,2 @@
++#include "runtime/ps5SignalContext.hpp"
++
+@@ -312 +314 @@ address os::Posix::ucontext_get_pc(const ucontext_t * uc) {
+-  return (address)uc->context_pc;
++  return (address)ps5_signal_context(uc)->context_pc;
+@@ -316 +318 @@ void os::Posix::ucontext_set_pc(ucontext_t * uc, address pc) {
+-  uc->context_pc = (intptr_t)pc ;
++  ps5_signal_context(uc)->context_pc = (intptr_t)pc ;
+@@ -320 +322 @@ intptr_t* os::Bsd::ucontext_get_sp(const ucontext_t * uc) {
+-  return (intptr_t*)uc->context_sp;
++  return (intptr_t*)ps5_signal_context(uc)->context_sp;
+@@ -324 +326 @@ intptr_t* os::Bsd::ucontext_get_fp(const ucontext_t * uc) {
+-  return (intptr_t*)uc->context_fp;
++  return (intptr_t*)ps5_signal_context(uc)->context_fp;
+@@ -619 +621 @@ bool PosixSignals::pd_hotspot_signal_handler(int sig, siginfo_t* info,
+-      uc->context_trapno == trap_page_fault) {
++      ps5_signal_context(uc)->context_trapno == trap_page_fault) {
+@@ -767,4 +769,4 @@ void os::print_context(outputStream *st, const void *context) {
+-  st->print(  "RAX=" INTPTR_FORMAT, (intptr_t)uc->context_rax);
+-  st->print(", RBX=" INTPTR_FORMAT, (intptr_t)uc->context_rbx);
+-  st->print(", RCX=" INTPTR_FORMAT, (intptr_t)uc->context_rcx);
+-  st->print(", RDX=" INTPTR_FORMAT, (intptr_t)uc->context_rdx);
++  st->print(  "RAX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rax);
++  st->print(", RBX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rbx);
++  st->print(", RCX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rcx);
++  st->print(", RDX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rdx);
+@@ -772,4 +774,4 @@ void os::print_context(outputStream *st, const void *context) {
+-  st->print(  "RSP=" INTPTR_FORMAT, (intptr_t)uc->context_rsp);
+-  st->print(", RBP=" INTPTR_FORMAT, (intptr_t)uc->context_rbp);
+-  st->print(", RSI=" INTPTR_FORMAT, (intptr_t)uc->context_rsi);
+-  st->print(", RDI=" INTPTR_FORMAT, (intptr_t)uc->context_rdi);
++  st->print(  "RSP=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rsp);
++  st->print(", RBP=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rbp);
++  st->print(", RSI=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rsi);
++  st->print(", RDI=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rdi);
+@@ -777,4 +779,4 @@ void os::print_context(outputStream *st, const void *context) {
+-  st->print(  "R8 =" INTPTR_FORMAT, (intptr_t)uc->context_r8);
+-  st->print(", R9 =" INTPTR_FORMAT, (intptr_t)uc->context_r9);
+-  st->print(", R10=" INTPTR_FORMAT, (intptr_t)uc->context_r10);
+-  st->print(", R11=" INTPTR_FORMAT, (intptr_t)uc->context_r11);
++  st->print(  "R8 =" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r8);
++  st->print(", R9 =" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r9);
++  st->print(", R10=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r10);
++  st->print(", R11=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r11);
+@@ -782,4 +784,4 @@ void os::print_context(outputStream *st, const void *context) {
+-  st->print(  "R12=" INTPTR_FORMAT, (intptr_t)uc->context_r12);
+-  st->print(", R13=" INTPTR_FORMAT, (intptr_t)uc->context_r13);
+-  st->print(", R14=" INTPTR_FORMAT, (intptr_t)uc->context_r14);
+-  st->print(", R15=" INTPTR_FORMAT, (intptr_t)uc->context_r15);
++  st->print(  "R12=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r12);
++  st->print(", R13=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r13);
++  st->print(", R14=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r14);
++  st->print(", R15=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_r15);
+@@ -787,3 +789,3 @@ void os::print_context(outputStream *st, const void *context) {
+-  st->print(  "RIP=" INTPTR_FORMAT, (intptr_t)uc->context_rip);
+-  st->print(", EFLAGS=" INTPTR_FORMAT, (intptr_t)uc->context_flags);
+-  st->print(", ERR=" INTPTR_FORMAT, (intptr_t)uc->context_err);
++  st->print(  "RIP=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_rip);
++  st->print(", EFLAGS=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_flags);
++  st->print(", ERR=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_err);
+@@ -791 +793 @@ void os::print_context(outputStream *st, const void *context) {
+-  st->print("  TRAPNO=" INTPTR_FORMAT, (intptr_t)uc->context_trapno);
++  st->print("  TRAPNO=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_trapno);
+@@ -796 +798 @@ void os::print_context(outputStream *st, const void *context) {
+-  struct savefpu *savefpu = (struct savefpu *)uc->uc_mcontext.mc_fpstate;
++  struct savefpu *savefpu = (struct savefpu *)ps5_signal_context(uc)->uc_mcontext.mc_fpstate;
+@@ -804,4 +806,4 @@ void os::print_context(outputStream *st, const void *context) {
+-  st->print(  "EAX=" INTPTR_FORMAT, (intptr_t)uc->context_eax);
+-  st->print(", EBX=" INTPTR_FORMAT, (intptr_t)uc->context_ebx);
+-  st->print(", ECX=" INTPTR_FORMAT, (intptr_t)uc->context_ecx);
+-  st->print(", EDX=" INTPTR_FORMAT, (intptr_t)uc->context_edx);
++  st->print(  "EAX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_eax);
++  st->print(", EBX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_ebx);
++  st->print(", ECX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_ecx);
++  st->print(", EDX=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_edx);
+@@ -809,4 +811,4 @@ void os::print_context(outputStream *st, const void *context) {
+-  st->print(  "ESP=" INTPTR_FORMAT, (intptr_t)uc->context_esp);
+-  st->print(", EBP=" INTPTR_FORMAT, (intptr_t)uc->context_ebp);
+-  st->print(", ESI=" INTPTR_FORMAT, (intptr_t)uc->context_esi);
+-  st->print(", EDI=" INTPTR_FORMAT, (intptr_t)uc->context_edi);
++  st->print(  "ESP=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_esp);
++  st->print(", EBP=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_ebp);
++  st->print(", ESI=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_esi);
++  st->print(", EDI=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_edi);
+@@ -814,2 +816,2 @@ void os::print_context(outputStream *st, const void *context) {
+-  st->print(  "EIP=" INTPTR_FORMAT, (intptr_t)uc->context_eip);
+-  st->print(", EFLAGS=" INTPTR_FORMAT, (intptr_t)uc->context_eflags);
++  st->print(  "EIP=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_eip);
++  st->print(", EFLAGS=" INTPTR_FORMAT, (intptr_t)ps5_signal_context(uc)->context_eflags);
+@@ -853,16 +855,16 @@ void os::print_register_info(outputStream *st, const void *context) {
+-  st->print("RAX="); print_location(st, uc->context_rax);
+-  st->print("RBX="); print_location(st, uc->context_rbx);
+-  st->print("RCX="); print_location(st, uc->context_rcx);
+-  st->print("RDX="); print_location(st, uc->context_rdx);
+-  st->print("RSP="); print_location(st, uc->context_rsp);
+-  st->print("RBP="); print_location(st, uc->context_rbp);
+-  st->print("RSI="); print_location(st, uc->context_rsi);
+-  st->print("RDI="); print_location(st, uc->context_rdi);
+-  st->print("R8 ="); print_location(st, uc->context_r8);
+-  st->print("R9 ="); print_location(st, uc->context_r9);
+-  st->print("R10="); print_location(st, uc->context_r10);
+-  st->print("R11="); print_location(st, uc->context_r11);
+-  st->print("R12="); print_location(st, uc->context_r12);
+-  st->print("R13="); print_location(st, uc->context_r13);
+-  st->print("R14="); print_location(st, uc->context_r14);
+-  st->print("R15="); print_location(st, uc->context_r15);
++  st->print("RAX="); print_location(st, ps5_signal_context(uc)->context_rax);
++  st->print("RBX="); print_location(st, ps5_signal_context(uc)->context_rbx);
++  st->print("RCX="); print_location(st, ps5_signal_context(uc)->context_rcx);
++  st->print("RDX="); print_location(st, ps5_signal_context(uc)->context_rdx);
++  st->print("RSP="); print_location(st, ps5_signal_context(uc)->context_rsp);
++  st->print("RBP="); print_location(st, ps5_signal_context(uc)->context_rbp);
++  st->print("RSI="); print_location(st, ps5_signal_context(uc)->context_rsi);
++  st->print("RDI="); print_location(st, ps5_signal_context(uc)->context_rdi);
++  st->print("R8 ="); print_location(st, ps5_signal_context(uc)->context_r8);
++  st->print("R9 ="); print_location(st, ps5_signal_context(uc)->context_r9);
++  st->print("R10="); print_location(st, ps5_signal_context(uc)->context_r10);
++  st->print("R11="); print_location(st, ps5_signal_context(uc)->context_r11);
++  st->print("R12="); print_location(st, ps5_signal_context(uc)->context_r12);
++  st->print("R13="); print_location(st, ps5_signal_context(uc)->context_r13);
++  st->print("R14="); print_location(st, ps5_signal_context(uc)->context_r14);
++  st->print("R15="); print_location(st, ps5_signal_context(uc)->context_r15);
+@@ -870,8 +872,8 @@ void os::print_register_info(outputStream *st, const void *context) {
+-  st->print("EAX="); print_location(st, uc->context_eax);
+-  st->print("EBX="); print_location(st, uc->context_ebx);
+-  st->print("ECX="); print_location(st, uc->context_ecx);
+-  st->print("EDX="); print_location(st, uc->context_edx);
+-  st->print("ESP="); print_location(st, uc->context_esp);
+-  st->print("EBP="); print_location(st, uc->context_ebp);
+-  st->print("ESI="); print_location(st, uc->context_esi);
+-  st->print("EDI="); print_location(st, uc->context_edi);
++  st->print("EAX="); print_location(st, ps5_signal_context(uc)->context_eax);
++  st->print("EBX="); print_location(st, ps5_signal_context(uc)->context_ebx);
++  st->print("ECX="); print_location(st, ps5_signal_context(uc)->context_ecx);
++  st->print("EDX="); print_location(st, ps5_signal_context(uc)->context_edx);
++  st->print("ESP="); print_location(st, ps5_signal_context(uc)->context_esp);
++  st->print("EBP="); print_location(st, ps5_signal_context(uc)->context_ebp);
++  st->print("ESI="); print_location(st, ps5_signal_context(uc)->context_esi);
++  st->print("EDI="); print_location(st, ps5_signal_context(uc)->context_edi);
+diff --git a/src/hotspot/share/classfile/classLoader.cpp b/src/hotspot/share/classfile/classLoader.cpp
+index 501fed37b..a46f84ad3 100644
+--- a/src/hotspot/share/classfile/classLoader.cpp
++++ b/src/hotspot/share/classfile/classLoader.cpp
+@@ -659,2 +659,10 @@ void ClassLoader::setup_bootstrap_search_path_impl(JavaThread* current, const ch
+-          const char* canonical_path = get_canonical_path(path, current);
+-          assert(canonical_path != NULL, "canonical_path issue");
++          const char* canonical_path;
++#ifdef __PROSPERO__
++          canonical_path = strcmp(path, "/app0/assets/java17/lib/modules") == 0
++              ? path : get_canonical_path(path, current);
++#else
++          canonical_path = get_canonical_path(path, current);
++#endif
++          if (canonical_path == NULL) {
++            vm_exit_during_initialization("Unable to resolve the Java17 boot image path", path);
++          }
+diff --git a/src/hotspot/share/prims/jni.cpp b/src/hotspot/share/prims/jni.cpp
+index b8b914ddd..445b4c3bf 100644
+--- a/src/hotspot/share/prims/jni.cpp
++++ b/src/hotspot/share/prims/jni.cpp
+@@ -27,0 +28 @@
++#include "runtime/ps5LtsBootstrap.hpp"
+@@ -3631,0 +3633 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
++  ps5_lts_trace("Entering genuine Java17 Threads::create_vm");
+@@ -3632,0 +3635 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
++  ps5_lts_trace("Java17 Threads::create_vm returned");
+diff --git a/src/hotspot/share/runtime/arguments.cpp b/src/hotspot/share/runtime/arguments.cpp
+index 9fa7ec1d1..b89560319 100644
+--- a/src/hotspot/share/runtime/arguments.cpp
++++ b/src/hotspot/share/runtime/arguments.cpp
+@@ -25,0 +26 @@
++#include "runtime/ps5LtsBootstrap.hpp"
+@@ -3282,0 +3284,4 @@ jint Arguments::parse_options_environment_variable(const char* name,
++#ifdef __PROSPERO__
++  ps5_lts_trace("PS5 Java17 uses explicit native launcher options");
++  return JNI_OK;
 +#endif
 diff --git a/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c b/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c
 index 8b900dcf6..50c3f6edb 100644
@@ -115,6 +357,161 @@ index 8b900dcf6..50c3f6edb 100644
 +#else
 @@ -285,0 +293 @@ Java_java_lang_ProcessHandleImpl_waitForProcessExit0(JNIEnv* env,
 +#endif // __PROSPERO__
+diff --git a/src/java.base/unix/native/libjava/java_props_md.c b/src/java.base/unix/native/libjava/java_props_md.c
+index b1cb0aa1e..35845e571 100644
+--- a/src/java.base/unix/native/libjava/java_props_md.c
++++ b/src/java.base/unix/native/libjava/java_props_md.c
+@@ -362,0 +363,3 @@ GetJavaProperties(JNIEnv *env)
++#ifdef __PROSPERO__
++    sprops.tmp_dir = "/download0";
++#else
+@@ -363,0 +367 @@ GetJavaProperties(JNIEnv *env)
++#endif
+@@ -402 +406,4 @@ GetJavaProperties(JNIEnv *env)
+-#ifdef MACOSX
++#ifdef __PROSPERO__
++        sprops.os_name = "PS5";
++        sprops.os_version = "unknown";
++#elif defined(MACOSX)
+@@ -434,0 +442,8 @@ GetJavaProperties(JNIEnv *env)
++#ifdef __PROSPERO__
++    /* Native title defaults; explicit Java property overrides remain supported. */
++    sprops.format_language = sprops.display_language = "en";
++    sprops.format_country = sprops.display_country = "US";
++    sprops.format_script = sprops.display_script = "";
++    sprops.format_variant = sprops.display_variant = "";
++    sprops.encoding = "UTF-8";
++#else
+@@ -452,0 +468,2 @@ GetJavaProperties(JNIEnv *env)
++#endif
++
+@@ -487,0 +505,4 @@ GetJavaProperties(JNIEnv *env)
++#ifdef __PROSPERO__
++        sprops.user_name = "ps5";
++        sprops.user_home = "/download0";
++#else
+@@ -497,0 +519 @@ GetJavaProperties(JNIEnv *env)
++#endif
+@@ -504,0 +527 @@ GetJavaProperties(JNIEnv *env)
++#ifndef __PROSPERO__
+@@ -505,0 +529 @@ GetJavaProperties(JNIEnv *env)
++#endif
+@@ -508,0 +533,3 @@ GetJavaProperties(JNIEnv *env)
++#ifdef __PROSPERO__
++        sprops.user_dir = "/app0";
++#else
+@@ -515,0 +543 @@ GetJavaProperties(JNIEnv *env)
++#endif
+diff --git a/src/java.base/unix/native/libjimage/osSupport_unix.cpp b/src/java.base/unix/native/libjimage/osSupport_unix.cpp
+index ae7dac110..01aa565e0 100644
+--- a/src/java.base/unix/native/libjimage/osSupport_unix.cpp
++++ b/src/java.base/unix/native/libjimage/osSupport_unix.cpp
+@@ -34,0 +35,5 @@
++#include <errno.h>
++#include <limits.h>
++#include <stdint.h>
++#include <stdio.h>
++#include "../../../../hotspot/share/runtime/ps5LtsBootstrap.hpp"
+@@ -54,0 +60,10 @@ jlong osSupport::size(const char *path) {
++#ifdef __PROSPERO__
++    // Obtain the readable file length without depending on stat field layout.
++    int fd = ::open(path, O_RDONLY);
++    if (fd < 0) return -1;
++    off_t length = ::lseek(fd, 0, SEEK_END);
++    int error = errno;
++    ::close(fd);
++    if (length < 0) errno = error;
++    return static_cast<jlong>(length);
++#else
+@@ -60,0 +76 @@ jlong osSupport::size(const char *path) {
++#endif
+@@ -66,0 +83,12 @@ jlong osSupport::read(jint fd, char *buf, jlong nBytes, jlong offset) {
++#ifdef __PROSPERO__
++    if(nBytes<0 || offset<0 || nBytes>LLONG_MAX-offset) {errno=EINVAL;return -1;}
++    jlong completed=0;
++    while(completed<nBytes) {
++        size_t request=(size_t)((nBytes-completed)>1024*1024?1024*1024:nBytes-completed);
++        ssize_t got=::pread(fd,buf+completed,request,offset+completed);
++        if(got>0)completed+=got;
++        else if(got<0 && errno==EINTR)continue;
++        else return got<0?-1:completed;
++    }
++    return completed;
++#else
+@@ -67,0 +96 @@ jlong osSupport::read(jint fd, char *buf, jlong nBytes, jlong offset) {
++#endif
+@@ -73,0 +103,10 @@ jlong osSupport::read(jint fd, char *buf, jlong nBytes, jlong offset) {
++#ifdef __PROSPERO__
++static size_t ps5_mapping_size(size_t bytes) {
++    long page = sysconf(_SC_PAGESIZE);
++    if (page <= 0 || bytes == 0) return 0;
++    size_t alignment = static_cast<size_t>(page);
++    if (bytes > SIZE_MAX - (alignment - 1)) return 0;
++    return ((bytes + alignment - 1) / alignment) * alignment;
++}
++#endif
++
+@@ -76,6 +115,47 @@ void* osSupport::map_memory(int fd, const char *filename, size_t file_offset, si
+-    mapped_address = (void*) mmap(NULL,
+-            bytes, PROT_READ, MAP_SHARED,
+-            fd, file_offset);
+-    if (mapped_address == MAP_FAILED) {
+-        return NULL;
+-    }
++#ifdef __PROSPERO__
++        // Native PS5 module-image reading uses anonymous memory directly.
++        // The file-backed mmap attempt crashed before returning on console.
++        ps5_lts_trace("JIMAGE: PS5 anonymous read-only image copy");
++        if (bytes == 0 || file_offset > static_cast<size_t>(LLONG_MAX) ||
++                bytes > static_cast<size_t>(LLONG_MAX) - file_offset) return NULL;
++        size_t allocation_bytes = ps5_mapping_size(bytes);
++        if (!allocation_bytes) return NULL;
++        char details[128];
++        snprintf(details, sizeof(details), "ALLOC: JIMAGE bytes=%zu aligned=%zu offset=%zu",
++                 bytes, allocation_bytes, file_offset);
++        ps5_lts_trace(details);
++        ps5_lts_trace("ENTER: JIMAGE native anonymous allocation");
++        mapped_address = mmap(NULL, allocation_bytes, PROT_READ | PROT_WRITE,
++                              MAP_PRIVATE | MAP_ANON, -1, 0);
++        if (mapped_address == MAP_FAILED) {
++            ps5_lts_trace("FAIL: JIMAGE anonymous mapping");
++            return NULL;
++        }
++        ps5_lts_trace("DONE: JIMAGE anonymous allocation");
++        ps5_lts_trace("ENTER: JIMAGE file-to-memory copy");
++        size_t completed = 0;
++        while (completed < bytes) {
++            size_t request = bytes - completed;
++            if (request > 1024 * 1024) request = 1024 * 1024;
++            ssize_t got = pread(fd, static_cast<char*>(mapped_address) + completed,
++                                request, file_offset + completed);
++            if (got > 0) completed += static_cast<size_t>(got);
++            else if (got < 0 && errno == EINTR) continue;
++            else {
++                ps5_lts_trace("FAIL: JIMAGE anonymous copy read");
++                munmap(mapped_address, allocation_bytes);
++                return NULL;
++            }
++        }
++        ps5_lts_trace("DONE: JIMAGE file-to-memory copy");
++        ps5_lts_trace("ENTER: JIMAGE read-only protection");
++        if (mprotect(mapped_address, allocation_bytes, PROT_READ) != 0) {
++            ps5_lts_trace("FAIL: JIMAGE anonymous copy read-only protection");
++            munmap(mapped_address, allocation_bytes);
++            return NULL;
++        }
++        ps5_lts_trace("DONE: JIMAGE anonymous read-only copy");
++#else
++    mapped_address = mmap(NULL, bytes, PROT_READ, MAP_SHARED, fd, file_offset);
++    if (mapped_address == MAP_FAILED) return NULL;
++#endif
+@@ -88,0 +169,4 @@ int osSupport::unmap_memory(void *addr, size_t bytes) {
++#ifdef __PROSPERO__
++    size_t allocation_bytes = ps5_mapping_size(bytes);
++    return allocation_bytes && munmap(addr, allocation_bytes) == 0;
++#else
+@@ -89,0 +174 @@ int osSupport::unmap_memory(void *addr, size_t bytes) {
++#endif
 diff --git a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
 index 8cd723ecc..18cd726ae 100644
 --- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
@@ -144,4 +541,66 @@ index 8cd723ecc..18cd726ae 100644
 -    int saved_errno;
 -
 @@ -534,0 +553 @@ Java_sun_nio_fs_UnixNativeDispatcher_getlinelen(JNIEnv* env, jclass this, jlong
++#endif
+diff --git a/src/hotspot/share/runtime/ps5LtsBootstrap.hpp b/src/hotspot/share/runtime/ps5LtsBootstrap.hpp
+new file mode 100644
+index 000000000..6bc835662
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5LtsBootstrap.hpp
+@@ -0,0 +1,29 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHARE_RUNTIME_PS5LTSBOOTSTRAP_HPP
++#define SHARE_RUNTIME_PS5LTSBOOTSTRAP_HPP
++#ifdef __PROSPERO__
++#include <errno.h>
++#include <fcntl.h>
++#include <string.h>
++#include <unistd.h>
++// A fixed small probe log; no stdio, VM allocation or VM lock is needed.
++inline void ps5_lts_trace(const char *text) {
++  int saved = errno;
++  int fd = ::open("/download0/java17-vm-trace.log", O_CREAT | O_WRONLY | O_APPEND, 0600);
++  if (fd >= 0) {
++    size_t left = ::strlen(text), sent = 0;
++    while (sent < left) {
++      ssize_t n = ::write(fd, text + sent, left - sent);
++      if (n > 0) sent += static_cast<size_t>(n);
++      else if (n < 0 && errno == EINTR) continue;
++      else break;
++    }
++    (void)::write(fd, "\n", 1);
++    (void)::close(fd);
++  }
++  errno = saved;
++}
++#else
++inline void ps5_lts_trace(const char *) {}
++#endif
++#endif
+diff --git a/src/hotspot/share/runtime/ps5SignalContext.hpp b/src/hotspot/share/runtime/ps5SignalContext.hpp
+new file mode 100644
+index 000000000..2fa275ed5
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5SignalContext.hpp
+@@ -0,0 +1,21 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHARE_RUNTIME_PS5SIGNALCONTEXT_HPP
++#define SHARE_RUNTIME_PS5SIGNALCONTEXT_HPP
++#include <stddef.h>
++#ifdef __PROSPERO__
++// PS5 signal frames have 48 reserved bytes after the 16-byte signal mask.
++// Use this view only for register members; never replace the kernel's pointer.
++struct Ps5SignalContext {
++ unsigned char mask_and_reserved[0x40];
++ mcontext_t uc_mcontext;
++};
++static_assert(offsetof(ucontext_t,uc_mcontext)==0x10,"Re-audit changed SDK context layout");
++static_assert(offsetof(Ps5SignalContext,uc_mcontext)==0x40,"PS5 machine context offset");
++static_assert(offsetof(Ps5SignalContext,uc_mcontext)+offsetof(mcontext_t,mc_rip)==0xe0,"PS5 RIP offset");
++static_assert(offsetof(Ps5SignalContext,uc_mcontext)+offsetof(mcontext_t,mc_rsp)==0xf8,"PS5 RSP offset");
++inline Ps5SignalContext* ps5_signal_context(ucontext_t*uc){return reinterpret_cast<Ps5SignalContext*>(uc);}
++inline const Ps5SignalContext* ps5_signal_context(const ucontext_t*uc){return reinterpret_cast<const Ps5SignalContext*>(uc);}
++#else
++template<class C> inline C* ps5_signal_context(C*uc){return uc;}
++#endif
 +#endif
