@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-09",
+  "runtime_major": 17,
+  "patch_sha256": "88d297181bb03aebe72d1c17ee49a9c51f1d9f0ababc4b2ed54ccd088e129340",
+  "thread_source_sha256": "58213523e9d12ec96313b2d3aa269cea29afbf62c2b0f63a13d3104ad4647857",
+  "scope": "Fixed PS5 phase tracing only; no allocator/heap/GC/JNI/control-flow policy change",
+  "checks": [
+    "Complete pinned17/21 source replay/idempotence/refusal controls",
+    "Actual17 host standalone interpreter Java/JNI/thread/destruction regression",
+    "PS5 target17 HotSpot/core build and ELF audit",
+    "Matching consumer002 native/signature/package checks recorded separately"
+  ],
+  "console": "Pending exact consumer002 phase/fault capture; no crash resolution claimed",
+  "known_evidence": "Prior consumer001 image allocation/read/read-only protection completed before last retained trace. No PC/causal subsystem established.",
+  "frozen": "Preserved exact17startup002/21startup001 sources and packages; Java25 unchanged"
+}

@@ -343,6 +343,110 @@ index 9fa7ec1d1..b89560319 100644
 +  ps5_lts_trace("PS5 Java17 uses explicit native launcher options");
 +  return JNI_OK;
 +#endif
+diff --git a/b/src/hotspot/share/runtime/ps5LtsBootstrap.hpp b/src/hotspot/share/runtime/ps5LtsBootstrap.hpp
+new file mode 100644
+index 0000000..6bc8356
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5LtsBootstrap.hpp
+@@ -0,0 +1,29 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHARE_RUNTIME_PS5LTSBOOTSTRAP_HPP
++#define SHARE_RUNTIME_PS5LTSBOOTSTRAP_HPP
++#ifdef __PROSPERO__
++#include <errno.h>
++#include <fcntl.h>
++#include <string.h>
++#include <unistd.h>
++// A fixed small probe log; no stdio, VM allocation or VM lock is needed.
++inline void ps5_lts_trace(const char *text) {
++  int saved = errno;
++  int fd = ::open("/download0/java17-vm-trace.log", O_CREAT | O_WRONLY | O_APPEND, 0600);
++  if (fd >= 0) {
++    size_t left = ::strlen(text), sent = 0;
++    while (sent < left) {
++      ssize_t n = ::write(fd, text + sent, left - sent);
++      if (n > 0) sent += static_cast<size_t>(n);
++      else if (n < 0 && errno == EINTR) continue;
++      else break;
++    }
++    (void)::write(fd, "\n", 1);
++    (void)::close(fd);
++  }
++  errno = saved;
++}
++#else
++inline void ps5_lts_trace(const char *) {}
++#endif
++#endif
+diff --git a/b/src/hotspot/share/runtime/ps5SignalContext.hpp b/src/hotspot/share/runtime/ps5SignalContext.hpp
+new file mode 100644
+index 0000000..2fa275e
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5SignalContext.hpp
+@@ -0,0 +1,21 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHARE_RUNTIME_PS5SIGNALCONTEXT_HPP
++#define SHARE_RUNTIME_PS5SIGNALCONTEXT_HPP
++#include <stddef.h>
++#ifdef __PROSPERO__
++// PS5 signal frames have 48 reserved bytes after the 16-byte signal mask.
++// Use this view only for register members; never replace the kernel's pointer.
++struct Ps5SignalContext {
++ unsigned char mask_and_reserved[0x40];
++ mcontext_t uc_mcontext;
++};
++static_assert(offsetof(ucontext_t,uc_mcontext)==0x10,"Re-audit changed SDK context layout");
++static_assert(offsetof(Ps5SignalContext,uc_mcontext)==0x40,"PS5 machine context offset");
++static_assert(offsetof(Ps5SignalContext,uc_mcontext)+offsetof(mcontext_t,mc_rip)==0xe0,"PS5 RIP offset");
++static_assert(offsetof(Ps5SignalContext,uc_mcontext)+offsetof(mcontext_t,mc_rsp)==0xf8,"PS5 RSP offset");
++inline Ps5SignalContext* ps5_signal_context(ucontext_t*uc){return reinterpret_cast<Ps5SignalContext*>(uc);}
++inline const Ps5SignalContext* ps5_signal_context(const ucontext_t*uc){return reinterpret_cast<const Ps5SignalContext*>(uc);}
++#else
++template<class C> inline C* ps5_signal_context(C*uc){return uc;}
++#endif
++#endif
+diff --git a/src/hotspot/share/runtime/thread.cpp b/src/hotspot/share/runtime/thread.cpp
+index b45fdd92d..c27495697 100644
+--- a/src/hotspot/share/runtime/thread.cpp
++++ b/src/hotspot/share/runtime/thread.cpp
+@@ -26,0 +27 @@
++#include "runtime/ps5LtsBootstrap.hpp"
+@@ -2734,0 +2736 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: os init completed");
+@@ -2745,0 +2748 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: enter JDK version init");
+@@ -2746,0 +2750 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: JDK version init completed");
+@@ -2755,0 +2760 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: enter argument parse");
+@@ -2756,0 +2762 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: argument parse returned");
+@@ -2763,0 +2770 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: enter before ergonomics");
+@@ -2765,0 +2773 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: enter ergonomics");
+@@ -2766,0 +2775 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: ergonomics returned");
+@@ -2789,0 +2799 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: enter os init2");
+@@ -2790,0 +2801 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: os init2 returned");
+@@ -2823,0 +2835 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: enter VM globals");
+@@ -2824,0 +2837 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: VM globals completed");
+@@ -2864,0 +2878 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: enter VM universe initialization");
+@@ -2865,0 +2880 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: VM universe initialization returned");
+@@ -2931,0 +2947 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: enter java.lang initialization");
+@@ -2932,0 +2949 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: java.lang initialized");
+@@ -3017,0 +3035 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: enter module initialization");
+@@ -3018,0 +3037 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
++  ps5_lts_trace("STARTUP: module initialization returned");
 diff --git a/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c b/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c
 index 8b900dcf6..50c3f6edb 100644
 --- a/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c
@@ -541,66 +645,4 @@ index 8cd723ecc..18cd726ae 100644
 -    int saved_errno;
 -
 @@ -534,0 +553 @@ Java_sun_nio_fs_UnixNativeDispatcher_getlinelen(JNIEnv* env, jclass this, jlong
-+#endif
-diff --git a/src/hotspot/share/runtime/ps5LtsBootstrap.hpp b/src/hotspot/share/runtime/ps5LtsBootstrap.hpp
-new file mode 100644
-index 000000000..6bc835662
---- /dev/null
-+++ b/src/hotspot/share/runtime/ps5LtsBootstrap.hpp
-@@ -0,0 +1,29 @@
-+/* SPDX-License-Identifier: GPL-2.0-only */
-+#ifndef SHARE_RUNTIME_PS5LTSBOOTSTRAP_HPP
-+#define SHARE_RUNTIME_PS5LTSBOOTSTRAP_HPP
-+#ifdef __PROSPERO__
-+#include <errno.h>
-+#include <fcntl.h>
-+#include <string.h>
-+#include <unistd.h>
-+// A fixed small probe log; no stdio, VM allocation or VM lock is needed.
-+inline void ps5_lts_trace(const char *text) {
-+  int saved = errno;
-+  int fd = ::open("/download0/java17-vm-trace.log", O_CREAT | O_WRONLY | O_APPEND, 0600);
-+  if (fd >= 0) {
-+    size_t left = ::strlen(text), sent = 0;
-+    while (sent < left) {
-+      ssize_t n = ::write(fd, text + sent, left - sent);
-+      if (n > 0) sent += static_cast<size_t>(n);
-+      else if (n < 0 && errno == EINTR) continue;
-+      else break;
-+    }
-+    (void)::write(fd, "\n", 1);
-+    (void)::close(fd);
-+  }
-+  errno = saved;
-+}
-+#else
-+inline void ps5_lts_trace(const char *) {}
-+#endif
-+#endif
-diff --git a/src/hotspot/share/runtime/ps5SignalContext.hpp b/src/hotspot/share/runtime/ps5SignalContext.hpp
-new file mode 100644
-index 000000000..2fa275ed5
---- /dev/null
-+++ b/src/hotspot/share/runtime/ps5SignalContext.hpp
-@@ -0,0 +1,21 @@
-+/* SPDX-License-Identifier: GPL-2.0-only */
-+#ifndef SHARE_RUNTIME_PS5SIGNALCONTEXT_HPP
-+#define SHARE_RUNTIME_PS5SIGNALCONTEXT_HPP
-+#include <stddef.h>
-+#ifdef __PROSPERO__
-+// PS5 signal frames have 48 reserved bytes after the 16-byte signal mask.
-+// Use this view only for register members; never replace the kernel's pointer.
-+struct Ps5SignalContext {
-+ unsigned char mask_and_reserved[0x40];
-+ mcontext_t uc_mcontext;
-+};
-+static_assert(offsetof(ucontext_t,uc_mcontext)==0x10,"Re-audit changed SDK context layout");
-+static_assert(offsetof(Ps5SignalContext,uc_mcontext)==0x40,"PS5 machine context offset");
-+static_assert(offsetof(Ps5SignalContext,uc_mcontext)+offsetof(mcontext_t,mc_rip)==0xe0,"PS5 RIP offset");
-+static_assert(offsetof(Ps5SignalContext,uc_mcontext)+offsetof(mcontext_t,mc_rsp)==0xf8,"PS5 RSP offset");
-+inline Ps5SignalContext* ps5_signal_context(ucontext_t*uc){return reinterpret_cast<Ps5SignalContext*>(uc);}
-+inline const Ps5SignalContext* ps5_signal_context(const ucontext_t*uc){return reinterpret_cast<const Ps5SignalContext*>(uc);}
-+#else
-+template<class C> inline C* ps5_signal_context(C*uc){return uc;}
-+#endif
 +#endif

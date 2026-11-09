@@ -51,3 +51,9 @@ pending in the separate consumer. No Minecraft files or raw reports enter this
 repository. See [ProsperoCraft](https://github.com/mateo-cogeanu/ProsperoCraft) for
 the local1.20 bootstrap candidate and physical-console results. Existing exact
 hardware and shader/release gates remain; passing startup does not establish play.
+
+
+The [early startup phase trace](java-lts-startup-phase-trace.md) follows an
+extended-image consumer001 crash after native JIMAGE read-only setup. Active17
+adds fixed phase markers; consumer002 supplies scoped fault capture. Cause and
+exact console result remain pending, with original passing startup bytes retained.

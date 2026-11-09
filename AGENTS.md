@@ -455,3 +455,15 @@ ABI/classloader coherence and their game harnesses. Desktop class availability
 is not native AWT/fonts/GUI/printing support. See docs/java-lts-bootstrap-integration.md.
 PPSA99878/01.000.001 is an unvalidated consumer1.20 entry/JNI bootstrap test, not
 playable-world/C2/shader/performance acceptance; no release/Store or frozen pass.
+
+
+## Java17 early startup phase diagnostics —2026-11-09
+
+Consumer001 crashes in JNI_CreateJavaVM after extended JIMAGE allocation/read/
+read-only protection completes. Retained trace has no PC; heap/module/JNI cause
+is unproven. Active17 Threads::create_vm adds fixed phase trace calls only,
+preserving semantics/options and non-PS5 no-op behavior. Runtime trace0600 remains
+private by default. Consumer002 owns explicit diagnostic-only0644 sharing and
+existing scoped fault capture around VM creation; preserve prior handlers/context
+and working25/frozen17/21 bytes. No crash resolution, game/shader/endurance pass
+or release/Store approval. See docs/java-lts-startup-phase-trace.md.
