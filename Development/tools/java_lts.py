@@ -207,7 +207,7 @@ def main():
     parser.add_argument('--modules', default='java.base', help='Explicit target class modules; defaults to core only')
     args = parser.parse_args()
     modules = tuple(dict.fromkeys(args.modules.split(',')))
-    supported = {'java.base','java.logging','java.management','jdk.management','jdk.unsupported','java.xml','java.prefs','java.datatransfer','java.desktop'}
+    supported = {'java.base','java.logging','java.management','jdk.management','jdk.unsupported','java.xml','java.prefs','java.datatransfer','java.desktop','jdk.zipfs'}
     if not modules or modules[0] != 'java.base' or set(modules) - supported:
         parser.error('Modules must start with java.base and use reviewed class-only module names')
     if args.modules != 'java.base' and not args.image:

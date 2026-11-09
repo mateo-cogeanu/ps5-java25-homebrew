@@ -75,3 +75,10 @@ The consumer uses this for a native-side breadcrumb before its first Java file
 operation, avoiding dependence on successful Java NIO initialization for evidence.
 Exact PS5 consumer004results are pending;003only establishes VM creation with
 that profile, not the complete row3/bootstrap or a proven512MiB failure cause.
+
+Explicit class images can include the target-built `jdk.zipfs` module.
+Its OpenJDK service declaration supplies the standard `jar` NIO provider
+when the module is resolved. The default image selection remains `java.base`.
+The Java 17 target image audit found `jdk.nio.zipfs.ZipFileSystemProvider`
+in the generated image. Provider discovery and archive access on PS5
+still require console validation.
