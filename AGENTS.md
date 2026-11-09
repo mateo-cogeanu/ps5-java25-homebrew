@@ -478,3 +478,14 @@ using bounded stack formatting, no error strings/caller paths or changed failure
 semantics. Consumer003 alone reduces its test heap512to128MiB to isolate the
 passing probe profile while retaining extended modules/bindings. No production
 heap/GC/Java25 default change or game/crash acceptance; frozenbytes preserved.
+
+
+## Optional LTS JNI-stage callbacks —2026-11-09
+
+Shared17/21probe JNI helper gains default-null fixed trace/on-class callbacks for
+explicit consumer diagnostics, with original default/check/error/ref behavior.
+Consumer003physically creates the extended VM at128MiB, then crashes row3before
+its Java stage file; exact boundary/cause unproven.004adds native checkpoints and
+consumer-owned nativeStage registration plus scoped bounded signal capture. No
+new Java API/game class/native policy replacement, frozen pass or release claim.
+See docs/java-lts-bootstrap-integration.md; consumer source/fault policy stays there.

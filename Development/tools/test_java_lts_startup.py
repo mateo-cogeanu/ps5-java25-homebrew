@@ -18,6 +18,7 @@ def main():
     parser.add_argument('--major', type=int, choices=(17,21), default=17)
     parser.add_argument('--probe-dir', type=Path)
     parser.add_argument('--vm-option', action='append', default=[])
+    parser.add_argument('--register-stage', action='store_true', help='Explicit custom probe diagnostic native')
     a = parser.parse_args()
     a.output_dir = a.output_dir or ROOT / ('build/java-lts/startup' + str(a.major) + '-host')
     probe = a.probe_dir.resolve() if a.probe_dir else ROOT / ('java25/lts/probe' if a.major == 17 else 'java25/lts/probe21')
@@ -55,6 +56,13 @@ int main(int argc,char**argv){
 '''.replace('Java17', 'Java' + str(a.major)))
     import json
     text = source.read_text()
+    if a.register_stage:
+        text = text.replace('int main(int argc,char**argv){', '\n'.join([
+            'void JNICALL test_stage(JNIEnv*,jclass,jint){}',
+            'int bind_stage(JNIEnv*e,jclass k){JNINativeMethod n{const_cast<char*>("nativeStage"),const_cast<char*>("(I)V"),reinterpret_cast<void*>(&test_stage)};return e->RegisterNatives(k,&n,1);}',
+            'int main(int argc,char**argv){']))
+        text = text.replace('run(env,bytes.data(),bytes.size())','run(env,bytes.data(),bytes.size(),nullptr,bind_stage)')
+
     text = text.replace('args.nOptions=3;', 'args.nOptions=' + str(3 + len(a.vm_option)) + ';')
     text = text.replace('{const_cast<char*>("-Xmx128m"),nullptr}};', '{const_cast<char*>("-Xmx128m"),nullptr}' +
                         ''.join(',{const_cast<char*>(' + json.dumps(o) + '),nullptr}' for o in a.vm_option) + '};')

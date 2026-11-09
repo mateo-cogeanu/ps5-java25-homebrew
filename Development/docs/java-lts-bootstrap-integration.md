@@ -57,3 +57,21 @@ The [early startup phase trace](java-lts-startup-phase-trace.md) follows an
 extended-image consumer001 crash after native JIMAGE read-only setup. Active17
 adds fixed phase markers; consumer002 supplies scoped fault capture. Cause and
 exact console result remain pending, with original passing startup bytes retained.
+
+
+## Consumer JNI-stage diagnostics —2026-11-09
+
+The shared17/21 `jni_checks.hpp` accepts optional fixed-stage tracing and an
+explicit on-class registration callback. Defaults preserve the original three-
+argument path. Calls bracket loader lookup, DefineClass, native registration,
+method lookup and run() entry/return; only fixed labels are emitted. The callback
+can register a consumer-owned diagnostic native after the original multiply and
+before run-method lookup. Callback failures preserve pending JNI exceptions and
+release the local class reference. No game class or runtime API is replaced.
+
+The host startup fixture accepts explicit `--register-stage` for the matching
+consumer diagnostic native. Default standalone17/21 checks remain unchanged.
+The consumer uses this for a native-side breadcrumb before its first Java file
+operation, avoiding dependence on successful Java NIO initialization for evidence.
+Exact PS5 consumer004results are pending;003only establishes VM creation with
+that profile, not the complete row3/bootstrap or a proven512MiB failure cause.
