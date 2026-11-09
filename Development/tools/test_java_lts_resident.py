@@ -19,7 +19,8 @@ def main():
     a = p.parse_args()
     generated = registry({'jvm': ['JVM_Fixture', 'not_jvm_export'],
                           'java': ['Java_Fixture', 'lts_java_JNI_OnLoad'],
-                          'net': ['Java_NetFixture', 'lts_net_JNI_OnLoad']},
+                          'net': ['Java_NetFixture', 'lts_net_JNI_OnLoad'],
+                          'explicit_probe': ['Java_ExtraFixture','lts_explicit_probe_JNI_OnLoad']},
                          major=a.major, asm_prefix='_' if os.uname().sysname == 'Darwin' else '')
     with tempfile.TemporaryDirectory(prefix='java17-registry-') as folder:
         root = Path(folder)
@@ -35,6 +36,8 @@ def main():
 #include <dlfcn.h>
 extern "C" {
 void*__dlopen(const char*,int);void*__dlsym(void*,const char*);int __dlclose(void*);char*__dlerror();int __dladdr(const void*,Dl_info*);
+int Java_ExtraFixture(){return 44;}
+int lts_explicit_probe_JNI_OnLoad(void*vm,void*reserved){return vm==reinterpret_cast<void*>(0x12)&&reserved==reinterpret_cast<void*>(0x34)?0x00150000:-1;}
 int JVM_Fixture(){return 17;}int Java_Fixture(){return 21;}int Java_NetFixture(){return 31;}
 int lts_java_JNI_OnLoad(void*,void*){return 0x00010008;}
 int lts_net_JNI_OnLoad(void*,void*){return -1;}
@@ -42,6 +45,7 @@ char __lts_jvm_text_start[16]{};char __lts_jvm_text_end[16]{};
 }
 int main(){
  void*process=__dlopen(nullptr,0);void*java=__dlopen("/app0/assets/java17/lib/libjava.so",0);void*net=__dlopen("libnet.so",0);
+ void*extra=__dlopen("libexplicit_probe.so",0);assert(extra&&extra!=java);
  assert(process&&java&&net&&process!=java&&java!=net);
  using Fn=int(*)();using Load=int(*)(void*,void*);
  assert(reinterpret_cast<Fn>(__dlsym(process,"JVM_Fixture"))()==17);
@@ -54,6 +58,10 @@ int main(){
  assert(reinterpret_cast<Load>(__dlsym(process,"JNI_OnLoad_java"))(nullptr,nullptr)==0x00010008);
  assert(reinterpret_cast<Load>(__dlsym(process,"JNI_OnLoad_net"))(nullptr,nullptr)==-1);
  assert(__dlclose(reinterpret_cast<void*>(0x1234))==-1&&__dlerror());
+ assert(reinterpret_cast<Load>(__dlsym(process,"JNI_OnLoad_explicit_probe"))(reinterpret_cast<void*>(0x12),reinterpret_cast<void*>(0x34))==0x00150000);
+ assert(reinterpret_cast<Load>(__dlsym(extra,"JNI_OnLoad_explicit_probe"))(nullptr,nullptr)==-1);
+ assert(reinterpret_cast<Fn>(__dlsym(extra,"Java_ExtraFixture"))()==44);
+ assert(!__dlsym(java,"Java_ExtraFixture")&&__dlerror());
  assert(__dlclose(java)==0&&reinterpret_cast<Fn>(__dlsym(java,"Java_Fixture"))()==21);
  Dl_info info{};assert(!__dladdr(nullptr,&info)&&!__dladdr(reinterpret_cast<void*>(&JVM_Fixture),nullptr));
  assert(!__dladdr(reinterpret_cast<void*>(&JVM_Fixture),&info));

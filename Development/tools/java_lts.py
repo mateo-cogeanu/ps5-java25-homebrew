@@ -126,13 +126,14 @@ def audit(source, port, output, llvm, major, spec):
     print('PASS Java', major, 'target HotSpot C1+C2, java.base class generation and native ELF audit; console pending')
 
 
-def build_image(source, output, boot, major, env):
+def build_image(source, output, boot, major, env, modules=("java.base",)):
     """Encode only target classes/configuration; never include desktop native code."""
     make = shutil.which('gmake')
     if make is None:
         raise FileNotFoundError('GNU make is required as gmake')
     with (output / 'image-gendata.log').open('w') as log:
-        subprocess.run([make, 'CONF=ps5-bootstrap', 'java.base-gendata'], cwd=source,
+        subprocess.run([make, 'CONF=ps5-bootstrap', 'java.base-gendata',
+                        *[m + '-java' for m in modules if m != 'java.base']], cwd=source,
                        env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
     build = source / 'build/ps5-bootstrap'
     classes = build / 'jdk/modules/java.base'
@@ -148,12 +149,20 @@ def build_image(source, output, boot, major, env):
         temporary = Path(folder)
         # Host jlink accepts this transport tag. The JMOD contains class/config
         # data only; it has no host/Linux launcher, library or platform spoof.
-        jmod = temporary / 'java.base.jmod'
-        subprocess.run([str(boot / 'bin/jmod'), 'create', '--class-path', str(classes),
-                        '--config', str(conf), '--module-version', version,
-                        '--target-platform', 'linux-amd64', str(jmod)], check=True)
+        for module in modules:
+            module_classes = build / 'jdk/modules' / module
+            body = (module_classes / 'module-info.class').read_bytes()
+            if body[:4] != b'\xca\xfe\xba\xbe' or int.from_bytes(body[6:8], 'big') != major + 44:
+                raise ValueError('Wrong target module class generation: ' + module)
+            options = []
+            module_conf = build / 'support/modules_conf' / module
+            if module_conf.is_dir():
+                options += ['--config', str(module_conf)]
+            subprocess.run([str(boot / 'bin/jmod'), 'create', '--class-path', str(module_classes),
+                            *options, '--module-version', version,
+                            '--target-platform', 'linux-amd64', str(temporary / (module + '.jmod'))], check=True)
         staged = temporary / 'image'
-        subprocess.run([str(boot / 'bin/jlink'), '--module-path', str(temporary), '--add-modules', 'java.base',
+        subprocess.run([str(boot / 'bin/jlink'), '--module-path', str(temporary), '--add-modules', ','.join(modules),
                         '--compress=2', '--no-header-files', '--no-man-pages', '--output', str(staged)], check=True)
         libs = build / 'support/modules_libs/java.base'
         for name in ('tzdb.dat', 'security/cacerts'):
@@ -175,7 +184,7 @@ def build_image(source, output, boot, major, env):
               'classImageBytes': (image / 'lib/modules').stat().st_size,
               'targetGeneratedData': {name: sha(image / 'lib' / name) for name in ('tzdb.dat', 'security/cacerts')},
               'jmodTransportTag': 'linux-amd64; classes/config only, no Linux native artifacts',
-              'targetClassReadBack': ['Object', 'Runtime', 'StrictMath'], 'modules': ['java.base'],
+              'targetClassReadBack': ['Object', 'Runtime', 'StrictMath'], 'modules': list(modules),
               'nativeLibrariesIncluded': False, 'console': 'NOT RUN; native packaging/startup integration pending'}
     (output / 'image-audit.json').write_text(json.dumps(record, indent=2) + '\n')
     print('PASS Java', major, 'target class-only core image and exact class read-back; not a runnable application')
@@ -195,7 +204,14 @@ def main():
     parser.add_argument('--build', action='store_true')
     parser.add_argument('--audit', action='store_true')
     parser.add_argument('--image', action='store_true', help='Encode target-built java.base classes/config; no native app')
+    parser.add_argument('--modules', default='java.base', help='Explicit target class modules; defaults to core only')
     args = parser.parse_args()
+    modules = tuple(dict.fromkeys(args.modules.split(',')))
+    supported = {'java.base','java.logging','java.management','jdk.management','jdk.unsupported','java.xml','java.prefs','java.datatransfer','java.desktop'}
+    if not modules or modules[0] != 'java.base' or set(modules) - supported:
+        parser.error('Modules must start with java.base and use reviewed class-only module names')
+    if args.modules != 'java.base' and not args.image:
+        parser.error('--modules requires --image')
     spec = json.loads((ROOT / 'java25/lts/upstream.json').read_text())['runtimes'][str(args.major)]
     cache = (args.cache_dir or ROOT / ('.tools/java' + str(args.major))).resolve()
     source = cache / 'openjdk'
@@ -284,7 +300,7 @@ def main():
     if args.build or args.audit:
         audit(source, port, output, llvm, args.major, spec)
     if args.image:
-        build_image(source, output, boot, args.major, env)
+        build_image(source, output, boot, args.major, env, modules)
 
 
 if __name__ == '__main__':

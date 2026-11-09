@@ -114,3 +114,13 @@ lives in the separate history archive. No C2/game/performance claim follows.
 rebased bootstrap boundary and its own matching class image/core objects. Host
 checks and packaging pass; the maintainer also reported exact-build ALL PASS for its four interpreter startup rows. The working
 Java25 consumer remains unchanged. Consumer launchers require separate integration.
+
+
+## Explicit consumer bootstrap image —2026-11-09
+
+The [opt-in integration guide](java-lts-bootstrap-integration.md) covers extended
+class modules, genuine management natives, explicit linked resident groups and a
+consumer-supplied probe directory. Current17target build/host/bootstrap/package
+checks pass; exact consumer PS5 execution remains pending. The frozen startup
+packages and default Java25 consumer are preserved. Native desktop support and
+playable game/shader/performance acceptance are not implied.

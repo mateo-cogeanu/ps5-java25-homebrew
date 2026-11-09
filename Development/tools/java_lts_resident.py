@@ -38,7 +38,7 @@ def registry(libraries, *, major=17, asm_prefix=''):
             entries.append('{"' + label + '", reinterpret_cast<void *>(&' + alias + ')}')
             if label == 'JNI_OnLoad':
                 original_load = alias
-        if name in GROUPS:
+        if name != 'jvm':
             # Standard OpenJDK static-library discovery. Run each real JNI_OnLoad
             # when present; statically linked groups without one require only JNI1.8.
             expression = ('reinterpret_cast<int (*)(void*,void*)>(&' + original_load + ')(vm, reserved)'
@@ -102,6 +102,8 @@ def main():
     p.add_argument('--lld', required=True, type=Path)
     p.add_argument('--output-dir', required=True, type=Path)
     p.add_argument('--major', type=int, choices=(17, 21), default=17)
+    p.add_argument('--management', action='store_true', help='Opt in to matching management/management_ext natives')
+    p.add_argument('--library', action='append', default=[], help='Explicit resident name=object; consumer owns ABI')
     a = p.parse_args()
     llvm = a.llvm_home.resolve()
     output = a.output_dir.resolve()
@@ -145,6 +147,41 @@ def main():
         if args:
             subprocess.run([str(tool(llvm, 'llvm-objcopy')), *args, str(merged)], check=True)
         inputs[name] = {str(f.relative_to(build)): sha(f) for f in objects}
+        groups[name] = merged
+    extra = []
+    if a.management:
+        for module, name in (('java.management', 'management'), ('jdk.management', 'management_ext')):
+            objects = sorted((build / 'support/native' / module / ('lib' + name)).glob('*.o'))
+            if not objects:
+                raise ValueError('Build matching management objects first: ' + name)
+            merged = output / ('embedded-' + name + '.o')
+            subprocess.run([str(a.lld.absolute()), '-r', *map(str, objects), '-o', str(merged)], check=True)
+            extra.append((name, merged))
+            inputs[name] = {str(f.relative_to(build)): sha(f) for f in objects}
+    for value in a.library:
+        name, separator, path = value.partition('=')
+        if not separator or not re.fullmatch('[a-z][a-z0-9_]*', name) or name in groups or any(n == name for n,_ in extra):
+            raise ValueError('Invalid/duplicate explicit resident group')
+        original = Path(path).resolve()
+        if not original.is_file():
+            raise FileNotFoundError(original)
+        merged = output / ('embedded-' + name + '.o')
+        if original != merged:
+            import shutil
+            shutil.copy2(original, merged)
+        extra.append((name, merged))
+        inputs[name] = {'explicitObjectSha256': sha(original)}
+    for name, merged in extra:
+        symbols = subprocess.check_output([str(tool(llvm, 'llvm-nm')), '--defined-only', '--extern-only', str(merged)], text=True)
+        args = [arg for sym in ('JNI_OnLoad','JNI_OnUnload','jmm_interface','jmm_version','jvm','throw_internal_error') if re.search(r'\b' + sym + '$', symbols, re.M)
+                for arg in ('--redefine-sym', sym + '=lts_' + name + '_' + sym)]
+        if args:
+            subprocess.run([str(tool(llvm, 'llvm-objcopy')), *args, str(merged)], check=True)
+        sections = subprocess.check_output([str(tool(llvm, 'llvm-readelf')), '-SW', str(merged)], text=True)
+        ctors = sorted(set(re.findall(r'\]\s+(\.(?:init_array|ctors)\S*)\s', sections)))
+        if ctors:
+            subprocess.run([str(tool(llvm, 'llvm-objcopy')),
+                            *[arg for n in ctors for arg in ('--rename-section',n+'=.data.rel.ro.jvm_init_array.'+name+n)], str(merged)], check=True)
         groups[name] = merged
     exports = {}
     for name, obj in groups.items():

@@ -21,9 +21,14 @@ def main():
     p.add_argument('--work-dir', type=Path, default=None)
     p.add_argument('--image-dir', type=Path, default=None)
     p.add_argument('--major', type=int, choices=(17, 21), default=17)
+    p.add_argument('--probe-dir', type=Path, help='Explicit consumer startup source directory')
+    p.add_argument('--extra-assets', type=Path, help='Explicit extra JAR directory, local test only')
+    p.add_argument('--management', action='store_true')
+    p.add_argument('--library', action='append', default=[])
+    p.add_argument('--link-object', action='append', type=Path, default=[])
     a = p.parse_args()
     major = a.major
-    probe = ROOT / ('java25/lts/probe' if major == 17 else 'java25/lts/probe21')
+    probe = a.probe_dir.resolve() if a.probe_dir else ROOT / ('java25/lts/probe' if major == 17 else 'java25/lts/probe21')
     a.work_dir = a.work_dir or ROOT / ('build/java-lts/startup' + str(major))
     a.image_dir = a.image_dir or ROOT / ('build/java-lts/' + str(major) + '/boot-image')
     llvm, boot, work = a.llvm_home.resolve(), a.boot_jdk.resolve(), a.work_dir.resolve()
@@ -34,11 +39,18 @@ def main():
     build = source / 'build/ps5-bootstrap'
     param = probe / 'param.json'
     metadata = json.loads(param.read_text())
-    if (metadata['titleId'], metadata['contentVersion']) != ({17: ('PPSA99876', '01.000.002'), 21: ('PPSA99877', '01.000.001')}[major]):
+    if not re.fullmatch(r'PPSA[0-9]{5}', metadata['titleId']) or not re.fullmatch(r'[0-9]{2}\.[0-9]{3}\.[0-9]{3}', metadata['contentVersion']):
+        raise ValueError('Invalid explicit probe identity/version')
+    if not re.fullmatch(r'[A-Z]{2}[0-9]{4}-' + metadata['titleId'] + r'_00-[A-Z0-9]{16}', metadata['contentId']):
+        raise ValueError('Invalid explicit content identity')
+    if not a.probe_dir and (metadata['titleId'], metadata['contentVersion']) != ({17: ('PPSA99876', '01.000.002'), 21: ('PPSA99877', '01.000.001')}[major]):
         raise ValueError('Review standalone probe identity/version')
     package = ROOT / ('dist/' + metadata['titleId'] + '.zip')
     if package.exists():
         raise FileExistsError('Existing test package preserved; increment the probe version first')
+    for obj in a.link_object:
+        if not obj.is_file():
+            raise FileNotFoundError(obj)
     work.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, LLVM_CONFIG=str(tool(llvm, 'llvm-config')))
     subprocess.run([sys.executable, str(ROOT / 'tools/java_lts.py'), '--major', str(major),
@@ -49,12 +61,16 @@ def main():
         raise ValueError('Unverified Java' + str(major) + ' class image')
     resident = work / 'resident'
     subprocess.run([sys.executable, str(ROOT / 'tools/java_lts_resident.py'), '--llvm-home', str(llvm),
-                    '--major', str(major), '--lld', str(a.lld.absolute()), '--output-dir', str(resident)], cwd=ROOT, env=env, check=True)
+                    '--major', str(major), '--lld', str(a.lld.absolute()), '--output-dir', str(resident),
+                    *(['--management'] if a.management else []),
+                    *[value for entry in a.library for value in ('--library', entry)]], cwd=ROOT, env=env, check=True)
     assets = work / 'assets'
     if assets.exists():
         raise FileExistsError('Existing asset snapshot preserved; choose a new --work-dir')
     runtime = assets / ('java' + str(major))
     shutil.copytree(image, runtime)
+    if a.extra_assets:
+        shutil.copytree(a.extra_assets.resolve(), runtime / 'extra')
     (runtime / 'classes').mkdir()
     subprocess.run([str(boot / 'bin/javac'), '--release', str(major), '-d', str(runtime / 'classes'),
                     str(probe / 'HelloLts.java')], check=True)
@@ -67,11 +83,13 @@ def main():
     # A local probe may be redistributed only with its source/license record.
     source_record = runtime / 'port-source'
     shutil.copytree(ROOT / 'java25/lts', source_record / 'lts')
+    if a.probe_dir:
+        shutil.copytree(probe, source_record / 'consumer-probe')
     shutil.copyfile(ROOT / 'tools/java_lts.py', source_record / 'java_lts.py')
     shutil.copyfile(ROOT / 'tools/java_lts_resident.py', source_record / 'java_lts_resident.py')
     (runtime / 'runtime-provenance.json').write_text(json.dumps({
         'major': major, 'upstream': json.loads((ROOT / 'java25/lts/upstream.json').read_text())['runtimes'][str(major)],
-        'scope': 'Unvalidated isolated native startup test; not ProsperoCraft, Minecraft, C2 or shader acceptance',
+        'scope': 'Explicit consumer bootstrap test; no game rendering/C2/shader acceptance' if a.probe_dir else 'Unvalidated isolated native startup test; not ProsperoCraft, Minecraft, C2 or shader acceptance',
         'console': 'NOT RUN'}, indent=2) + '\n')
     # Keep the shared pinned SDK archive intact. Native applications use real
     # imported platform memory functions, not payload-side raw mmap callbacks.
@@ -104,14 +122,15 @@ def main():
     layout.write_text(script)
     links = json.loads((resident / 'link-inputs.json').read_text())
     args = ['--defsym=' + name + '=0' for name in ('__cxa_thread_atexit_impl', 'collector_func_load', 'kernel_mprotect')]
-    args += ['-L' + str(sdk / 'target/lib'), *links, str(libc)]
+    args += ['-L' + str(sdk / 'target/lib'), *links, *[str(p.resolve()) for p in a.link_object], str(libc)]
     args += [str(sdk / 'target/lib' / name) for name in ('libpthread.a', 'libc++.a', 'libc++abi.a', 'libunwind.a')]
     response = work / 'link.rsp'
     response.write_text('\n'.join(json.dumps(s) for s in args) + '\n')
     headers = build / 'support/modules_include/java.base'
     command = [sys.executable, str(ROOT / 'tools/package_native.py'), '--source', str(probe / 'startup.cpp'),
                '--param', str(param), '--extra-link-response', str(response), '--linker-script', str(layout),
-               '--asset-dir', str(assets), '--include-dir', str(headers), '--include-dir', str(headers / 'freebsd')]
+               '--asset-dir', str(assets), '--include-dir', str(headers), '--include-dir', str(headers / 'freebsd'),
+               '--include-dir', str(ROOT / ('java25/lts/probe' if major == 17 else 'java25/lts/probe21'))]
     for name in ('LICENSE', 'ADDITIONAL_LICENSE_INFO', 'ASSEMBLY_EXCEPTION'):
         command += ['--license-file', str(source / name)]
     subprocess.run(command, cwd=ROOT, env=env, check=True)
@@ -119,12 +138,12 @@ def main():
     # shared packaging scratch output. No Java25 application artifacts are rebuilt.
     symbols = work / ('java' + str(major) + '-startup-' + metadata['contentVersion'].split('.')[-1] + '-symbols.elf')
     shutil.copy2(ROOT / 'build/native/llvm-pie.elf', symbols)
-    verify_package(work, llvm, package, image, metadata)
+    verify_package(work, llvm, package, image, metadata, major=major, probe=probe, extra_objects=a.link_object)
 
 
-def verify_package(work, llvm, package, image, metadata):
-    major = { 'PPSA99876': 17, 'PPSA99877': 21 }[metadata['titleId']]
-    probe = ROOT / ('java25/lts/probe' if major == 17 else 'java25/lts/probe21')
+def verify_package(work, llvm, package, image, metadata, *, major=None, probe=None, extra_objects=()):
+    major = major or { 'PPSA99876': 17, 'PPSA99877': 21 }[metadata['titleId']]
+    probe = probe or ROOT / ('java25/lts/probe' if major == 17 else 'java25/lts/probe21')
     symbols = work / ('java' + str(major) + '-startup-' + metadata['contentVersion'].split('.')[-1] + '-symbols.elf')
     resident = work / 'resident'
     image_audit = json.loads((image.parent / 'image-audit.json').read_text())
@@ -152,8 +171,9 @@ def verify_package(work, llvm, package, image, metadata):
     record = {'titleId': metadata['titleId'], 'version': metadata['contentVersion'],
               'packageSha256': sha(package), 'packageBytes': package.stat().st_size, 'symbolsSha256': sha(symbols),
               'classImageSha256': image_audit['classImageSha256'], 'nativeResident': json.loads((resident / 'audit.json').read_text()),
-              'sourceSha256': {str(f.relative_to(ROOT)): sha(f) for f in probe.rglob('*') if f.is_file()},
+              'sourceSha256': {(str(f.relative_to(ROOT)) if f.is_relative_to(ROOT) else 'explicit-probe/' + str(f.relative_to(probe))): sha(f) for f in probe.rglob('*') if f.is_file()},
               'console': 'NOT RUN', 'release': 'Local test only; no release or Store publication',
+              'linkObjectsSha256': {p.name: sha(p) for p in extra_objects},
               'scope': 'Genuine' + str(major) + ' interpreter startup/arithmetic/StrictMath/exceptions/JNI/thread/destruction probe'}
     (work / 'package-audit.json').write_text(json.dumps(record, indent=2) + '\n')
     print('Local Java' + str(major) + ' startup test ready:', package, record['packageSha256'])

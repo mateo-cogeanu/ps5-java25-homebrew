@@ -1,0 +1,59 @@
+{
+  "built_date": "2026-11-08",
+  "documented_date": "2026-11-09",
+  "major": 17,
+  "class_image_sha256": "6ca3a65c2eec7e3963b65ba67f93b35713309afd23bdb412896783ee7088ca46",
+  "class_image_bytes": 29546570,
+  "modules": [
+    "java.base",
+    "java.xml",
+    "java.prefs",
+    "java.datatransfer",
+    "java.desktop",
+    "java.logging",
+    "java.management",
+    "jdk.management",
+    "jdk.unsupported"
+  ],
+  "matching_native_groups": [
+    "jvm",
+    "java",
+    "zip",
+    "jimage",
+    "net",
+    "nio",
+    "verify",
+    "management",
+    "management_ext",
+    "lwjgl331"
+  ],
+  "native_group_hashes": {
+    "jvm": "206487893764706e3446905a3aade531866d196fed3448b3435bde471a1f048d",
+    "java": "f4875eb4589aa6ed9dfbb899d315da2e2093ae031773ef8689f32b6f4024c946",
+    "zip": "2071dcc7654d8182e8929777b51a877bf742d85c6172b630271290d41c12ee76",
+    "jimage": "c401813d208e2bacee716fc7fc1fda4bbc48fdc489ac324d49ee74f4c2c7d8ec",
+    "net": "07f9aaf14f1ef1c2720a15aff884dcaeca192575500f03172bc7a013dcf0da15",
+    "nio": "25ddd547135bcdb0c07a70569af6775cc6c0c7b439b228ebdcba42c7ea04fe71",
+    "verify": "b6f68b24fa021efb28f40d4effe7f3e8282e1f7e73ebd00277de981295455fde",
+    "management": "016e57d19e4ac3d8dd856e2f16dfb1cf9488928644cd463021ac2dc14ee5fafb",
+    "management_ext": "107254773a4a632b3593ca79395a0a44d4a618016db0e855172177adaf6164db",
+    "lwjgl331": "0cc1bf60958f83cbb4b542534d10b08e94dd6dfca53aacb2c76dca08bd274b91"
+  },
+  "extra_link_objects": {
+    "ffi-core.o": "a20e6db4034a24bf1be1b714665cd9f33f0dd669ba4fb9dc80cc5e6b4bb07690"
+  },
+  "runtime_scope": "Opt-in extended target class image, original management natives and explicit static resident consumer group; default core images and released bytes preserved",
+  "checks": [
+    "Pinned17/21 source patch replay/idempotence and conflict/refusal tests",
+    "Actual17 host JNI probe with original consumer run(), arithmetic/UTF16/StrictMath/exception/worker and clean destruction; PS5-specific331 path explicitly skipped on host",
+    "Actual generated17/21 registry lookup, explicit extra-group original loader argument/version/error propagation, scoped refusal and concurrency under ASan/UBSan",
+    "Target full VM/native link, staged constructors, real VM text ownership and separate private management/global symbols",
+    "Signed app/companion integrity and ZIP CRC; consumer separately checks original payload hashes"
+  ],
+  "console": "PENDING exact consumer PPSA99878/01.000.001; previous standalone17/21 startup passes remain scoped",
+  "limits": [
+    "java.desktop contains target-built classes only; no full AWT/fonts/printing/GUI/native desktop support",
+    "No C2, playable Minecraft, world, graphics/audio/input, shaders or performance acceptance",
+    "Original game JARs remain local in consumer; no game JAR/source/raw log publication here"
+  ]
+}

@@ -441,3 +441,17 @@ checksums. This supersedes pending startup status only; C2, general API/FFM/virt
 threads, Minecraft, shaders, performance and endurance remain unvalidated. Keep
 both17/21 frozen bytes and working25 consumer. Consumer bootstrap/bindings and
 physical game/release gates remain separate; see docs/java21-startup-probe.md.
+
+
+## Opt-in LTS consumer bootstrap integration —2026-11-09
+
+Active LTS tools accept explicit class-only --modules images, genuine matching
+management groups and statically linked --library name=object inputs. Default
+core images/probes remain unchanged; no runtime arbitrary ELF loader is added.
+Separate management/consumer JVM globals and JNI initializers retain private
+ownership and constructor staging. Explicit consumer --probe-dir/extra assets/
+link objects support local tests; consumers own original publisher inputs,
+ABI/classloader coherence and their game harnesses. Desktop class availability
+is not native AWT/fonts/GUI/printing support. See docs/java-lts-bootstrap-integration.md.
+PPSA99878/01.000.001 is an unvalidated consumer1.20 entry/JNI bootstrap test, not
+playable-world/C2/shader/performance acceptance; no release/Store or frozen pass.
