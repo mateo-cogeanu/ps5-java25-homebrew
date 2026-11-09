@@ -705,10 +705,35 @@ index ae7dac110..01aa565e0 100644
 @@ -89,0 +174 @@ int osSupport::unmap_memory(void *addr, size_t bytes) {
 +#endif
 diff --git a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
-index 8cd723ecc..18cd726ae 100644
+index 8cd723ecc..6810c6d94 100644
 --- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
 +++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
-@@ -524,0 +525,20 @@ Java_sun_nio_fs_UnixNativeDispatcher_getlinelen(JNIEnv* env, jclass this, jlong
+@@ -315,0 +316,16 @@ static void throwUnixException(JNIEnv* env, int errnum) {
++#ifdef __PROSPERO__
++/* Fixed bootstrap breadcrumbs only; never include a caller pathname. */
++static void ps5_nio_trace(const char* message) {
++    int saved = errno;
++    int fd = open("/download0/java17-vm-trace.log", O_CREAT | O_WRONLY | O_APPEND, 0600);
++    if (fd >= 0) {
++        (void)write(fd, message, strlen(message));
++        (void)write(fd, "\n", 1);
++        (void)close(fd);
++    }
++    errno = saved;
++}
++#else
++#define ps5_nio_trace(message) ((void)0)
++#endif
++
+@@ -318,0 +335 @@ Java_sun_nio_fs_UnixNativeDispatcher_init(JNIEnv* env, jclass this)
++    ps5_nio_trace("NIO: enter UnixNativeDispatcher init");
+@@ -453,0 +471 @@ Java_sun_nio_fs_UnixNativeDispatcher_init(JNIEnv* env, jclass this)
++    ps5_nio_trace("NIO: UnixNativeDispatcher IDs and capabilities ready");
+@@ -462,0 +481 @@ Java_sun_nio_fs_UnixNativeDispatcher_getcwd(JNIEnv* env, jclass this) {
++    ps5_nio_trace("NIO: enter native getcwd");
+@@ -463,0 +483 @@ Java_sun_nio_fs_UnixNativeDispatcher_getcwd(JNIEnv* env, jclass this) {
++    ps5_nio_trace("NIO: native getcwd returned");
+@@ -524,0 +545,20 @@ Java_sun_nio_fs_UnixNativeDispatcher_getlinelen(JNIEnv* env, jclass this, jlong
 +    int saved_errno;
 +#ifdef __PROSPERO__
 +    // Only the length is needed here. The SDK has fgetc but no getline;
@@ -729,8 +754,8 @@ index 8cd723ecc..18cd726ae 100644
 +        res = -1;
 +    saved_errno = errno;
 +#else
-@@ -527,2 +546,0 @@ Java_sun_nio_fs_UnixNativeDispatcher_getlinelen(JNIEnv* env, jclass this, jlong
+@@ -527,2 +566,0 @@ Java_sun_nio_fs_UnixNativeDispatcher_getlinelen(JNIEnv* env, jclass this, jlong
 -    int saved_errno;
 -
-@@ -534,0 +553 @@ Java_sun_nio_fs_UnixNativeDispatcher_getlinelen(JNIEnv* env, jclass this, jlong
+@@ -534,0 +573 @@ Java_sun_nio_fs_UnixNativeDispatcher_getlinelen(JNIEnv* env, jclass this, jlong
 +#endif

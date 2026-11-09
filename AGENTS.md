@@ -489,3 +489,14 @@ its Java stage file; exact boundary/cause unproven.004adds native checkpoints an
 consumer-owned nativeStage registration plus scoped bounded signal capture. No
 new Java API/game class/native policy replacement, frozen pass or release claim.
 See docs/java-lts-bootstrap-integration.md; consumer source/fault policy stays there.
+
+
+## Java17 NIO bootstrap boundary —2026-11-09
+
+Consumer004successfully enters its Java probe, then faults at first Path.of before
+management/bindings/original Main. Captured SIGSEGV PC is not yet region-resolved;
+getcwd/native cause unproven. Runtime17adds fixed UnixNativeDispatcher init/getcwd
+markers only, preserving errno and genuine return/capability/syscall semantics.
+Consumer005tests upstream sun.nio.fs.chdirAllowed=true to resolve paths against
+configured user.dir without the native cwd comparison; no global default or fake
+filesystem answer. Exact PS5 result pending. See docs/java17-nio-bootstrap-boundary.md.

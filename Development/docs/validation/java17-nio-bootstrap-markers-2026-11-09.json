@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-09",
+  "major": 17,
+  "source_sha256": "a13e060f72b14d59440f339baf3de409273093779871b860bfa66575899ff7f2",
+  "scope": "Fixed native init/getcwd breadcrumbs only, no behavior/default/syscall/capability changes",
+  "checks": [
+    "Complete pinned17/21source replay/idempotence/refusal",
+    "Target17HotSpot/core/native build and ELF audit",
+    "Actual host17consumer JNI/Java/original entry with explicit upstream filesystem mode"
+  ],
+  "console": "Pending consumer005;004Path.of boundary established but native PC/cause unproven",
+  "consumer_policy": "Upstream chdirAllowed=true belongs consumer; do not fabricate getcwd, replace game classes, or change working25/frozenbytes"
+}
