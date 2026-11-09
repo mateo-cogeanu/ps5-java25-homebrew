@@ -39,7 +39,7 @@ startup.cpp, HelloLts.java and param.json; HelloLts retains the registered JNI
 multiply and run()/major contract used by the shared test helper. Identity/content
 ID and existing artifact checks run before packaging. The consumer probe sources
 are included with the local runtime source record. Supplemental linked object
-hashes join the package audit. Native signatures, constructor/VM bounds, matching
+hashes join the package audit. Required native entry symbols, constructor/VM bounds, matching
 image bytes, metadata and ZIP CRC are checked. No release is created by the tools.
 `test_java_lts_startup.py --probe-dir ... --vm-option=...` can execute that exact
 Java/JNI helper under a real matching host VM, with explicit host-only test options.
