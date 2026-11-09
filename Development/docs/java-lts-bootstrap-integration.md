@@ -82,3 +82,11 @@ when the module is resolved. The default image selection remains `java.base`.
 The Java 17 target image audit found `jdk.nio.zipfs.ZipFileSystemProvider`
 in the generated image. Provider discovery and archive access on PS5
 still require console validation.
+
+An explicit consumer probe can supply additional target import stubs,
+one named staged constructor section and an existing thread destructor
+provider symbol. The native linker and PS5 converter receive the same
+import stubs. The packager checks that the named constructor range is
+present and nonempty. The caller owns the timing of constructor execution,
+the provider ABI and the checks on the imported objects. Standalone probes
+retain the default link and constructor configuration.

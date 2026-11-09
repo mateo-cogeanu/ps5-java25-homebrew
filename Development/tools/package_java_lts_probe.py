@@ -26,7 +26,15 @@ def main():
     p.add_argument('--management', action='store_true')
     p.add_argument('--library', action='append', default=[])
     p.add_argument('--link-object', action='append', type=Path, default=[])
+    p.add_argument('--import-stub', action='append', type=Path, default=[])
+    p.add_argument('--staged-constructors', metavar='NAME=SECTION')
+    p.add_argument('--thread-atexit-provider')
     a = p.parse_args()
+    if (a.import_stub or a.staged_constructors or a.thread_atexit_provider) and not a.probe_dir:
+        p.error('Custom native link inputs require an explicit consumer probe')
+    identifier = r'[A-Za-z_][A-Za-z0-9_]*'
+    if a.thread_atexit_provider and not re.fullmatch(identifier, a.thread_atexit_provider):
+        p.error('Invalid thread destructor provider symbol')
     major = a.major
     probe = a.probe_dir.resolve() if a.probe_dir else ROOT / ('java25/lts/probe' if major == 17 else 'java25/lts/probe21')
     a.work_dir = a.work_dir or ROOT / ('build/java-lts/startup' + str(major))
@@ -118,10 +126,20 @@ def main():
         KEEP(*(.data.rel.ro.jvm_init_array))
         PROVIDE_HIDDEN(__jvm_init_array_end = .);
 ''' + anchor)
+    if a.staged_constructors:
+        name, sep, section = a.staged_constructors.partition('=')
+        if not sep or not re.fullmatch(identifier, name) or not re.fullmatch(
+                r'\.data\.rel\.ro\.[A-Za-z0-9_.]+', section):
+            p.error('Expected NAME=.data.rel.ro.SECTION')
+        bounds = (f'        PROVIDE_HIDDEN(__{name}_init_start = .);\n'
+                  f'        KEEP(*(SORT_BY_NAME({section}.*)))\n'
+                  f'        PROVIDE_HIDDEN(__{name}_init_end = .);\n')
+        script = script.replace(anchor, bounds + anchor)
     layout = work / 'probe.ld'
     layout.write_text(script)
     links = json.loads((resident / 'link-inputs.json').read_text())
-    args = ['--defsym=' + name + '=0' for name in ('__cxa_thread_atexit_impl', 'collector_func_load', 'kernel_mprotect')]
+    args = ['--defsym=__cxa_thread_atexit_impl=' + (a.thread_atexit_provider or '0'),
+            '--defsym=collector_func_load=0', '--defsym=kernel_mprotect=0']
     args += ['-L' + str(sdk / 'target/lib'), *links, *[str(p.resolve()) for p in a.link_object], str(libc)]
     args += [str(sdk / 'target/lib' / name) for name in ('libpthread.a', 'libc++.a', 'libc++abi.a', 'libunwind.a')]
     response = work / 'link.rsp'
@@ -131,13 +149,21 @@ def main():
                '--param', str(param), '--extra-link-response', str(response), '--linker-script', str(layout),
                '--asset-dir', str(assets), '--include-dir', str(headers), '--include-dir', str(headers / 'freebsd'),
                '--include-dir', str(ROOT / ('java25/lts/probe' if major == 17 else 'java25/lts/probe21'))]
-    for name in ('LICENSE', 'ADDITIONAL_LICENSE_INFO', 'ASSEMBLY_EXCEPTION'):
-        command += ['--license-file', str(source / name)]
+    for stub in a.import_stub:
+        command += ['--import-stub', str(stub.resolve(strict=True))]
+    for license_name in ('LICENSE', 'ADDITIONAL_LICENSE_INFO', 'ASSEMBLY_EXCEPTION'):
+        command += ['--license-file', str(source / license_name)]
     subprocess.run(command, cwd=ROOT, env=env, check=True)
     # Preserve this probe's symbols before another native package can replace the
     # shared packaging scratch output. No Java25 application artifacts are rebuilt.
     symbols = work / ('java' + str(major) + '-startup-' + metadata['contentVersion'].split('.')[-1] + '-symbols.elf')
     shutil.copy2(ROOT / 'build/native/llvm-pie.elf', symbols)
+    if a.staged_constructors:
+        symbols_text = subprocess.check_output([str(tool(llvm, 'llvm-nm')), str(symbols)], text=True)
+        bounds = {label: re.search(r'^([0-9a-fA-F]+) \w __' + name + '_init_' + label + '$',
+                                  symbols_text, re.M) for label in ('start', 'end')}
+        if not all(bounds.values()) or int(bounds['start'][1], 16) >= int(bounds['end'][1], 16):
+            raise ValueError('Consumer constructor stage was empty or missing')
     verify_package(work, llvm, package, image, metadata, major=major, probe=probe, extra_objects=a.link_object)
 
 

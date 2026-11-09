@@ -37,6 +37,7 @@ def main():
     parser.add_argument("--license-file", action="append", default=[], help="Additional upstream notice/license to include")
     parser.add_argument("--asset-dir", help="Directory whose contents are included under app assets/")
     parser.add_argument("--include-dir",action="append",default=[],help="Additional native source include directory")
+    parser.add_argument("--import-stub", action="append", type=Path, default=[])
     args = parser.parse_args()
     if not UPSTREAM.exists():
         run("git", "clone", "https://github.com/blackbearreloaded/ps5-native-app-boilerplate.git", UPSTREAM)
@@ -85,8 +86,8 @@ def main():
         objects.append(obj)
     pie, elf = WORK / "llvm-pie.elf", WORK / "eboot.elf"
     extras = ["@" + str(ROOT / args.extra_link_response)] if args.extra_link_response else []
-    run("bash", SDK / "bin/prospero-lld", "-T", args.linker_script, "--eh-frame-hdr", "--version-script", native / "app-symbols.map", "-e", "_start", "-o", pie, *objects, *extras, "--as-needed", *sorted((SDK / "target/lib").glob("*.so")), env=env)
-    run(tool, "link", "--in", pie, "--out", elf, "--stub-dir", SDK / "target/lib", "--module-sdk", "0x02000009", "--companion-sdk", "0x08050001", "--file-name", "eboot.elf")
+    run("bash", SDK / "bin/prospero-lld", "-T", args.linker_script, "--eh-frame-hdr", "--version-script", native / "app-symbols.map", "-e", "_start", "-o", pie, *objects, *extras, "--as-needed", *args.import_stub, *sorted((SDK / "target/lib").glob("*.so")), env=env)
+    run(tool, "link", "--in", pie, "--out", elf, "--stub-dir", SDK / "target/lib", *[item for stub in args.import_stub for item in ("--stub", stub)], "--module-sdk", "0x02000009", "--companion-sdk", "0x08050001", "--file-name", "eboot.elf")
     metadata = json.loads((ROOT / args.param).read_text())
     title = metadata["titleId"]
     if (not re.fullmatch(r"PPSA\d{5}", title) or
