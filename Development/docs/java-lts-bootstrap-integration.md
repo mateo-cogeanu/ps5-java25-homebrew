@@ -90,3 +90,8 @@ import stubs. The packager checks that the named constructor range is
 present and nonempty. The caller owns the timing of constructor execution,
 the provider ABI and the checks on the imported objects. Standalone probes
 retain the default link and constructor configuration.
+
+Consumer probes can repeat the staged constructor option to retain
+independent native initialization ranges. The packager rejects duplicate
+or overlapping stages and verifies every linked range is nonempty. The
+Java 17 graphics and audio probe links separate GPU and OpenAL ranges.

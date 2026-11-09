@@ -27,7 +27,7 @@ def main():
     p.add_argument('--library', action='append', default=[])
     p.add_argument('--link-object', action='append', type=Path, default=[])
     p.add_argument('--import-stub', action='append', type=Path, default=[])
-    p.add_argument('--staged-constructors', metavar='NAME=SECTION')
+    p.add_argument('--staged-constructors', action='append', default=[], metavar='NAME=SECTION')
     p.add_argument('--thread-atexit-provider')
     a = p.parse_args()
     if (a.import_stub or a.staged_constructors or a.thread_atexit_provider) and not a.probe_dir:
@@ -126,11 +126,16 @@ def main():
         KEEP(*(.data.rel.ro.jvm_init_array))
         PROVIDE_HIDDEN(__jvm_init_array_end = .);
 ''' + anchor)
-    if a.staged_constructors:
-        name, sep, section = a.staged_constructors.partition('=')
+    stages = {}
+    for spec in a.staged_constructors:
+        name, sep, section = spec.partition('=')
         if not sep or not re.fullmatch(identifier, name) or not re.fullmatch(
                 r'\.data\.rel\.ro\.[A-Za-z0-9_.]+', section):
             p.error('Expected NAME=.data.rel.ro.SECTION')
+        if name in stages or any(section == prior or section.startswith(prior + '.')
+                                 or prior.startswith(section + '.') for prior in stages.values()):
+            p.error('Duplicate or overlapping consumer constructor stage')
+        stages[name] = section
         bounds = (f'        PROVIDE_HIDDEN(__{name}_init_start = .);\n'
                   f'        KEEP(*(SORT_BY_NAME({section}.*)))\n'
                   f'        PROVIDE_HIDDEN(__{name}_init_end = .);\n')
@@ -160,10 +165,11 @@ def main():
     shutil.copy2(ROOT / 'build/native/llvm-pie.elf', symbols)
     if a.staged_constructors:
         symbols_text = subprocess.check_output([str(tool(llvm, 'llvm-nm')), str(symbols)], text=True)
-        bounds = {label: re.search(r'^([0-9a-fA-F]+) \w __' + name + '_init_' + label + '$',
-                                  symbols_text, re.M) for label in ('start', 'end')}
-        if not all(bounds.values()) or int(bounds['start'][1], 16) >= int(bounds['end'][1], 16):
-            raise ValueError('Consumer constructor stage was empty or missing')
+        for name in stages:
+            bounds = {label: re.search(r'^([0-9a-fA-F]+) \w __' + name + '_init_' + label + '$',
+                                      symbols_text, re.M) for label in ('start', 'end')}
+            if not all(bounds.values()) or int(bounds['start'][1], 16) >= int(bounds['end'][1], 16):
+                raise ValueError('Consumer constructor stage was empty or missing')
     verify_package(work, llvm, package, image, metadata, major=major, probe=probe, extra_objects=a.link_object)
 
 
