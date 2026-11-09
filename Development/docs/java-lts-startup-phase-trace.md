@@ -27,3 +27,23 @@ Exact PS5 failure PC, new phase result and any causal repair remain pending.
 Host source replay/standalone JNI checks and target17 build pass; they do not
 establish physical crash resolution. See the
 [build record](validation/java17-startup-phase-trace-2026-11-09.json).
+
+
+## Universe boundary follow-up —2026-11-09
+
+Consumer002's retained phases pass argument parsing, ergonomics, OS init2 and
+VM globals, then stop inside init_globals before returning. No fault frame was
+captured by the external handler (its file is empty); its initial installation
+was reported successful. The runtime may replace those handlers during startup;
+that alone does not establish the crash signal or cause. Original game entry and
+Java module initialization were not reached.
+
+Active17 now brackets management/JVMTI storage, class loader, code cache, CPU
+version, stub generation, universe/heap and interpreter initialization. Its fatal
+VMError entry records numeric ID, PC, requested bytes and source line before the
+ordinary error printer, limited to four reports by a native atomic counter. The
+fixed96byte formatter uses no allocation, dynamic error message or caller path.
+Error handling and return/control-flow semantics remain intact; non-PS5 calls
+remain no-ops. Target17 and scoped standalone JNI checks pass; physical evidence
+is pending. Consumer003 separately tests128MiB instead of512MiB; no runtime heap
+policy/default or working25 game setting is changed, and no cause/fix is claimed.

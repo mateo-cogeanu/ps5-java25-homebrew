@@ -343,12 +343,73 @@ index 9fa7ec1d1..b89560319 100644
 +  ps5_lts_trace("PS5 Java17 uses explicit native launcher options");
 +  return JNI_OK;
 +#endif
+diff --git a/src/hotspot/share/runtime/init.cpp b/src/hotspot/share/runtime/init.cpp
+index 06974b89e..6f5d5f5e0 100644
+--- a/src/hotspot/share/runtime/init.cpp
++++ b/src/hotspot/share/runtime/init.cpp
+@@ -25,0 +26 @@
++#include "runtime/ps5LtsBootstrap.hpp"
+@@ -113,0 +115 @@ jint init_globals() {
++  ps5_lts_trace("GLOBALS: enter management");
+@@ -114,0 +117,2 @@ jint init_globals() {
++  ps5_lts_trace("GLOBALS: done management");
++  ps5_lts_trace("GLOBALS: enter JVMTI storage");
+@@ -115,0 +120 @@ jint init_globals() {
++  ps5_lts_trace("GLOBALS: done JVMTI storage");
+@@ -116,0 +122 @@ jint init_globals() {
++  ps5_lts_trace("GLOBALS: enter class loader");
+@@ -117,0 +124 @@ jint init_globals() {
++  ps5_lts_trace("GLOBALS: done class loader");
+@@ -118,0 +126 @@ jint init_globals() {
++  ps5_lts_trace("GLOBALS: enter code cache");
+@@ -120 +128,5 @@ jint init_globals() {
+-  VM_Version_init();              // depends on codeCache_init for emitting code
++  ps5_lts_trace("GLOBALS: done code cache");
++  ps5_lts_trace("GLOBALS: enter CPU version");
++  VM_Version_init();
++  ps5_lts_trace("GLOBALS: done CPU version");              // depends on codeCache_init for emitting code
++  ps5_lts_trace("GLOBALS: enter initial stubs");
+@@ -122 +134,4 @@ jint init_globals() {
+-  jint status = universe_init();  // dependent on codeCache_init and
++  ps5_lts_trace("GLOBALS: done initial stubs");
++  ps5_lts_trace("GLOBALS: enter universe/heap");
++  jint status = universe_init();
++  ps5_lts_trace("GLOBALS: done universe/heap");  // dependent on codeCache_init and
+@@ -129 +144,3 @@ jint init_globals() {
+-  interpreter_init_stub();  // before methods get loaded
++  ps5_lts_trace("GLOBALS: enter interpreter stubs");
++  interpreter_init_stub();
++  ps5_lts_trace("GLOBALS: done interpreter stubs");  // before methods get loaded
+@@ -132,0 +150 @@ jint init_globals() {
++  ps5_lts_trace("GLOBALS: enter shared runtime stubs");
+@@ -134,3 +152,10 @@ jint init_globals() {
+-  universe2_init();  // dependent on codeCache_init and stubRoutines_init1
+-  javaClasses_init();// must happen after vtable initialization, before referenceProcessor_init
+-  interpreter_init_code();  // after javaClasses_init and before any method gets linked
++  ps5_lts_trace("GLOBALS: done shared runtime stubs");
++  ps5_lts_trace("GLOBALS: enter universe2");
++  universe2_init();
++  ps5_lts_trace("GLOBALS: done universe2");  // dependent on codeCache_init and stubRoutines_init1
++  ps5_lts_trace("GLOBALS: enter java class layout");
++  javaClasses_init();
++  ps5_lts_trace("GLOBALS: done java class layout");// must happen after vtable initialization, before referenceProcessor_init
++  ps5_lts_trace("GLOBALS: enter interpreter code");
++  interpreter_init_code();
++  ps5_lts_trace("GLOBALS: done interpreter code");  // after javaClasses_init and before any method gets linked
+@@ -161 +186,4 @@ jint init_globals() {
+-  stubRoutines_init2(); // note: StubRoutines need 2-phase init
++  ps5_lts_trace("GLOBALS: enter final stubs");
++  stubRoutines_init2();
++  ps5_lts_trace("GLOBALS: done final stubs"); // note: StubRoutines need 2-phase init
++  ps5_lts_trace("GLOBALS: enter method handle adapters");
+@@ -162,0 +191 @@ jint init_globals() {
++  ps5_lts_trace("GLOBALS: done method handle adapters");
 diff --git a/b/src/hotspot/share/runtime/ps5LtsBootstrap.hpp b/src/hotspot/share/runtime/ps5LtsBootstrap.hpp
 new file mode 100644
-index 0000000..6bc8356
+index 0000000..24a4703
 --- /dev/null
 +++ b/src/hotspot/share/runtime/ps5LtsBootstrap.hpp
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,38 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +#ifndef SHARE_RUNTIME_PS5LTSBOOTSTRAP_HPP
 +#define SHARE_RUNTIME_PS5LTSBOOTSTRAP_HPP
@@ -374,8 +435,17 @@ index 0000000..6bc8356
 +  }
 +  errno = saved;
 +}
++inline void ps5_lts_trace_number(const char* label, uint64_t value) {
++ char text[96];size_t n=0;
++ while(*label&&n<64)text[n++]=*label++;
++ text[n++]='0';text[n++]='x';const char hex[]="0123456789abcdef";
++ for(int shift=60;shift>=0;shift-=4)text[n++]=hex[(value>>shift)&15];
++ text[n]=0;ps5_lts_trace(text);
++}
++
 +#else
 +inline void ps5_lts_trace(const char *) {}
++inline void ps5_lts_trace_number(const char *, uint64_t) {}
 +#endif
 +#endif
 diff --git a/b/src/hotspot/share/runtime/ps5SignalContext.hpp b/src/hotspot/share/runtime/ps5SignalContext.hpp
@@ -447,6 +517,24 @@ index b45fdd92d..c27495697 100644
 +  ps5_lts_trace("STARTUP: enter module initialization");
 @@ -3018,0 +3037 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 +  ps5_lts_trace("STARTUP: module initialization returned");
+diff --git a/src/hotspot/share/utilities/vmError.cpp b/src/hotspot/share/utilities/vmError.cpp
+index cce0af395..8ae2dd348 100644
+--- a/src/hotspot/share/utilities/vmError.cpp
++++ b/src/hotspot/share/utilities/vmError.cpp
+@@ -27,0 +28 @@
++#include "runtime/ps5LtsBootstrap.hpp"
+@@ -1520,0 +1522,11 @@ void VMError::report_and_die(int id, const char* message, const char* detail_fmt
++#ifdef __PROSPERO__
++  // Bounded numeric evidence before pretty-printing/allocating during a fatal error.
++  static unsigned int ps5_reports = 0;
++  if (__atomic_fetch_add(&ps5_reports, 1u, __ATOMIC_RELAXED) < 4u) {
++    ps5_lts_trace_number("VMERROR: id=", static_cast<uint64_t>(id));
++    ps5_lts_trace_number("VMERROR: pc=", reinterpret_cast<uintptr_t>(pc));
++    ps5_lts_trace_number("VMERROR: requested bytes=", static_cast<uint64_t>(size));
++    ps5_lts_trace_number("VMERROR: source line=", static_cast<uint64_t>(lineno));
++  }
++#endif
++
 diff --git a/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c b/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c
 index 8b900dcf6..50c3f6edb 100644
 --- a/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c

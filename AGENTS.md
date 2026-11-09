@@ -467,3 +467,14 @@ private by default. Consumer002 owns explicit diagnostic-only0644 sharing and
 existing scoped fault capture around VM creation; preserve prior handlers/context
 and working25/frozen17/21 bytes. No crash resolution, game/shader/endurance pass
 or release/Store approval. See docs/java-lts-startup-phase-trace.md.
+
+
+## Java17 init_globals boundary diagnostics —2026-11-09
+
+Consumer002 reaches init_globals after OS init2/VM globals; external fault file is
+empty despite reported installation. Cause/PC unproven. Active17 adds fixed inner
+initialization markers and at most4numeric VMError entry records (ID/PC/size/line),
+using bounded stack formatting, no error strings/caller paths or changed failure
+semantics. Consumer003 alone reduces its test heap512to128MiB to isolate the
+passing probe profile while retaining extended modules/bindings. No production
+heap/GC/Java25 default change or game/crash acceptance; frozenbytes preserved.

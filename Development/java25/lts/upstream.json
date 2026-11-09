@@ -35,13 +35,15 @@
         "src/hotspot/share/classfile/classLoader.cpp": "9a358c87481b8f52f7dcfbc226655d473ce8fb7232f527f76d4eb7cf14713851",
         "src/hotspot/share/prims/jni.cpp": "38571814b94c9fa8f0795e4071c16c19d02a8ea57864bc1f79d2b9ed1833cb7a",
         "src/hotspot/share/runtime/arguments.cpp": "e2e7c0e09cfa0bc24a1f37e025c380023be702fc18ee8cf0b3d455708b6a727f",
-        "src/hotspot/share/runtime/ps5LtsBootstrap.hpp": "8f43a3447711c60998b2b03531bed099e2a5b8153b38332202a138215691587a",
+        "src/hotspot/share/runtime/ps5LtsBootstrap.hpp": "6fa5ae215865072f2df70eebbec3418cd1de0608181b9121de1f40716cc61b02",
         "src/hotspot/share/runtime/ps5SignalContext.hpp": "652cff823d69ed03a8b9d7caaeed6b969ff7b294cac8c0e8f51e258d63f61e0b",
         "src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c": "a9e2d6779352f9516cdf9b0f056d60210ae3ccb81941c1e65ec1fa111c4171b4",
         "src/java.base/unix/native/libjava/java_props_md.c": "0e06bdbfad52bd24bd2ee534ab7b5d19e7c2373f0f69e1160ba6bcd06a9a97eb",
         "src/java.base/unix/native/libjimage/osSupport_unix.cpp": "d1afa2b78ede3b9fc0d91a96aa3820304a542113df6db9dac93141eeebcecce8",
         "src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c": "13cbf73289418b7aeaa46a4a3b5cec69da1d462ab8334a5857718455de3fb801",
-        "src/hotspot/share/runtime/thread.cpp": "58213523e9d12ec96313b2d3aa269cea29afbf62c2b0f63a13d3104ad4647857"
+        "src/hotspot/share/runtime/thread.cpp": "58213523e9d12ec96313b2d3aa269cea29afbf62c2b0f63a13d3104ad4647857",
+        "src/hotspot/share/runtime/init.cpp": "152c9fa05790419fd047a2b820d85421e743ba4ceab664ce95401bac826f15d5",
+        "src/hotspot/share/utilities/vmError.cpp": "4a91d0ef09c666438d4436cba9f8ecbdef79e7899e0431414077bff804626370"
       }
     },
     "21": {
