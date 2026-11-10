@@ -1,0 +1,154 @@
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -27,0 +28,3 @@
++#ifdef __PROSPERO__
++#include "runtime/ps5ThreadAttributes.hpp"
++#endif
+@@ -715,3 +718,23 @@
+-  pthread_attr_t attr;
+-  pthread_attr_init(&attr);
+-  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
++#ifdef __PROSPERO__
++  ps5_thread_attributes::Lease attr_lease;
++  const int init_result = attr_lease.acquire();
++  if (init_result != 0) {
++    ps5_lts_trace_number("THREAD: attribute init refused=", init_result);
++    thread->set_osthread(NULL);
++    delete osthread;
++    return false;
++  }
++  pthread_attr_t* attr = attr_lease.value;
++  const int detach_result = pthread_attr_setdetachstate(attr, PTHREAD_CREATE_DETACHED);
++  if (detach_result != 0) {
++    ps5_lts_trace_number("THREAD: detach attribute refused=", detach_result);
++    thread->set_osthread(NULL);
++    delete osthread;
++    return false;
++  }
++#else
++  pthread_attr_t attr_storage;
++  pthread_attr_t* attr = &attr_storage;
++  pthread_attr_init(attr);
++  pthread_attr_setdetachstate(attr, PTHREAD_CREATE_DETACHED);
++#endif
+@@ -721 +744 @@
+-  int status = pthread_attr_setstacksize(&attr, stack_size);
++  int status = pthread_attr_setstacksize(attr, stack_size);
+@@ -743 +766 @@
+-      ret = pthread_create(&tid, &attr, (void* (*)(void*)) thread_native_entry, thread);
++      ret = pthread_create(&tid, attr, (void* (*)(void*)) thread_native_entry, thread);
+@@ -749 +772 @@
+-                           thread->name(), (uintx) tid, os::Posix::describe_pthread_attr(buf, sizeof(buf), &attr));
++                           thread->name(), (uintx) tid, os::Posix::describe_pthread_attr(buf, sizeof(buf), attr));
+@@ -752 +775 @@
+-                              thread->name(), os::errno_name(ret), os::Posix::describe_pthread_attr(buf, sizeof(buf), &attr));
++                              thread->name(), os::errno_name(ret), os::Posix::describe_pthread_attr(buf, sizeof(buf), attr));
+@@ -760 +783,9 @@
+-    pthread_attr_destroy(&attr);
++#ifdef __PROSPERO__
++    if (ret != 0) {
++      ps5_lts_trace_number("THREAD: native create refused=", ret);
++      ps5_lts_trace_number("THREAD: requested stack bytes=", stack_size);
++    }
++    attr_lease.release();
++#else
++    pthread_attr_destroy(attr);
++#endif
+@@ -2317,0 +2349,3 @@
++#ifdef __PROSPERO__
++  ps5_thread_attributes::initialize();
++#endif
+@@ -2615,3 +2649,9 @@
+-  pthread_attr_t attr;
+-
+-  int rslt = pthread_attr_init(&attr);
++#ifdef __PROSPERO__
++  ps5_thread_attributes::QueryLease query;
++  int rslt = query.acquire();
++  pthread_attr_t* attr = query.value;
++#else
++  pthread_attr_t attr_storage;
++  pthread_attr_t* attr = &attr_storage;
++  int rslt = pthread_attr_init(attr);
++#endif
+@@ -2623 +2663 @@
+-  rslt = pthread_attr_get_np(pthread_self(), &attr);
++  rslt = pthread_attr_get_np(pthread_self(), attr);
+@@ -2628 +2668 @@
+-  if (pthread_attr_getstack(&attr, (void **)bottom, size) != 0) {
++  if (pthread_attr_getstack(attr, (void **)bottom, size) != 0) {
+@@ -2632 +2672,3 @@
+-  pthread_attr_destroy(&attr);
++#ifndef __PROSPERO__
++  pthread_attr_destroy(attr);
++#endif
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5ThreadAttributes.hpp
+@@ -0,0 +1,67 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef PS5_THREAD_ATTRIBUTES_HPP
++#define PS5_THREAD_ATTRIBUTES_HPP
++#include <pthread.h>
++#include <errno.h>
++// Real pthread attributes initialized before native-heap pressure. Slots are
++// borrowed exclusively, passed by address without copying opaque objects, and
++// retained for the process lifetime. pthread_create consumes attributes before
++// it returns; the lease may then return its slot even for a detached child.
++namespace ps5_thread_attributes {
++constexpr unsigned capacity = 32;
++struct Slot { pthread_attr_t value; bool valid, busy; };
++template<bool Query=false> inline Slot* slots() { static Slot values[capacity] = {}; return values; }
++template<bool Query=false> inline unsigned* state() { static unsigned value = 0; return &value; }
++template<bool Query=false> inline unsigned* lock_word() { static unsigned value = 0; return &value; }
++inline void pause() {
++#if defined(__x86_64__)
++    __asm__ volatile("pause");
++#elif defined(__aarch64__)
++    __asm__ volatile("yield");
++#endif
++}
++template<bool Query=false> inline void lock() { while (__atomic_exchange_n(lock_word<Query>(),1u,__ATOMIC_ACQUIRE)) pause(); }
++template<bool Query=false> inline void unlock() { __atomic_store_n(lock_word<Query>(),0u,__ATOMIC_RELEASE); }
++template<bool Query> inline void initialize_pool() {
++    unsigned expected = 0;
++    if (__atomic_compare_exchange_n(state<Query>(),&expected,1u,false,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE)) {
++        for (unsigned i=0;i<capacity;++i) slots<Query>()[i].valid = pthread_attr_init(&slots<Query>()[i].value) == 0;
++        __atomic_store_n(state<Query>(),2u,__ATOMIC_RELEASE);
++    } else while (__atomic_load_n(state<Query>(),__ATOMIC_ACQUIRE) != 2u) pause();
++}
++// Stack-query attributes must never be reused for creation: get_np may set
++// an explicit live stack address in the opaque object. Prime both domains early.
++inline void initialize() { initialize_pool<false>(); initialize_pool<true>(); }
++template<bool Query> class BasicLease {
++    Slot* slot = nullptr;
++    pthread_attr_t local;
++    bool local_valid = false;
++public:
++    pthread_attr_t* value = nullptr;
++    BasicLease() = default;
++    BasicLease(const BasicLease&) = delete;
++    BasicLease& operator=(const BasicLease&) = delete;
++    int acquire() {
++        initialize();
++        lock<Query>();
++        for (unsigned i=0;i<capacity;++i) if (slots<Query>()[i].valid && !slots<Query>()[i].busy) {
++            slot=&slots<Query>()[i]; slot->busy=true; value=&slot->value; break;
++        }
++        unlock<Query>();
++        if (slot != nullptr) return 0;
++        int result=pthread_attr_init(&local);
++        if (result == 0) { local_valid=true; value=&local; }
++        return result;
++    }
++    void release() {
++        int saved_errno=errno;
++        if (slot != nullptr) { lock<Query>(); slot->busy=false; unlock<Query>(); slot=nullptr; }
++        if (local_valid) { pthread_attr_destroy(&local); local_valid=false; }
++        value=nullptr; errno=saved_errno;
++    }
++    ~BasicLease() { release(); }
++};
++using Lease = BasicLease<false>;
++using QueryLease = BasicLease<true>;
++}
++#endif

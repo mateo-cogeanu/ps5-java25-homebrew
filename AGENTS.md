@@ -558,3 +558,12 @@ helper uses paired native scratch for large read/write buffers. Original
 bounds/file/Java exception behavior remains. Target/patch checks and actual
 host helper forced-refusal I/O/cleanup checks recorded. Consumer025 physical
 startup and later I/O pending. See docs/java17-file-io-native-scratch.md.
+
+## Java17 thread attribute leases —2026-11-10
+
+Consumer025 logs pthread_create EINVAL at1024KiB before a native abort.
+Active17 uses the Java25 genuine pthread attribute pool with separate32slot
+creation/query domains, early initialization, checked acquisition/detach state,
+paired lease release and original native stack/create semantics. Exact abort
+cause remains unresolved. Target/patch and actual host pool refusal/concurrency/
+ownership checks pass. Consumer026 PS5 pending. See docs/java17-thread-attribute-leases.md.
