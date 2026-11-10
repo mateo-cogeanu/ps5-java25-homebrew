@@ -109,3 +109,11 @@ build passed, as did a host check using the same allocator with forced
 malloc refusal, aligned payload checks, reallocation and cleanup.
 Whether the PS5 can satisfy the failed allocation through this fallback
 remains pending.
+
+The Java 17 PS5 port grows non-class metaspace in one 16 MiB root
+chunk per virtual space node. The original 64 MiB reservation failed
+during early VM startup in the 192 MiB Minecraft test. The VM can
+still add nodes as needed. Compressed class space, commit accounting,
+and other target platforms retain their existing behavior. The PS5
+target object passes the smaller size to the original node constructor.
+Physical JVM startup and game validation are pending.

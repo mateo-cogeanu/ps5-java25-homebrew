@@ -1,0 +1,11 @@
+--- a/src/hotspot/share/memory/metaspace/virtualSpaceList.cpp
++++ b/src/hotspot/share/memory/metaspace/virtualSpaceList.cpp
+@@ -98 +98,7 @@
+-  VirtualSpaceNode* vsn = VirtualSpaceNode::create_node(Settings::virtual_space_node_default_word_size(),
++#ifdef __PROSPERO__
++  // Grow non-class metaspace one root chunk at a time to avoid a 64 MiB reservation.
++  const size_t node_words = chunklevel::MAX_CHUNK_WORD_SIZE;
++#else
++  const size_t node_words = Settings::virtual_space_node_default_word_size();
++#endif
++  VirtualSpaceNode* vsn = VirtualSpaceNode::create_node(node_words,
