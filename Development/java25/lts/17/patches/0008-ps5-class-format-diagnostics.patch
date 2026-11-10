@@ -1,0 +1,37 @@
+--- a/src/hotspot/share/utilities/exceptions.cpp
++++ b/src/hotspot/share/utilities/exceptions.cpp
+@@ -26 +26 @@
+-#include "classfile/javaClasses.hpp"
++#include "classfile/javaClasses.inline.hpp"
+@@ -60 +60 @@
+-static void ps5_trace_pending_exception(oop exception, int line) {
++static void ps5_trace_pending_exception(oop exception, const char* file, int line) {
+@@ -74,0 +75,11 @@
++  const char* basename = strrchr(file, '/');
++  basename = basename ? basename + 1 : file;
++  char source[112] = "PENDING: source=";
++  const size_t source_prefix = sizeof("PENDING: source=") - 1;
++  size_t position = 0;
++  while (basename[position] && position < 80) {
++    source[source_prefix + position] = basename[position];
++    ++position;
++  }
++  source[source_prefix + position] = 0;
++  ps5_lts_trace(source);
+@@ -75,0 +87,13 @@
++  if (name->equals("java/lang/ClassFormatError")) {
++    oop detail = java_lang_Throwable::message(exception);
++    if (detail != nullptr && java_lang_String::value(detail) != nullptr) {
++      char reason[256];
++      java_lang_String::as_utf8_string(detail, reason, sizeof(reason));
++      for (size_t i = 0; reason[i]; ++i) {
++        const unsigned char ch = reason[i];
++        if (ch < 32 || ch > 126) reason[i] = '?';
++      }
++      ps5_lts_trace("PENDING: class format detail");
++      ps5_lts_trace(reason);
++    }
++  }
+@@ -90 +114 @@
+-  ps5_trace_pending_exception(exception, line);
++  ps5_trace_pending_exception(exception, file, line);

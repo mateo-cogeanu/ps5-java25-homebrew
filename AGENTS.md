@@ -533,3 +533,10 @@ retained fault file. Active17 offers explicit default-off pending exception
 class/source-line tracing with128process records, fixed buffers and original
 handling. Consumer022 scopes enablement to Main. Cause and physical startup
 remain pending. See docs/java17-pending-exception-trace.md.
+
+## Java17 class format diagnostics —2026-11-10
+
+Consumer022 returns ClassFormatError through reflection and destroys the VM
+cleanly. The explicit pending-exception trace now adds source basenames and
+bounded ClassFormatError details using caller-provided stack storage. Raw reports
+stay local. Consumer023 PS5 details and original Main acceptance pending.
