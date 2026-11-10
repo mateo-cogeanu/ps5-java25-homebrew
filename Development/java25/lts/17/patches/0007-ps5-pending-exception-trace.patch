@@ -1,0 +1,41 @@
+--- a/src/hotspot/share/utilities/exceptions.cpp
++++ b/src/hotspot/share/utilities/exceptions.cpp
+@@ -40,0 +41 @@
++#include "runtime/ps5LtsBootstrap.hpp"
+@@ -49,0 +51,28 @@
++#ifdef __PROSPERO__
++static bool ps5_exception_trace_enabled;
++static unsigned ps5_exception_trace_records;
++
++extern "C" __attribute__((visibility("default")))
++void JVM_PS5SetExceptionTraceEnabled(bool enabled) {
++  __atomic_store_n(&ps5_exception_trace_enabled, enabled, __ATOMIC_RELEASE);
++}
++
++static void ps5_trace_pending_exception(oop exception, int line) {
++  if (!__atomic_load_n(&ps5_exception_trace_enabled, __ATOMIC_ACQUIRE) ||
++      __atomic_fetch_add(&ps5_exception_trace_records, 1u, __ATOMIC_RELAXED) >= 128) {
++    return;
++  }
++  Symbol* name = exception->klass()->name();
++  const int length = MIN2(name->utf8_length(), 160);
++  char text[192] = "PENDING: ";
++  const size_t prefix = sizeof("PENDING: ") - 1;
++  for (int i = 0; i < length; ++i) {
++    const unsigned char ch = name->char_at(i);
++    text[prefix + i] = (ch >= 32 && ch <= 126) ? ch : '?';
++  }
++  text[prefix + length] = 0;
++  ps5_lts_trace(text);
++  ps5_lts_trace_number("PENDING: VM source line=", static_cast<uint64_t>(line));
++}
++#endif
++
+@@ -59,0 +89,3 @@
++#ifdef __PROSPERO__
++  ps5_trace_pending_exception(exception, line);
++#endif
+--- a/make/data/hotspot-symbols/symbols-ps5-bootstrap
++++ b/make/data/hotspot-symbols/symbols-ps5-bootstrap
+@@ -2,0 +3 @@
++JVM_PS5SetExceptionTraceEnabled

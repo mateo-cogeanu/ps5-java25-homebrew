@@ -53,11 +53,12 @@
         "src/hotspot/share/classfile/verifier.cpp": "e53a3305e6ff8a2b98edb0de67f67751467beaf7e17da883e5d691726ca40de5",
         "src/java.base/share/native/libverify/check_code.c": "f4ee3a88b7a8e916eaf76080e8f4375de8bcc2fb2f20dd83d859ea574a485692",
         "make/hotspot/lib/JvmMapfile.gmk": "10a03211c38de3cb1941dae7c983f446959cc5b7a582aa99af590481ec37b53f",
-        "make/data/hotspot-symbols/symbols-ps5-bootstrap": "ba052ddda4b60f80ad22320f3dd69ca1c573c9d1462fad854d88cdc618c1cff0",
+        "make/data/hotspot-symbols/symbols-ps5-bootstrap": "6aefb4e23417487b04dda0967dd3552dd5fd5ca3e42e57fd01377ef1808e2a08",
         "src/java.base/share/native/libjava/ClassLoader.c": "778efac8fbb1975a338f7fb7452979277dfd881d9c55781b649102632425765f",
         "src/java.base/share/native/libjimage/ps5ImageArray.hpp": "6290d2e36600c36cb43ac1faf41298aa771e78e5a60c50e59b10886ee673c2af",
         "src/java.base/share/native/libjimage/imageFile.cpp": "0400896b20b346742200d8917c56a79db66af4cbf3c9c9e6f2cccfcf68c60825",
-        "src/java.base/share/native/libjimage/imageDecompressor.cpp": "53696f123c26d654048d9597b5077bfa8390efbb3d4b25fe3f9ef16e2aba3c4d"
+        "src/java.base/share/native/libjimage/imageDecompressor.cpp": "53696f123c26d654048d9597b5077bfa8390efbb3d4b25fe3f9ef16e2aba3c4d",
+        "src/hotspot/share/utilities/exceptions.cpp": "ecf128fde44748c5eea0cdf3daeea8e3baa21f5c00f766c20f08fb24f8b803cc"
       }
     },
     "21": {

@@ -525,3 +525,11 @@ allocation trap. Exact callers remain unconfirmed. Active17 shares paired
 native scratch with ClassLoader-owned buffers and libjimage arrays. Preserve
 original game inputs and frozen builds. See docs/java17-core-native-scratch.md.
 Consumer020 physical row3 and title screen pending.
+
+## Java17 pending exception trace —2026-11-10
+
+Consumer021 stops after original Main initializes with no growth in the
+retained fault file. Active17 offers explicit default-off pending exception
+class/source-line tracing with128process records, fixed buffers and original
+handling. Consumer022 scopes enablement to Main. Cause and physical startup
+remain pending. See docs/java17-pending-exception-trace.md.
