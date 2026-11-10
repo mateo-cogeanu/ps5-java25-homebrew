@@ -1,0 +1,31 @@
+--- a/src/java.base/share/native/libzip/zip_util.c
++++ b/src/java.base/share/native/libzip/zip_util.c
+@@ -1511,0 +1512,23 @@
++#ifdef __PROSPERO__
++extern void *JVM_PS5AllocateNativeScratch(size_t size);
++extern void JVM_PS5ReleaseNativeScratch(void *buffer);
++
++static voidpf ps5_jimage_zalloc(voidpf opaque, uInt count, uInt size) {
++    (void)opaque;
++    if (size != 0 && (size_t)count > (size_t)-1 / size) {
++        return NULL;
++    }
++    size_t bytes = (size_t)count * size;
++    void *buffer = JVM_PS5AllocateNativeScratch(bytes);
++    if (buffer != NULL) {
++        memset(buffer, 0, bytes);
++    }
++    return buffer;
++}
++
++static void ps5_jimage_zfree(voidpf opaque, voidpf buffer) {
++    (void)opaque;
++    JVM_PS5ReleaseNativeScratch(buffer);
++}
++#endif
++
+@@ -1519,0 +1543,4 @@
++#ifdef __PROSPERO__
++    strm.zalloc = ps5_jimage_zalloc;
++    strm.zfree = ps5_jimage_zfree;
++#endif

@@ -540,3 +540,12 @@ Consumer022 returns ClassFormatError through reflection and destroys the VM
 cleanly. The explicit pending-exception trace now adds source basenames and
 bounded ClassFormatError details using caller-provided stack storage. Raw reports
 stay local. Consumer023 PS5 details and original Main acceptance pending.
+
+## Java17 JIMAGE zlib scratch —2026-11-10
+
+Consumer023 identifies zero class magic in original Java17 method-handle
+classes. Active17 ZIP_InflateFully uses paired native-scratch zlib callbacks
+on PS5, with overflow/zeroing and original cleanup/errors. Host forced normal
+allocator refusal reproduced Z_MEM_ERROR without callbacks and verified actual
+decompression bytes and cleanup with fallback. Exact PS5 cause and024 startup
+remain pending. See docs/java17-jimage-zlib-scratch.md.
