@@ -517,3 +517,11 @@ the existing native heap allocator for PS5 legacy verifier owned scratch,
 with paired cleanup and a fixed verifier OOM marker. Exact failing path is
 unconfirmed. Preserve original JARs and frozen snapshots. Consumer019 exact
 PS5 result and release remain pending. See docs/java17-verifier-native-scratch.md.
+
+## Java17 core native scratch —2026-11-10
+
+Consumer019 logs libjava OOM and a SIGILL resolved to the process C++ array
+allocation trap. Exact callers remain unconfirmed. Active17 shares paired
+native scratch with ClassLoader-owned buffers and libjimage arrays. Preserve
+original game inputs and frozen builds. See docs/java17-core-native-scratch.md.
+Consumer020 physical row3 and title screen pending.

@@ -57,10 +57,16 @@ def main():
         with tempfile.TemporaryDirectory(prefix='java-lts-preimages-') as folder:
             preimages = Path(folder)
             subprocess.run(['git', 'init', '-q', str(preimages)], check=True)
+            created = set()
             for patch in patches:
-                for line in patch.read_text().splitlines():
+                lines = patch.read_text().splitlines()
+                for line, following in zip(lines, lines[1:]):
+                    if line == '--- /dev/null' and following.startswith('+++ b/'):
+                        created.add(following.removeprefix('+++ b/'))
                     if line.startswith('--- a/'):
                         name = line.removeprefix('--- a/')
+                        if name in created:
+                            continue
                         target = preimages / name
                         target.parent.mkdir(parents=True, exist_ok=True)
                         target.write_bytes(subprocess.check_output(['git', 'show', 'HEAD:' + name], cwd=source))

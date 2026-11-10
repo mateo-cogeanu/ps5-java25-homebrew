@@ -45,15 +45,19 @@
         "src/hotspot/share/runtime/init.cpp": "152c9fa05790419fd047a2b820d85421e743ba4ceab664ce95401bac826f15d5",
         "src/hotspot/share/utilities/vmError.cpp": "4a91d0ef09c666438d4436cba9f8ecbdef79e7899e0431414077bff804626370",
         "src/hotspot/share/runtime/ps5NativeHeap.hpp": "affdb6d3201de3992391c701ef76df76d8f2b2496c42e79f545aa3e69599e764",
-        "src/hotspot/share/runtime/os.cpp": "b15667b0b92aed84cf34385dca1ed7d7b9f9992cfa10ed4568d142fc158cef41",
+        "src/hotspot/share/runtime/os.cpp": "a3725a579dd98de6afa3b3c0eb7f62ff53c796aa830958e7b1e3d52e0eada2a3",
         "src/hotspot/share/services/nmtPreInit.cpp": "c4ef230a44c6ef24fa3a0a614e883626685e74fa03b78578a5727644af34186a",
         "src/hotspot/share/memory/metaspace/virtualSpaceList.cpp": "8cfc51d19c4f1c18508db42a4f597e8a93e8b27feccd9382e88898bb79b343b4",
         "src/hotspot/share/utilities/debug.cpp": "1805ca7408af8148929e4a03592aa52e47505ead57a0c2ee9e70f8decfce33b2",
         "src/java.base/share/native/libjava/jni_util.c": "a18b2937573eba5793edb6a28d763378c8c6eab62a15581111ac131f6738643e",
         "src/hotspot/share/classfile/verifier.cpp": "e53a3305e6ff8a2b98edb0de67f67751467beaf7e17da883e5d691726ca40de5",
-        "src/java.base/share/native/libverify/check_code.c": "cb8a422b1b7ae48f27b50d1ca6f49501623f97ba030d12b3d3513fa20cf92ce2",
+        "src/java.base/share/native/libverify/check_code.c": "f4ee3a88b7a8e916eaf76080e8f4375de8bcc2fb2f20dd83d859ea574a485692",
         "make/hotspot/lib/JvmMapfile.gmk": "10a03211c38de3cb1941dae7c983f446959cc5b7a582aa99af590481ec37b53f",
-        "make/data/hotspot-symbols/symbols-ps5-bootstrap": "37fca71e521243b8281229f0ebfd69487a06ad86b66fc88e8f369dc91b9cd104"
+        "make/data/hotspot-symbols/symbols-ps5-bootstrap": "ba052ddda4b60f80ad22320f3dd69ca1c573c9d1462fad854d88cdc618c1cff0",
+        "src/java.base/share/native/libjava/ClassLoader.c": "778efac8fbb1975a338f7fb7452979277dfd881d9c55781b649102632425765f",
+        "src/java.base/share/native/libjimage/ps5ImageArray.hpp": "6290d2e36600c36cb43ac1faf41298aa771e78e5a60c50e59b10886ee673c2af",
+        "src/java.base/share/native/libjimage/imageFile.cpp": "0400896b20b346742200d8917c56a79db66af4cbf3c9c9e6f2cccfcf68c60825",
+        "src/java.base/share/native/libjimage/imageDecompressor.cpp": "53696f123c26d654048d9597b5077bfa8390efbb3d4b25fe3f9ef16e2aba3c4d"
       }
     },
     "21": {

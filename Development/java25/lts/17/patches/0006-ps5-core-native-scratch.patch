@@ -1,0 +1,133 @@
+--- a/make/data/hotspot-symbols/symbols-ps5-bootstrap
++++ b/make/data/hotspot-symbols/symbols-ps5-bootstrap
+@@ -1,2 +1,2 @@
+-JVM_PS5AllocateVerifierScratch
+-JVM_PS5ReleaseVerifierScratch
++JVM_PS5AllocateNativeScratch
++JVM_PS5ReleaseNativeScratch
+--- a/src/java.base/share/native/libverify/check_code.c
++++ b/src/java.base/share/native/libverify/check_code.c
+@@ -128,2 +128,2 @@
+-extern void *JVM_PS5AllocateVerifierScratch(size_t size);
+-extern void JVM_PS5ReleaseVerifierScratch(void *buffer);
++extern void *JVM_PS5AllocateNativeScratch(size_t size);
++extern void JVM_PS5ReleaseNativeScratch(void *buffer);
+@@ -137 +137 @@
+-    void *buffer = JVM_PS5AllocateVerifierScratch(bytes);
++    void *buffer = JVM_PS5AllocateNativeScratch(bytes);
+@@ -144 +144 @@
+-#define malloc JVM_PS5AllocateVerifierScratch
++#define malloc JVM_PS5AllocateNativeScratch
+@@ -146 +146 @@
+-#define free JVM_PS5ReleaseVerifierScratch
++#define free JVM_PS5ReleaseNativeScratch
+--- a/src/hotspot/share/runtime/os.cpp
++++ b/src/hotspot/share/runtime/os.cpp
+@@ -2022,2 +2022,2 @@
+-// libverify owns these buffers and releases them through the paired entry.
+-extern "C" __attribute__((visibility("default"))) void* JVM_PS5AllocateVerifierScratch(size_t size) {
++// Callers own these buffers and release them through the paired entry.
++extern "C" __attribute__((visibility("default"))) void* JVM_PS5AllocateNativeScratch(size_t size) {
+@@ -2027 +2027 @@
+-extern "C" __attribute__((visibility("default"))) void JVM_PS5ReleaseVerifierScratch(void* buffer) {
++extern "C" __attribute__((visibility("default"))) void JVM_PS5ReleaseNativeScratch(void* buffer) {
+--- a/src/java.base/share/native/libjava/ClassLoader.c
++++ b/src/java.base/share/native/libjava/ClassLoader.c
+@@ -30,0 +31,7 @@
++
++#ifdef __PROSPERO__
++extern void *JVM_PS5AllocateNativeScratch(size_t size);
++extern void JVM_PS5ReleaseNativeScratch(void *buffer);
++#define malloc JVM_PS5AllocateNativeScratch
++#define free JVM_PS5ReleaseNativeScratch
++#endif
+--- /dev/null
++++ b/src/java.base/share/native/libjimage/ps5ImageArray.hpp
+@@ -0,0 +1,28 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef PS5_IMAGE_ARRAY_HPP
++#define PS5_IMAGE_ARRAY_HPP
++
++#ifdef __PROSPERO__
++#include <stddef.h>
++extern "C" void* JVM_PS5AllocateNativeScratch(size_t size);
++extern "C" void JVM_PS5ReleaseNativeScratch(void* buffer);
++
++template <typename T>
++T* jimage_new_array(size_t count) {
++    if (count <= static_cast<size_t>(-1) / sizeof(T)) {
++        if (void* buffer = JVM_PS5AllocateNativeScratch(count * sizeof(T))) {
++            return static_cast<T*>(buffer);
++        }
++    }
++    // Preserve the resident no-exceptions allocation failure contract.
++    __builtin_trap();
++}
++
++#define JIMAGE_NEW_ARRAY(type, count) jimage_new_array<type>(count)
++#define JIMAGE_DELETE_ARRAY(buffer) JVM_PS5ReleaseNativeScratch(buffer)
++#else
++#define JIMAGE_NEW_ARRAY(type, count) new type[count]
++#define JIMAGE_DELETE_ARRAY(buffer) delete[] buffer
++#endif
++
++#endif
+--- a/src/java.base/share/native/libjimage/imageFile.cpp
++++ b/src/java.base/share/native/libjimage/imageFile.cpp
+@@ -37,0 +38 @@
++#include "ps5ImageArray.hpp"
+@@ -162 +163 @@
+-    char* replaced = new char[(int) strlen(package_name) + 1];
++    char* replaced = JIMAGE_NEW_ARRAY(char, (int) strlen(package_name) + 1);
+@@ -172 +173 @@
+-    char* path = new char[(int) strlen(radical) + (int) strlen(package_name) + 1];
++    char* path = JIMAGE_NEW_ARRAY(char, (int) strlen(radical) + (int) strlen(package_name) + 1);
+@@ -176 +177 @@
+-    delete[] replaced;
++    JIMAGE_DELETE_ARRAY(replaced);
+@@ -181 +182 @@
+-    delete[] path;
++    JIMAGE_DELETE_ARRAY(path);
+@@ -188 +189 @@
+-    u1* content = new u1[size];
++    u1* content = JIMAGE_NEW_ARRAY(u1, size);
+@@ -203 +204 @@
+-    delete[] content;
++    JIMAGE_DELETE_ARRAY(content);
+@@ -344 +345 @@
+-    _name = new char[len];
++    _name = JIMAGE_NEW_ARRAY(char, len);
+@@ -359 +360 @@
+-        delete[] _name;
++        JIMAGE_DELETE_ARRAY(_name);
+@@ -544 +545 @@
+-            compressed_data = new u1[(size_t)compressed_size];
++            compressed_data = JIMAGE_NEW_ARRAY(u1, (size_t)compressed_size);
+@@ -559 +560 @@
+-                delete[] compressed_data;
++                JIMAGE_DELETE_ARRAY(compressed_data);
+--- a/src/java.base/share/native/libjimage/imageDecompressor.cpp
++++ b/src/java.base/share/native/libjimage/imageDecompressor.cpp
+@@ -33,0 +34 @@
++#include "ps5ImageArray.hpp"
+@@ -91 +92 @@
+-        _decompressors = new ImageDecompressor*[_decompressors_num];
++        _decompressors = JIMAGE_NEW_ARRAY(ImageDecompressor*, _decompressors_num);
+@@ -98 +99 @@
+-    delete[] _decompressors;
++    JIMAGE_DELETE_ARRAY(_decompressors);
+@@ -170 +171 @@
+-            decompressed_resource = new u1[(size_t) _header._uncompressed_size];
++            decompressed_resource = JIMAGE_NEW_ARRAY(u1, (size_t) _header._uncompressed_size);
+@@ -181 +182 @@
+-                delete[] compressed_resource_base;
++                JIMAGE_DELETE_ARRAY(compressed_resource_base);
+@@ -187 +188 @@
+-    delete[] decompressed_resource;
++    JIMAGE_DELETE_ARRAY(decompressed_resource);
+@@ -280 +281 @@
+-                                char* fullpkg = new char[len];
++                                char* fullpkg = JIMAGE_NEW_ARRAY(char, len);
+@@ -287 +288 @@
+-                                delete[] pkg_base;
++                                JIMAGE_DELETE_ARRAY(pkg_base);
