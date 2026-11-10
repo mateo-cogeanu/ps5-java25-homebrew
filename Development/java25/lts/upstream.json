@@ -43,7 +43,10 @@
         "src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c": "a13e060f72b14d59440f339baf3de409273093779871b860bfa66575899ff7f2",
         "src/hotspot/share/runtime/thread.cpp": "58213523e9d12ec96313b2d3aa269cea29afbf62c2b0f63a13d3104ad4647857",
         "src/hotspot/share/runtime/init.cpp": "152c9fa05790419fd047a2b820d85421e743ba4ceab664ce95401bac826f15d5",
-        "src/hotspot/share/utilities/vmError.cpp": "4a91d0ef09c666438d4436cba9f8ecbdef79e7899e0431414077bff804626370"
+        "src/hotspot/share/utilities/vmError.cpp": "4a91d0ef09c666438d4436cba9f8ecbdef79e7899e0431414077bff804626370",
+        "src/hotspot/share/runtime/ps5NativeHeap.hpp": "affdb6d3201de3992391c701ef76df76d8f2b2496c42e79f545aa3e69599e764",
+        "src/hotspot/share/runtime/os.cpp": "4fc4eb3eaceb01c3bdb981b23f1d6d60f19a028cfa1cf5cb6b189faa2fc0e0f5",
+        "src/hotspot/share/services/nmtPreInit.cpp": "c4ef230a44c6ef24fa3a0a614e883626685e74fa03b78578a5727644af34186a"
       }
     },
     "21": {

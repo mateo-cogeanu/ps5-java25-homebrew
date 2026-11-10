@@ -1,0 +1,196 @@
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5NativeHeap.hpp
+@@ -0,0 +1,151 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHARE_RUNTIME_PS5NATIVEHEAP_HPP
++#define SHARE_RUNTIME_PS5NATIVEHEAP_HPP
++#ifdef __PROSPERO__
++#include <stddef.h>
++#include <stdint.h>
++#include <errno.h>
++#include <sys/mman.h>
++#include <unistd.h>
++#include <string.h>
++#include <stdlib.h>
++#include "runtime/ps5LtsBootstrap.hpp"
++
++// Raw storage below NMT. All os:: and NMT-preinit raw allocations use the same
++// prefix, so blocks remain compatible across the NMT initialization boundary.
++namespace ps5_native_heap {
++struct Slab;
++union Header {
++  struct { size_t size, mapped; Slab* slab; } block;
++  Header* next;
++  max_align_t alignment;
++};
++struct alignas(max_align_t) Slab {
++  Slab* next;
++  Header* available;
++  size_t mapped, stride, live;
++  unsigned index;
++};
++inline Slab** classes() { static Slab* heads[8] = {}; return heads; }
++inline unsigned* mutex_word() { static unsigned lock = 0; return &lock; }
++inline void lock() {
++  while (__atomic_exchange_n(mutex_word(), 1u, __ATOMIC_ACQUIRE)) {
++    while (__atomic_load_n(mutex_word(), __ATOMIC_RELAXED)) {
++#if defined(__x86_64__)
++      __asm__ volatile("pause");
++#elif defined(__aarch64__)
++      __asm__ volatile("yield");
++#endif
++    }
++  }
++}
++inline void unlock() { __atomic_store_n(mutex_word(), 0u, __ATOMIC_RELEASE); }
++inline bool rounded(size_t size, size_t* result) {
++  long page = sysconf(_SC_PAGESIZE);
++  if (page <= 0 || size > SIZE_MAX - ((size_t)page - 1)) return false;
++  *result = ((size + (size_t)page - 1) / (size_t)page) * (size_t)page;
++  return true;
++}
++inline void* map_pages(size_t bytes) {
++  return mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
++}
++inline void note(const char* label, size_t requested, size_t mapped, int error) {
++  static unsigned records;
++  if (__atomic_fetch_add(&records, 1u, __ATOMIC_RELAXED) >= 32) return;
++  ps5_lts_trace_number(label, requested);
++  ps5_lts_trace_number("Native heap mapped bytes=", mapped);
++  ps5_lts_trace_number("Native heap map errno=", static_cast<uint64_t>(error));
++}
++inline void* allocate(size_t size) {
++  int saved_errno = errno;
++  size = size == 0 ? 1 : size;
++  if (size > SIZE_MAX - sizeof(Header)) { errno = ENOMEM; return nullptr; }
++  Header* header = (Header*)::malloc(sizeof(Header) + size);
++  if (header != nullptr) {
++    header->block = {size, 0, nullptr}; errno = saved_errno; return header + 1;
++  }
++  if (size > 4096) {
++    size_t mapped;
++    if (!rounded(sizeof(Header) + size, &mapped)) { errno = ENOMEM; return nullptr; }
++    void* memory = map_pages(mapped); int error = memory == MAP_FAILED ? errno : 0;
++    note("PS5 native heap pages: requested=", size, mapped, error);
++    if (memory == MAP_FAILED) { errno = error; return nullptr; }
++    header = (Header*)memory; header->block = {size, mapped, nullptr};
++  } else {
++    unsigned index = 0; size_t capacity = 32;
++    while (capacity < size) { ++index; capacity *= 2; }
++    const size_t stride = sizeof(Header) + capacity;
++    bool created = false; size_t mapped = 0; int error = 0;
++    lock();
++    Slab* slab = classes()[index];
++    while (slab && !slab->available) slab = slab->next;
++    if (!slab) {
++      if (rounded(65536, &mapped)) {
++        void* memory = map_pages(mapped);
++        if (memory == MAP_FAILED) error = errno;
++        else {
++          slab = (Slab*)memory;
++          slab->next = classes()[index]; slab->available = nullptr;
++          slab->mapped = mapped; slab->stride = stride; slab->live = 0; slab->index = index;
++          const size_t count = (mapped - sizeof(Slab)) / stride;
++          for (size_t n = 0; n < count; ++n) {
++            Header* item = (Header*)((char*)memory + sizeof(Slab) + n * stride);
++            item->next = slab->available; slab->available = item;
++          }
++          classes()[index] = slab; created = true;
++        }
++      } else error = ENOMEM;
++    }
++    if (slab) {
++      header = slab->available; slab->available = header->next; ++slab->live;
++      header->block = {size, 0, slab};
++    }
++    unlock();
++    // File IO/diagnostics must never run while holding the allocator lock.
++    if (created || !slab) note("PS5 native heap slab: requested=", size, mapped, error);
++    if (!slab) { errno = error; return nullptr; }
++  }
++  errno = saved_errno; return header + 1;
++}
++inline void release(void* memory) {
++  if (!memory) return;
++  int saved_errno = errno;
++  Header* header = (Header*)memory - 1;
++  Slab* slab = header->block.slab;
++  if (slab) {
++    lock();
++    header->next = slab->available; slab->available = header; --slab->live;
++    size_t mapped = 0;
++    if (!slab->live) {
++      Slab** link = &classes()[slab->index];
++      while (*link != slab) link = &(*link)->next;
++      *link = slab->next; mapped = slab->mapped;
++    }
++    unlock();
++    if (mapped) munmap(slab, mapped);
++  } else if (header->block.mapped) munmap(header, header->block.mapped);
++  else ::free(header);
++  errno = saved_errno;
++}
++inline void* reallocate(void* memory, size_t size) {
++  if (!memory) return allocate(size);
++  size = size == 0 ? 1 : size;
++  if (size > SIZE_MAX - sizeof(Header)) { errno = ENOMEM; return nullptr; }
++  Header* header = (Header*)memory - 1;
++  const size_t old_size = header->block.size;
++  if (size <= old_size) { header->block.size = size; return memory; }
++  int saved_errno = errno;
++  if (!header->block.slab && !header->block.mapped) {
++    Header* resized = (Header*)::realloc(header, sizeof(Header) + size);
++    if (resized) { resized->block = {size, 0, nullptr}; errno = saved_errno; return resized + 1; }
++  }
++  void* replacement = allocate(size);
++  if (!replacement) return nullptr; // Original bytes and ownership are intact.
++  ::memcpy(replacement, memory, old_size);
++  release(memory); errno = saved_errno; return replacement;
++}
++static_assert(sizeof(Header) % alignof(max_align_t) == 0, "payload alignment");
++static_assert(sizeof(Slab) % alignof(max_align_t) == 0, "slab payload alignment");
++}
++#endif // __PROSPERO__
++#endif
+--- a/src/hotspot/share/runtime/os.cpp
++++ b/src/hotspot/share/runtime/os.cpp
+@@ -25,0 +26,3 @@
++#ifdef __PROSPERO__
++#include "runtime/ps5NativeHeap.hpp"
++#endif
+@@ -680 +683,6 @@
+-  void* const outer_ptr = ::malloc(outer_size);
++  void* const outer_ptr =
++#ifdef __PROSPERO__
++      ps5_native_heap::allocate(outer_size);
++#else
++      ::malloc(outer_size);
++#endif
+@@ -729 +737,6 @@
+-  void* const new_outer_ptr = ::realloc(old_outer_ptr, new_outer_size);
++  void* const new_outer_ptr =
++#ifdef __PROSPERO__
++      ps5_native_heap::reallocate(old_outer_ptr, new_outer_size);
++#else
++      ::realloc(old_outer_ptr, new_outer_size);
++#endif
+@@ -757,0 +771,3 @@
++#ifdef __PROSPERO__
++  ps5_native_heap::release(old_outer_ptr);
++#else
+@@ -758,0 +775 @@
++#endif
+--- a/src/hotspot/share/services/nmtPreInit.cpp
++++ b/src/hotspot/share/services/nmtPreInit.cpp
+@@ -26,0 +27,3 @@
++#ifdef __PROSPERO__
++#include "runtime/ps5NativeHeap.hpp"
++#endif
+@@ -37,0 +41,5 @@
++#ifdef __PROSPERO__
++static void* raw_malloc(size_t s) { return ps5_native_heap::allocate(s); }
++static void* raw_realloc(void* p, size_t s) { return ps5_native_heap::reallocate(p, s); }
++static void raw_free(void* p) { ps5_native_heap::release(p); }
++#else
+@@ -40,0 +49 @@
++#endif

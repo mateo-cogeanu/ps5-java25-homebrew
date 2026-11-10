@@ -95,3 +95,17 @@ Consumer probes can repeat the staged constructor option to retain
 independent native initialization ranges. The packager rejects duplicate
 or overlapping stages and verifies every linked range is nonempty. The
 Java 17 graphics and audio probe links separate GPU and OpenAL ranges.
+
+Java 17's development HotSpot now carries the Java 25 port's original
+malloc-first native heap fallback. Its paired allocation, reallocation and
+free operations cover HotSpot and its NMT preinitialization paths. On native
+allocator failure it can use anonymous page mappings or small slabs.
+The first 32 mapping attempts are recorded in the VM trace. Java heap
+policy and other JDK generations are outside this change.
+
+A console report from the 1.20 demo test captured a fatal HotSpot malloc
+failure for 9,232 bytes after the original Main initialized. The target
+build passed, as did a host check using the same allocator with forced
+malloc refusal, aligned payload checks, reallocation and cleanup.
+Whether the PS5 can satisfy the failed allocation through this fallback
+remains pending.
