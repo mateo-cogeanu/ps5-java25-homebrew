@@ -509,3 +509,11 @@ resource is unproven. Active17 traces first HotSpot OOM category, bounded commit
 refusals and bounded libjava OOM requests without exception messages. No memory
 policy or frozen changes. Consumer018 keeps the017 heap settings. See
 docs/java17-memory-failure-trace.md; physical console result pending.
+
+## Java17 verifier scratch fallback —2026-11-10
+
+Consumer018 reproduced row3 OOM with none of its new markers. Active17 uses
+the existing native heap allocator for PS5 legacy verifier owned scratch,
+with paired cleanup and a fixed verifier OOM marker. Exact failing path is
+unconfirmed. Preserve original JARs and frozen snapshots. Consumer019 exact
+PS5 result and release remain pending. See docs/java17-verifier-native-scratch.md.

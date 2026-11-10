@@ -1,0 +1,58 @@
+--- a/src/hotspot/share/runtime/os.cpp
++++ b/src/hotspot/share/runtime/os.cpp
+@@ -2018,0 +2019,12 @@
++
++
++#ifdef __PROSPERO__
++// libverify owns these buffers and releases them through the paired entry.
++extern "C" __attribute__((visibility("default"))) void* JVM_PS5AllocateVerifierScratch(size_t size) {
++  return ps5_native_heap::allocate(size);
++}
++
++extern "C" __attribute__((visibility("default"))) void JVM_PS5ReleaseVerifierScratch(void* buffer) {
++  ps5_native_heap::release(buffer);
++}
++#endif
+--- a/src/hotspot/share/classfile/verifier.cpp
++++ b/src/hotspot/share/classfile/verifier.cpp
+@@ -51,0 +52 @@
++#include "runtime/ps5LtsBootstrap.hpp"
+@@ -344,0 +346 @@
++    ps5_lts_trace("OOM: legacy verifier allocation refused");
+--- a/src/java.base/share/native/libverify/check_code.c
++++ b/src/java.base/share/native/libverify/check_code.c
+@@ -124,0 +125,22 @@
++#endif
++
++#ifdef __PROSPERO__
++extern void *JVM_PS5AllocateVerifierScratch(size_t size);
++extern void JVM_PS5ReleaseVerifierScratch(void *buffer);
++
++static void *ps5_verifier_calloc(size_t count, size_t size)
++{
++    if (size != 0 && count > (size_t)-1 / size) {
++        return NULL;
++    }
++    size_t bytes = count * size;
++    void *buffer = JVM_PS5AllocateVerifierScratch(bytes);
++    if (buffer != NULL) {
++        memset(buffer, 0, bytes);
++    }
++    return buffer;
++}
++
++#define malloc JVM_PS5AllocateVerifierScratch
++#define calloc ps5_verifier_calloc
++#define free JVM_PS5ReleaseVerifierScratch
+--- a/make/hotspot/lib/JvmMapfile.gmk
++++ b/make/hotspot/lib/JvmMapfile.gmk
+@@ -38,0 +39,4 @@
++endif
++
++ifeq ($(PS5_BOOTSTRAP), yes)
++  SYMBOLS_SRC += $(TOPDIR)/make/data/hotspot-symbols/symbols-ps5-bootstrap
+--- /dev/null
++++ b/make/data/hotspot-symbols/symbols-ps5-bootstrap
+@@ -0,0 +1,2 @@
++JVM_PS5AllocateVerifierScratch
++JVM_PS5ReleaseVerifierScratch
