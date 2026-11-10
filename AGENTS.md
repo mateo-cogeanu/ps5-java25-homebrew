@@ -549,3 +549,12 @@ on PS5, with overflow/zeroing and original cleanup/errors. Host forced normal
 allocator refusal reproduced Z_MEM_ERROR without callbacks and verified actual
 decompression bytes and cleanup with fallback. Exact PS5 cause and024 startup
 remain pending. See docs/java17-jimage-zlib-scratch.md.
+
+## Java17 file I/O scratch —2026-11-10
+
+Consumer024 reaches an actual RandomAccessFile.readBytes native-buffer OOM
+during JAR loading, past the previous zero magic failure. Active17 PS5 file
+helper uses paired native scratch for large read/write buffers. Original
+bounds/file/Java exception behavior remains. Target/patch checks and actual
+host helper forced-refusal I/O/cleanup checks recorded. Consumer025 physical
+startup and later I/O pending. See docs/java17-file-io-native-scratch.md.
