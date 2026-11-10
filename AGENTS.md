@@ -500,3 +500,12 @@ markers only, preserving errno and genuine return/capability/syscall semantics.
 Consumer005tests upstream sun.nio.fs.chdirAllowed=true to resolve paths against
 configured user.dir without the native cwd comparison; no global default or fake
 filesystem answer. Exact PS5 result pending. See docs/java17-nio-bootstrap-boundary.md.
+
+## Java17 memory failure trace —2026-11-10
+
+Consumer017 starts the VM and shuts it down cleanly. Original Main reports an
+unclassified OOM at aoi.<clinit> with roughly53MiB Java heap in use; the failing
+resource is unproven. Active17 traces first HotSpot OOM category, bounded commit
+refusals and bounded libjava OOM requests without exception messages. No memory
+policy or frozen changes. Consumer018 keeps the017 heap settings. See
+docs/java17-memory-failure-trace.md; physical console result pending.

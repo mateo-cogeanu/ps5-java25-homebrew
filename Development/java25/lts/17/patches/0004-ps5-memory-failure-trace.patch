@@ -1,0 +1,46 @@
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -1875,0 +1876,8 @@
++#ifdef __PROSPERO__
++  static unsigned failures;
++  if (__atomic_fetch_add(&failures, 1u, __ATOMIC_RELAXED) < 8) {
++    const int error = errno;
++    ps5_lts_trace_number("COMMIT: requested bytes=", size);
++    ps5_lts_trace_number("COMMIT: errno=", static_cast<uint64_t>(error));
++  }
++#endif
+--- a/src/hotspot/share/utilities/debug.cpp
++++ b/src/hotspot/share/utilities/debug.cpp
+@@ -46,0 +47 @@
++#include "runtime/ps5LtsBootstrap.hpp"
+@@ -349,0 +351,5 @@
++#ifdef __PROSPERO__
++    // HotSpot callers supply fixed VM reason strings, not Java messages.
++    ps5_lts_trace("OOM: HotSpot resource exhaustion");
++    ps5_lts_trace(message);
++#endif
+--- a/src/java.base/share/native/libjava/jni_util.c
++++ b/src/java.base/share/native/libjava/jni_util.c
+@@ -28,0 +29,5 @@
++#ifdef __PROSPERO__
++#include <errno.h>
++#include <fcntl.h>
++#include <unistd.h>
++#endif
+@@ -75,0 +81,16 @@
++#ifdef __PROSPERO__
++    static unsigned reports;
++    if (__atomic_fetch_add(&reports, 1u, __ATOMIC_RELAXED) < 8) {
++        static const char record[] = "OOM: libjava requested OutOfMemoryError\n";
++        int error = errno;
++        int fd = open("/download0/java17-vm-trace.log", O_WRONLY | O_CREAT | O_APPEND, 0600);
++        if (fd >= 0) {
++            ssize_t written;
++            do {
++                written = write(fd, record, sizeof(record) - 1);
++            } while (written < 0 && errno == EINTR);
++            (void)close(fd);
++        }
++        errno = error;
++    }
++#endif
