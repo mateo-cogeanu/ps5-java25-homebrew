@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Test actual PS5 Thread current-pointer methods with the real pthread TLS backend."""
 from pathlib import Path
+import argparse
 import os,re,subprocess
 ROOT=Path(__file__).resolve().parents[1]
-WORK=ROOT/'build/java25/current-thread-tls-test';WORK.mkdir(parents=True,exist_ok=True)
-SRC=ROOT/'.tools/java25/openjdk/src/hotspot'
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--major', type=int, choices=(17, 25), default=25)
+major = parser.parse_args().major
+WORK=ROOT/f'build/java{major}/current-thread-tls-test';WORK.mkdir(parents=True,exist_ok=True)
+SRC=ROOT/f'.tools/java{major}/openjdk/src/hotspot'
 hpp=(SRC/'share/runtime/thread.hpp').read_text()
 cpp=(SRC/'share/runtime/thread.cpp').read_text()
 backend=(SRC/'os/posix/threadLocalStorage_posix.cpp').read_text()
@@ -36,6 +40,7 @@ source='''#define __PROSPERO__ 1
 static std::atomic<int> refusal_mode{0}, refusal_notes{0};
 static void ps5_vm_trace(const char*) {}
 static void ps5_vm_trace_values(const char*,uintptr_t,const char*,uintptr_t,const char*,uintptr_t){++refusal_notes;}
+static void ps5_lts_trace_number(const char*,uint64_t){++refusal_notes;}
 static int test_set(pthread_key_t key,const void* value){
  if(refusal_mode==2 || (refusal_mode==1 && value) || (refusal_mode==4 && !value))return ENOMEM;
  if(refusal_mode==3 && value)return 0; // Setter claims success but readback disagrees.

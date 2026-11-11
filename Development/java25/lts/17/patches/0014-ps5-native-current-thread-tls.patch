@@ -1,0 +1,121 @@
+--- a/src/hotspot/share/runtime/thread.hpp
++++ b/src/hotspot/share/runtime/thread.hpp
+@@ -137 +137 @@
+-#ifndef USE_LIBRARY_BASED_TLS_ONLY
++#if !defined(USE_LIBRARY_BASED_TLS_ONLY) && !defined(__PROSPERO__)
+@@ -690 +690,2 @@
+-#ifndef USE_LIBRARY_BASED_TLS_ONLY
++  // On PS5, compiler TLS allocates on first access, including on VM workers.
++#if !defined(USE_LIBRARY_BASED_TLS_ONLY) && !defined(__PROSPERO__)
+--- a/src/hotspot/share/runtime/thread.cpp
++++ b/src/hotspot/share/runtime/thread.cpp
+@@ -185 +185 @@
+-#ifndef USE_LIBRARY_BASED_TLS_ONLY
++#if !defined(USE_LIBRARY_BASED_TLS_ONLY) && !defined(__PROSPERO__)
+@@ -329 +329 @@
+-#ifndef USE_LIBRARY_BASED_TLS_ONLY
++#if !defined(USE_LIBRARY_BASED_TLS_ONLY) && !defined(__PROSPERO__)
+@@ -340 +340 @@
+-#ifndef USE_LIBRARY_BASED_TLS_ONLY
++#if !defined(USE_LIBRARY_BASED_TLS_ONLY) && !defined(__PROSPERO__)
+--- a/src/hotspot/os/posix/threadLocalStorage_posix.cpp
++++ b/src/hotspot/os/posix/threadLocalStorage_posix.cpp
+@@ -25,0 +26 @@
++#include "utilities/debug.hpp"
+@@ -26,0 +28,4 @@
++#ifdef __PROSPERO__
++#include "runtime/ps5ThreadLocal.hpp"
++#include "runtime/ps5LtsBootstrap.hpp"
++#endif
+@@ -37,0 +43,9 @@
++#ifdef __PROSPERO__
++  void* override;
++  if (ps5_thread_local::get(&override)) {
++    // A failed native clear must not resurrect the detached/deleted Thread.
++    // POSIX has already cleared the key before invoking this destructor.
++    if (override == nullptr) { ps5_thread_local::clear_override(); return; }
++    p = override;
++  }
++#endif
+@@ -45,0 +60,3 @@
++#ifdef __PROSPERO__
++  guarantee(rslt == 0, "pthread_key_create failed: %d", rslt);
++#else
+@@ -46,0 +64 @@
++#endif
+@@ -61 +79,5 @@
+-  return (Thread*) pthread_getspecific(_thread_key); // may be NULL
++#ifdef __PROSPERO__
++  void* fallback;
++  if (ps5_thread_local::get(&fallback)) return (Thread*)fallback;
++#endif
++  return (Thread*) pthread_getspecific(_thread_key); // may be null
+@@ -66,0 +89,13 @@
++#ifdef __PROSPERO__
++  void* observed = pthread_getspecific(_thread_key);
++  if (rslt != 0 || observed != current) {
++    // Product builds must not silently continue with a null/stale current
++    // thread. Keep native TLS as the normal path; only override failed updates.
++    bool stored = ps5_thread_local::set(current);
++    ps5_lts_trace_number("TLS: native current-thread update result=", (unsigned)rslt);
++    ps5_lts_trace_number("TLS: current-thread fallback stored=", stored);
++    guarantee(stored, "PS5 current-thread fallback table exhausted (pthread error %d)", rslt);
++  } else {
++    ps5_thread_local::clear_override();
++  }
++#else
+@@ -67,0 +103 @@
++#endif
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5ThreadLocal.hpp
+@@ -0,0 +1,50 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef PS5_THREAD_LOCAL_HPP
++#define PS5_THREAD_LOCAL_HPP
++#include <pthread.h>
++#include <stdint.h>
++// Bounded, allocation-free storage only when the native key setter refuses an
++// update. A null value is a real override (e.g. a refused detach/clear).
++// JNI clients must still detach before their native thread exits.
++namespace ps5_thread_local {
++constexpr unsigned capacity = 1024;
++struct Slot { uintptr_t owner, value; bool active; };
++inline Slot* slots() { static Slot table[capacity] = {}; return table; }
++inline Slot* find(bool create) {
++  uintptr_t key=(uintptr_t)pthread_self();
++  if (!key) return nullptr;
++  unsigned start=(unsigned)(key>>4)%capacity;
++  for(unsigned n=0;n<capacity;++n) {
++    Slot* slot=&slots()[(start+n)%capacity];
++    uintptr_t owner=__atomic_load_n(&slot->owner,__ATOMIC_ACQUIRE);
++    if(owner==key) return slot;
++    if(!create && owner==0) return nullptr;
++    if(create && owner==0) {
++      uintptr_t expected=0;
++      if(__atomic_compare_exchange_n(&slot->owner,&expected,key,false,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE) || expected==key) return slot;
++    }
++  }
++  return nullptr;
++}
++inline bool get(void** value) {
++  Slot* slot=find(false);
++  if(!slot || !__atomic_load_n(&slot->active,__ATOMIC_ACQUIRE)) return false;
++  *value=(void*)__atomic_load_n(&slot->value,__ATOMIC_ACQUIRE);return true;
++}
++inline bool set(void* value) {
++  Slot* slot=find(true);
++  if(!slot) return false;
++  __atomic_store_n(&slot->value,(uintptr_t)value,__ATOMIC_RELEASE);
++  __atomic_store_n(&slot->active,true,__ATOMIC_RELEASE);return true;
++}
++inline void clear_override() {
++  Slot* slot=find(false);
++  if(slot) {
++    __atomic_store_n(&slot->active,false,__ATOMIC_RELEASE);
++    __atomic_store_n(&slot->value,(uintptr_t)0,__ATOMIC_RELEASE);
++    // Retain the identity so lookups may stop at the first never-used slot.
++    // At most 1024 distinct identities may require fallback in one process.
++  }
++}
++}
++#endif

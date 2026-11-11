@@ -42,7 +42,7 @@
         "src/java.base/unix/native/libjava/java_props_md.c": "0e06bdbfad52bd24bd2ee534ab7b5d19e7c2373f0f69e1160ba6bcd06a9a97eb",
         "src/java.base/unix/native/libjimage/osSupport_unix.cpp": "d1afa2b78ede3b9fc0d91a96aa3820304a542113df6db9dac93141eeebcecce8",
         "src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c": "a13e060f72b14d59440f339baf3de409273093779871b860bfa66575899ff7f2",
-        "src/hotspot/share/runtime/thread.cpp": "58213523e9d12ec96313b2d3aa269cea29afbf62c2b0f63a13d3104ad4647857",
+        "src/hotspot/share/runtime/thread.cpp": "04755e8c0f9cedc3fb2fc4a02d36f7837cb88b970877d91144bef945e19b913b",
         "src/hotspot/share/runtime/init.cpp": "152c9fa05790419fd047a2b820d85421e743ba4ceab664ce95401bac826f15d5",
         "src/hotspot/share/utilities/vmError.cpp": "4a91d0ef09c666438d4436cba9f8ecbdef79e7899e0431414077bff804626370",
         "src/hotspot/share/runtime/ps5NativeHeap.hpp": "affdb6d3201de3992391c701ef76df76d8f2b2496c42e79f545aa3e69599e764",
@@ -65,7 +65,10 @@
         "src/hotspot/share/runtime/ps5ThreadAttributes.hpp": "ba202c7dac72c1520ce5f6496e7ff912ee5db5cda663187acc57b99c7d0ab497",
         "src/hotspot/share/runtime/ps5Synchronization.hpp": "26f0cfab37e51c6a51326a368e0e28b63298d48ea38bf51a0b7f6e6f4538e2ee",
         "src/hotspot/os/posix/os_posix.hpp": "50aee390925c06eaaa6ca78351c2bd9a930f427e2e380e9c72fb73bd09affa07",
-        "src/hotspot/share/runtime/os.hpp": "ae0eb284a9c941c24113af6011796cc160243534e41985aa7d5ce3515e65f180"
+        "src/hotspot/share/runtime/os.hpp": "ae0eb284a9c941c24113af6011796cc160243534e41985aa7d5ce3515e65f180",
+        "src/hotspot/share/runtime/thread.hpp": "972409810187257dcc670a5ea80f003d0b355eac0bdec11ad6fb4dd623e12e8b",
+        "src/hotspot/os/posix/threadLocalStorage_posix.cpp": "0a4a171c63611a197ceb01b5d7fdeaf44865426b992e02134146cf2a4e8bc294",
+        "src/hotspot/share/runtime/ps5ThreadLocal.hpp": "d58c5bfc4fdc102d2b4716630cc5f197c59e0579c093af6a8fe5ca73972d07f9"
       }
     },
     "21": {

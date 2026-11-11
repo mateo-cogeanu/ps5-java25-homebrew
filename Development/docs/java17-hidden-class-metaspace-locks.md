@@ -18,6 +18,7 @@ The lock pool size and native allocator behavior are unchanged.
 
 The pinned patch application and PS5 target build passed. The target
 class loader object contains a 256-byte table for the 32 lock pointers.
-The next console test is Minecraft consumer 029. Check row 3 and the
-Minecraft title screen first. Class loading, unloading, throughput and
-the cause of the 028 native abort remain unverified on PS5.
+Consumer 029 still aborted during row 3. A comparison of the 028 and 029
+registers and linked symbols points to
+[current-thread storage](java17-current-thread-tls.md). Class loading,
+unloading and throughput with the shared locks remain unverified on PS5.
