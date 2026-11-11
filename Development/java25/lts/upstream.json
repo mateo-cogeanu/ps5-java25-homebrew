@@ -50,7 +50,7 @@
         "src/hotspot/share/services/nmtPreInit.cpp": "c4ef230a44c6ef24fa3a0a614e883626685e74fa03b78578a5727644af34186a",
         "src/hotspot/share/memory/metaspace/virtualSpaceList.cpp": "8cfc51d19c4f1c18508db42a4f597e8a93e8b27feccd9382e88898bb79b343b4",
         "src/hotspot/share/utilities/debug.cpp": "1805ca7408af8148929e4a03592aa52e47505ead57a0c2ee9e70f8decfce33b2",
-        "src/java.base/share/native/libjava/jni_util.c": "4599212274c6705315c3846c2130e313aa84f7b5272cc4c13f400886762dd28f",
+        "src/java.base/share/native/libjava/jni_util.c": "c1afeda336bba2af7d7e13447fdcd72a29889cf870abf70e0a774d5d7116aefe",
         "src/hotspot/share/classfile/verifier.cpp": "e53a3305e6ff8a2b98edb0de67f67751467beaf7e17da883e5d691726ca40de5",
         "src/java.base/share/native/libverify/check_code.c": "f4ee3a88b7a8e916eaf76080e8f4375de8bcc2fb2f20dd83d859ea574a485692",
         "make/hotspot/lib/JvmMapfile.gmk": "10a03211c38de3cb1941dae7c983f446959cc5b7a582aa99af590481ec37b53f",

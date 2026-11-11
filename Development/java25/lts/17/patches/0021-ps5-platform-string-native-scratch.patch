@@ -1,0 +1,92 @@
+diff --git a/src/java.base/share/native/libjava/jni_util.c b/src/java.base/share/native/libjava/jni_util.c
+--- a/src/java.base/share/native/libjava/jni_util.c
++++ b/src/java.base/share/native/libjava/jni_util.c
+@@ -39,0 +40,8 @@
++#ifdef __PROSPERO__
++extern void *JVM_PS5AllocateNativeScratch(size_t size);
++extern void JVM_PS5ReleaseNativeScratch(void *buffer);
++#define PLATFORM_STRING_ALLOCATE(size) JVM_PS5AllocateNativeScratch(size)
++#else
++#define PLATFORM_STRING_ALLOCATE(size) malloc(size)
++#endif
++
+@@ -50 +58 @@
+-    ((char *)malloc((len) + 1 < 4 ? 4 : (len) + 1)))
++    ((char *)PLATFORM_STRING_ALLOCATE((len) + 1 < 4 ? 4 : (len) + 1)))
+@@ -480,0 +489,13 @@
++#ifdef __PROSPERO__
++    // The scratch allocator may map memory and trace. Call it before pinning Java storage.
++    result = MALLOC_MIN4(len);
++    if (result == NULL) {
++        JNU_ThrowOutOfMemoryError(env, 0);
++        return NULL;
++    }
++    const jchar *str = (*env)->GetStringCritical(env, jstr, 0);
++    if (str == NULL) {
++        JVM_PS5ReleaseNativeScratch(result);
++        return NULL;
++    }
++#else
+@@ -491,0 +513 @@
++#endif
+@@ -545,0 +568,13 @@
++#ifdef __PROSPERO__
++    // The scratch allocator may map memory and trace. Call it before pinning Java storage.
++    result = MALLOC_MIN4(len);
++    if (result == NULL) {
++        JNU_ThrowOutOfMemoryError(env, 0);
++        return NULL;
++    }
++    const jchar *str = (*env)->GetStringCritical(env, jstr, 0);
++    if (str == NULL) {
++        JVM_PS5ReleaseNativeScratch(result);
++        return NULL;
++    }
++#else
+@@ -556,0 +592 @@
++#endif
+@@ -620,0 +657,13 @@
++#ifdef __PROSPERO__
++    // The scratch allocator may map memory and trace. Call it before pinning Java storage.
++    result = MALLOC_MIN4(len);
++    if (result == NULL) {
++        JNU_ThrowOutOfMemoryError(env, 0);
++        return NULL;
++    }
++    const jchar *str = (*env)->GetStringCritical(env, jstr, 0);
++    if (str == NULL) {
++        JVM_PS5ReleaseNativeScratch(result);
++        return NULL;
++    }
++#else
+@@ -631,0 +681 @@
++#endif
+@@ -908,0 +959,3 @@
++#ifdef __PROSPERO__
++    size_t rlen;
++#else
+@@ -909,0 +963 @@
++#endif
+@@ -934,0 +989,14 @@
++#ifdef __PROSPERO__
++    // The String's Latin-1 bytes are immutable. Release the pin before allocating.
++    (*env)->ReleasePrimitiveArrayCritical(env, value, str, JNI_ABORT);
++    result = MALLOC_MIN4(rlen);
++    if (result == NULL) {
++        JNU_ThrowOutOfMemoryError(env, 0);
++        return NULL;
++    }
++    str = (*env)->GetPrimitiveArrayCritical(env, value, NULL);
++    if (str == NULL) {
++        JVM_PS5ReleaseNativeScratch(result);
++        return NULL;
++    }
++#else
+@@ -940,0 +1009 @@
++#endif
+@@ -980,0 +1050,3 @@
++#ifdef __PROSPERO__
++    JVM_PS5ReleaseNativeScratch((void *)str);
++#else
+@@ -981,0 +1054 @@
++#endif
