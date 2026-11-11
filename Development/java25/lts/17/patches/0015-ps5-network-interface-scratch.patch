@@ -1,0 +1,18 @@
+--- a/src/java.base/unix/native/libnet/NetworkInterface.c
++++ b/src/java.base/unix/native/libnet/NetworkInterface.c
+@@ -70,0 +71,7 @@
++#endif
++
++#ifdef __PROSPERO__
++extern void *JVM_PS5AllocateNativeScratch(size_t size);
++extern void JVM_PS5ReleaseNativeScratch(void *buffer);
++#define malloc JVM_PS5AllocateNativeScratch
++#define free JVM_PS5ReleaseNativeScratch
+@@ -1016 +1023,6 @@
+-         CHECKED_MALLOC3(currif, netif *, sizeof(netif) + IFNAMESIZE);
++         currif = malloc(sizeof(netif) + IFNAMESIZE);
++         if (currif == NULL) {
++             free(addrP);
++             JNU_ThrowOutOfMemoryError(env, "Native heap allocation failed");
++             return ifs;
++         }
