@@ -11,6 +11,7 @@ import sys
 import zipfile
 
 from java_lts import ROOT, sha, tool, verify_boot
+from java_compiler_tls import stage_compiler_tls
 
 
 def main():
@@ -29,9 +30,13 @@ def main():
     p.add_argument('--import-stub', action='append', type=Path, default=[])
     p.add_argument('--staged-constructors', action='append', default=[], metavar='NAME=SECTION')
     p.add_argument('--thread-atexit-provider')
+    p.add_argument('--compiler-tls', action='store_true',
+                   help='Use the scoped SDK compiler-TLS adapter for a Java 17 consumer')
     a = p.parse_args()
     if (a.import_stub or a.staged_constructors or a.thread_atexit_provider) and not a.probe_dir:
         p.error('Custom native link inputs require an explicit consumer probe')
+    if a.compiler_tls and (a.major != 17 or not a.probe_dir):
+        p.error('--compiler-tls requires an explicit Java 17 consumer probe')
     identifier = r'[A-Za-z_][A-Za-z0-9_]*'
     if a.thread_atexit_provider and not re.fullmatch(identifier, a.thread_atexit_provider):
         p.error('Invalid thread destructor provider symbol')
@@ -104,6 +109,16 @@ def main():
     libc = work / 'native-libc.a'
     shutil.copy2(sdk / 'target/lib/libc.a', libc)
     subprocess.run([str(tool(llvm, 'llvm-ar')), 'd', str(libc), 'mman.o'], check=True)
+    compiler_tls = []
+    if a.compiler_tls:
+        backend = stage_compiler_tls(ROOT, work, llvm / 'bin', sdk, libc, source / 'src/hotspot/share',
+                                     java17=True)
+        compiler_tls = [str(backend), '--wrap=pthread_create', '--wrap=pthread_join']
+        for relative in ('tools/java_compiler_tls.py', 'java25/probe/emutls_alloc.cpp',
+                         'java25/probe/emutls_keys.hpp'):
+            target = source_record / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / relative, target)
     script = (native / 'ps5-pie.ld').read_text()
     for section, label in (('.eh_frame_hdr', '__eh_frame_hdr'), ('.eh_frame', '__eh_frame')):
         anchor = 'KEEP(*(' + section + '))'
@@ -145,7 +160,8 @@ def main():
     links = json.loads((resident / 'link-inputs.json').read_text())
     args = ['--defsym=__cxa_thread_atexit_impl=' + (a.thread_atexit_provider or '0'),
             '--defsym=collector_func_load=0', '--defsym=kernel_mprotect=0']
-    args += ['-L' + str(sdk / 'target/lib'), *links, *[str(p.resolve()) for p in a.link_object], str(libc)]
+    args += ['-L' + str(sdk / 'target/lib'), *links, *[str(p.resolve()) for p in a.link_object],
+             *compiler_tls, str(libc)]
     args += [str(sdk / 'target/lib' / name) for name in ('libpthread.a', 'libc++.a', 'libc++abi.a', 'libunwind.a')]
     response = work / 'link.rsp'
     response.write_text('\n'.join(json.dumps(s) for s in args) + '\n')
@@ -170,10 +186,12 @@ def main():
                                       symbols_text, re.M) for label in ('start', 'end')}
             if not all(bounds.values()) or int(bounds['start'][1], 16) >= int(bounds['end'][1], 16):
                 raise ValueError('Consumer constructor stage was empty or missing')
-    verify_package(work, llvm, package, image, metadata, major=major, probe=probe, extra_objects=a.link_object)
+    verify_package(work, llvm, package, image, metadata, major=major, probe=probe,
+                   extra_objects=a.link_object, compiler_tls=a.compiler_tls)
 
 
-def verify_package(work, llvm, package, image, metadata, *, major=None, probe=None, extra_objects=()):
+def verify_package(work, llvm, package, image, metadata, *, major=None, probe=None,
+                   extra_objects=(), compiler_tls=False):
     major = major or { 'PPSA99876': 17, 'PPSA99877': 21 }[metadata['titleId']]
     probe = probe or ROOT / ('java25/lts/probe' if major == 17 else 'java25/lts/probe21')
     symbols = work / ('java' + str(major) + '-startup-' + metadata['contentVersion'].split('.')[-1] + '-symbols.elf')
@@ -185,6 +203,13 @@ def verify_package(work, llvm, package, image, metadata, *, major=None, probe=No
     for name in ('JNI_CreateJavaVM', 'JNI_GetDefaultJavaVMInitArgs', 'JVM_CurrentTimeMillis', '__dlopen', '__dlsym'):
         if name not in addresses:
             raise ValueError('Missing actual Java' + str(major) + ' startup definition: ' + name)
+    if compiler_tls:
+        required = {'__emutls_get_address', '__wrap_pthread_create', '__wrap_pthread_join'}
+        required.update('ps5_emutls_' + name for name in
+                        ('malloc', 'realloc', 'free', 'setspecific', 'getspecific', 'key_create'))
+        if required - addresses.keys():
+            raise ValueError('Missing linked compiler-TLS definitions: ' +
+                             ', '.join(sorted(required - addresses.keys())))
     if not addresses['__jvm_init_array_start'] < addresses['__jvm_init_array_end']:
         raise ValueError('Missing staged real VM constructors')
     if addresses['__init_array_start'] != addresses['__init_array_end']:
@@ -207,6 +232,9 @@ def verify_package(work, llvm, package, image, metadata, *, major=None, probe=No
               'console': 'NOT RUN', 'release': 'Local test only; no release or Store publication',
               'linkObjectsSha256': {p.name: sha(p) for p in extra_objects},
               'scope': 'Genuine' + str(major) + ' interpreter startup/arithmetic/StrictMath/exceptions/JNI/thread/destruction probe'}
+    if compiler_tls:
+        record['compilerTlsSha256'] = {name: sha(work / 'emutls-adapter' / name)
+                                       for name in ('emutls.o', 'backend.o')}
     (work / 'package-audit.json').write_text(json.dumps(record, indent=2) + '\n')
     print('Local Java' + str(major) + ' startup test ready:', package, record['packageSha256'])
 

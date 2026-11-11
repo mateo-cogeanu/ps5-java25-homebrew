@@ -25,6 +25,7 @@ fixture passed. The fixture exercises native refusal, false-success
 readback, detach, JNI destructor restoration, signal lookup and fallback
 capacity. Target fixture IR uses the native key without compiler TLS.
 
-Consumer 030 will test this path on the actual PS5 with the same game files,
-heap, image and graphics inputs as 029. Row 3, title-screen startup and
-longer-running thread lifecycle checks remain pending.
+Consumer 030 recorded a native key update returning ENOMEM and its
+allocation-free fallback storing the thread pointer. It then aborted
+at a different emulated TLS descriptor during row 3. See
+[compiler TLS for the Java 17 consumer](java17-compiler-tls.md).

@@ -1,4 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
+#include <cstdlib>
+#include <pthread.h>
+#ifdef PS5_EMUTLS_JAVA17
+#include "runtime/ps5NativeHeap.hpp"
+#else
 #include "emutls_alloc.hpp"
 #include "../../.tools/java25/openjdk/src/hotspot/share/runtime/ps5StartupTrace.hpp"
 #ifdef __PROSPERO__
@@ -6,7 +11,22 @@
 extern "C" void* ps5_emutls_direct_map(size_t bytes){return ps5_native_direct::map(bytes);}
 extern "C" bool ps5_emutls_direct_unmap(void* address,size_t bytes,int* result){return ps5_native_direct::unmap(address,bytes,result);}
 #endif
+#endif
 extern "C" {
+#ifdef PS5_EMUTLS_JAVA17
+void* ps5_emutls_malloc(size_t count) {
+ void* result = ps5_native_heap::allocate(count);
+ if (!result) ps5_lts_trace_number("EMUTLS: allocation refused bytes=", count);
+ return result;
+}
+void* ps5_emutls_realloc(void* p, size_t count) {
+ if (!count && p) { ps5_native_heap::release(p); return nullptr; }
+ void* result = ps5_native_heap::reallocate(p, count);
+ if (!result) ps5_lts_trace_number("EMUTLS: resize refused bytes=", count);
+ return result;
+}
+void ps5_emutls_free(void* p) { ps5_native_heap::release(p); }
+#else
 void ps5_emutls_enable_direct(int enabled){ps5::emutls_alloc::enable_direct(enabled!=0);}
 void* ps5_emutls_malloc(size_t count){
  void* p=ps5::emutls_alloc::allocate(count);
@@ -18,26 +38,41 @@ void* ps5_emutls_malloc(size_t count){
 }
 void* ps5_emutls_realloc(void* p,size_t count){return ps5::emutls_alloc::resize(p,count);}
 void ps5_emutls_free(void* p){ps5::emutls_alloc::release(p);}
+#endif
 }
 #include "emutls_keys.hpp"
 #include <sched.h>
 namespace {
 ps5::emutls_keys::Registry<1024> emutls_registry{};
 void (*original_emutls_destructor)(void*)=nullptr;
-[[noreturn]] void emutls_capacity_failure(){ps5_vm_trace("FAIL: EMUTLS identity registry exhausted");std::abort();}
+void emutls_trace(const char* message) {
+#ifdef PS5_EMUTLS_JAVA17
+ ps5_lts_trace(message);
+#else
+ ps5_vm_trace(message);
+#endif
+}
+size_t emutls_payload_size(void* value) {
+#ifdef PS5_EMUTLS_JAVA17
+ return (static_cast<ps5_native_heap::Header*>(value)-1)->block.size;
+#else
+ return (static_cast<ps5::emutls_alloc::Header*>(value)-1)->block.size;
+#endif
+}
+[[noreturn]] void emutls_capacity_failure(){emutls_trace("FAIL: EMUTLS identity registry exhausted");std::abort();}
 // Same SDK compiler-rt address-array ABI as the adapted emutls.o: two header
 // words followed by aligned variable addresses. Reclaim only after actual
 // thread death (successful join or native identity reuse), never at start-routine
 // return, which would precede C++/pthread key destructors.
 void release_retired_array(void* value){
  if(!value)return;
- auto* h=static_cast<ps5::emutls_alloc::Header*>(value)-1;
+ const size_t bytes = emutls_payload_size(value);
  auto* words=static_cast<uintptr_t*>(value);
- if(h->block.size<2*sizeof(uintptr_t)||words[1]>(h->block.size-2*sizeof(uintptr_t))/sizeof(void*)){
-  ps5_vm_trace("FAIL: EMUTLS address array ABI mismatch");std::abort();
+ if(bytes<2*sizeof(uintptr_t)||words[1]>(bytes-2*sizeof(uintptr_t))/sizeof(void*)){
+  emutls_trace("FAIL: EMUTLS address array ABI mismatch");std::abort();
  }
- for(uintptr_t i=0;i<words[1];++i){void* p=reinterpret_cast<void*>(words[2+i]);if(p)ps5::emutls_alloc::release(static_cast<void**>(p)[-1]);}
- ps5::emutls_alloc::release(value);
+ for(uintptr_t i=0;i<words[1];++i){void* p=reinterpret_cast<void*>(words[2+i]);if(p)ps5_emutls_free(static_cast<void**>(p)[-1]);}
+ ps5_emutls_free(value);
 }
 void emutls_destructor(void*){
  const int saved=errno;
@@ -70,7 +105,11 @@ int ps5_emutls_setspecific(pthread_key_t key,const void* value){
  if(!emutls_registry.set((uintptr_t)pthread_self(),const_cast<void*>(value)))emutls_capacity_failure();
  int result=pthread_setspecific(key,value);void* observed=pthread_getspecific(key);
  if(result||observed!=value){
+#ifdef PS5_EMUTLS_JAVA17
+  ps5_lts_trace_number("EMUTLS: retained key fallback result=", (unsigned)result);
+#else
   ps5_vm_trace_values("EMUTLS: retained key fallback self=",(uintptr_t)pthread_self()," result=",(unsigned)result," requested=",(uintptr_t)value);
+#endif
  }
  errno=saved;return 0; // Canonical storage is established even if native setter refuses.
 }

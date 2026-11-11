@@ -10,6 +10,7 @@ import argparse
 import shutil
 
 from java25_embedded_hotspot import embed_hotspot
+from java_compiler_tls import stage_compiler_tls
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
@@ -109,25 +110,8 @@ absent_callbacks = ["__cxa_thread_atexit_impl", "__dladdr", "__dlclose", "__dler
 # untouched, and leave every other libc allocator reference unchanged.
 emutls_backend=[]
 if args.startup:
-    emutls_dir=WORK/"emutls-adapter";emutls_dir.mkdir(exist_ok=True)
-    subprocess.run([str(llvm/"llvm-ar"),"x",str(native_libc),"emutls.o"],cwd=emutls_dir,check=True)
-    emutls_obj=emutls_dir/"emutls.o"
-    if hashlib.sha256(emutls_obj.read_bytes()).hexdigest() != "f12a423ab50bab567caab55986904949f3b15074d253e95b151374054b57d94d":
-        raise SystemExit("Unsupported SDK compiler-TLS object/address-array ABI")
-    subprocess.run([str(llvm/"llvm-objcopy"),*["--redefine-sym="+name+"=ps5_emutls_"+name for name in ("malloc","realloc","free","pthread_setspecific","pthread_getspecific","pthread_key_create")],str(emutls_obj)],check=True)
-    # Scoped pthread adapters have shorter exported names.
-    subprocess.run([str(llvm/"llvm-objcopy"),*["--redefine-sym=ps5_emutls_pthread_"+name+"=ps5_emutls_"+name for name in ("setspecific","getspecific","key_create")],str(emutls_obj)],check=True)
-    emutls_symbols=subprocess.check_output([str(llvm/"llvm-nm"),"--undefined-only",str(emutls_obj)],text=True)
-    for name in ("malloc","realloc","free","setspecific","getspecific","key_create"):
-        if not re.search(r"\bU\s+ps5_emutls_"+name+r"$",emutls_symbols,re.M):
-            raise SystemExit("Missing scoped compiler-TLS adapter: "+name)
-    for name in ("malloc","realloc","free","pthread_setspecific","pthread_getspecific","pthread_key_create"):
-        if re.search(r"\bU\s+"+name+r"$",emutls_symbols,re.M):
-            raise SystemExit("Unadapted compiler-TLS dependency: "+name)
-    subprocess.run([str(llvm/"llvm-ar"),"r",str(native_libc),str(emutls_obj)],check=True)
-    backend=emutls_dir/"backend.o"
-    subprocess.run([str(llvm/"clang++"),"-target","x86_64-sie-ps5","-fvisibility-nodllstorageclass=default","-isysroot",str(SDK),"-isystem",str(SDK/"target/include/c++/v1"),"-isystem",str(SDK/"target/include"),"-std=c++20","-O2","-Wall","-Wextra","-Werror","-fno-exceptions","-fno-rtti","-fno-stack-protector","-femulated-tls","-I"+str(ROOT/".tools/java25/openjdk/src/hotspot/share"),"-c",str(ROOT/"java25/probe/emutls_alloc.cpp"),"-o",str(backend)],check=True)
-    emutls_backend=[backend]
+    emutls_backend = [stage_compiler_tls(ROOT, WORK, llvm, SDK, native_libc,
+                                        ROOT / '.tools/java25/openjdk/src/hotspot/share')]
 # Keep SDK resolver result ownership coherent when its small libc allocations
 # fail. Rebind only the pinned netdb object, including its matching free/strdup.
 if args.startup:

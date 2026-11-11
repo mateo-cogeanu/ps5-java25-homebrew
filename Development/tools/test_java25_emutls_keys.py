@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """Test the actual compiler-TLS adapter with real pthread lifecycle and failure injection."""
 from pathlib import Path
+import argparse
 import subprocess
-R=Path(__file__).resolve().parents[1];W=R/'build/java25/emutls-keys-test';W.mkdir(parents=True,exist_ok=True)
+R=Path(__file__).resolve().parents[1]
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--major', type=int, choices=(17, 25), default=25)
+major=parser.parse_args().major
+W=R/f'build/java{major}/emutls-keys-test';W.mkdir(parents=True,exist_ok=True)
 cpp=r'''
 #include <pthread.h>
 #include <sched.h>
@@ -17,7 +22,7 @@ cpp=r'''
 #include <vector>
 #include <sys/mman.h>
 #include <unistd.h>
-static std::atomic<bool> deny_heap{true},deny_set{true},false_success{false},fail_create{false},fail_join{false};
+static std::atomic<bool> deny_heap{true},deny_map{false},deny_set{true},false_success{false},fail_create{false},fail_join{false};
 static std::atomic<int> maps{0},heaps{0},destroyed{0},after_return{0},creates{0},sets{0};
 static pthread_key_t key,late_key;
 namespace injected {
@@ -25,7 +30,10 @@ void* alloc(size_t n){if(deny_heap){errno=ENOMEM;return nullptr;}void*p=::malloc
 void drop(void*p){if(p)--heaps;::free(p);}
 }
 namespace std {inline void* injected_malloc(size_t n){return injected::alloc(n);}inline void injected_free(void*p){injected::drop(p);}}
-void* test_map(void*p,size_t n,int prot,int flags,int fd,off_t off){p=::mmap(p,n,prot,flags,fd,off);if(p!=MAP_FAILED)++maps;return p;}
+using std::injected_malloc;
+using std::injected_free;
+void* injected_realloc(void* p,size_t n){if(deny_heap){errno=ENOMEM;return nullptr;}return ::realloc(p,n);}
+void* test_map(void*p,size_t n,int prot,int flags,int fd,off_t off){if(deny_map){errno=ENOMEM;return MAP_FAILED;}p=::mmap(p,n,prot,flags,fd,off);if(p!=MAP_FAILED)++maps;return p;}
 int test_unmap(void*p,size_t n){int r=::munmap(p,n);if(!r)--maps;return r;}
 int test_set(pthread_key_t k,const void*p){++sets;if(deny_set)return ENOMEM;if(false_success)return 0;return ::pthread_setspecific(k,p);}
 int test_key_create(pthread_key_t*k,void(*f)(void*)){return ::pthread_key_create(k,f);}
@@ -33,6 +41,7 @@ extern "C" int __real_pthread_create(pthread_t*t,const pthread_attr_t*a,void*(*f
 extern "C" int __real_pthread_join(pthread_t t,void**p){if(fail_join)return EDEADLK;return ::pthread_join(t,p);}
 #define malloc injected_malloc
 #define free injected_free
+#define realloc injected_realloc
 #define mmap test_map
 #define munmap test_unmap
 #define pthread_setspecific test_set
@@ -40,6 +49,7 @@ extern "C" int __real_pthread_join(pthread_t t,void**p){if(fail_join)return EDEA
 #include "java25/probe/emutls_alloc.cpp"
 #undef malloc
 #undef free
+#undef realloc
 #undef mmap
 #undef munmap
 #undef pthread_setspecific
@@ -67,6 +77,15 @@ void* stale_native_worker(void*){
 }
 int main(){
  assert(ps5_emutls_key_create(&key,normal_destructor)==0);assert(::pthread_key_create(&late_key,late_destructor)==0);
+ // The observed 128-byte initial allocation and its growth must survive heap refusal.
+ auto* initial=static_cast<unsigned char*>(ps5_emutls_malloc(128));assert(initial);
+ memset(initial,0x57,128);
+ deny_map=true;assert(!ps5_emutls_realloc(initial,256)&&errno==ENOMEM);
+ for(int i=0;i<128;++i)assert(initial[i]==0x57);
+ deny_map=false;
+ auto* grown=static_cast<unsigned char*>(ps5_emutls_realloc(initial,256));assert(grown);
+ for(int i=0;i<128;++i)assert(grown[i]==0x57);
+ ps5_emutls_free(grown);assert(!maps&&!heaps);
  pthread_t t;void*answer=nullptr;
  // Refused key registration: retain until native destructors have really run.
  assert(__wrap_pthread_create(&t,nullptr,worker,(void*)71)==0);assert(__wrap_pthread_join(t,&answer)==0&&answer==(void*)17);assert(after_return==1&&destroyed==0&&!maps&&!heaps);
@@ -95,5 +114,8 @@ int main(){
 }
 '''
 p=W/'test.cpp';p.write_text(cpp)
-subprocess.run(['/usr/bin/clang++','-std=c++20','-O1','-g','-fsanitize=address,undefined','-pthread','-I',str(R),str(p),'-o',str(W/'test')],check=True)
+flags=['-DPS5_EMUTLS_JAVA17=1', '-D__PROSPERO__=1', '-I',
+       str(R/'.tools/java17/openjdk/src/hotspot/share')] if major==17 else []
+subprocess.run(['/usr/bin/clang++','-std=c++20','-O1','-g','-fsanitize=address,undefined','-pthread',
+                *flags,'-I',str(R),str(p),'-o',str(W/'test')],check=True)
 subprocess.run([str(W/'test')],check=True)
