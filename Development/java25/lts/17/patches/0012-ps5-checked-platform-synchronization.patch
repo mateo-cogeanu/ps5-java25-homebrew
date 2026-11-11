@@ -1,0 +1,182 @@
+--- /dev/null
++++ b/src/hotspot/share/runtime/ps5Synchronization.hpp
+@@ -0,0 +1,92 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHARE_RUNTIME_PS5SYNCHRONIZATION_HPP
++#define SHARE_RUNTIME_PS5SYNCHRONIZATION_HPP
++#include <pthread.h>
++#ifdef __PROSPERO__
++#include <errno.h>
++#include <stddef.h>
++namespace ps5_sync {
++template<class Handle,size_t Count> struct Pool {
++ struct Slot {Handle native;bool initialized,busy;};
++ Slot slots[Count];unsigned lock_word,ready;
++ void lock(){while(__atomic_exchange_n(&lock_word,1u,__ATOMIC_ACQUIRE)){
++  while(__atomic_load_n(&lock_word,__ATOMIC_RELAXED)){
++#if defined(__x86_64__)
++   __asm__ volatile("pause");
++#elif defined(__aarch64__)
++   __asm__ volatile("yield");
++#endif
++  }
++ }}
++ void unlock(){__atomic_store_n(&lock_word,0u,__ATOMIC_RELEASE);}
++ template<class Init,class Attr> size_t prime(Init initialize,Attr*attr){
++  size_t count=0;
++  for(auto&s:slots){s.initialized=initialize(&s.native,attr)==0;if(s.initialized)++count;}
++  __atomic_store_n(&ready,1u,__ATOMIC_RELEASE);return count;
++ }
++ Handle* acquire(){
++  if(!__atomic_load_n(&ready,__ATOMIC_ACQUIRE))return nullptr;
++  Handle* result=nullptr;lock();
++  for(auto&s:slots)if(s.initialized&&!s.busy){s.busy=true;result=&s.native;break;}
++  unlock();return result;
++ }
++ bool release(Handle*p){bool found=false;lock();for(auto&s:slots)if(&s.native==p){found=s.initialized&&s.busy;if(found)s.busy=false;break;}unlock();return found;}
++};
++inline Pool<pthread_mutex_t,4096>& mutex_pool(){static Pool<pthread_mutex_t,4096> p{};return p;}
++inline Pool<pthread_cond_t,4096>& relative_pool(){static Pool<pthread_cond_t,4096> p{};return p;}
++struct Configuration {const pthread_mutexattr_t* mutex;const pthread_condattr_t* relative;unsigned state;};
++inline Configuration& configuration(){static Configuration c{};return c;}
++struct PrimeResult {size_t mutexes,relative;};
++inline PrimeResult prime(pthread_mutexattr_t* ma,pthread_condattr_t* ca){
++ auto&c=configuration();unsigned expected=0;
++ if(!__atomic_compare_exchange_n(&c.state,&expected,1u,false,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE))return {0,0};
++ c.mutex=ma;c.relative=ca;
++ PrimeResult result{mutex_pool().prime(pthread_mutex_init,ma),relative_pool().prime(pthread_cond_init,ca)};
++ __atomic_store_n(&c.state,2u,__ATOMIC_RELEASE);return result;
++}
++class MutexLease {
++ pthread_mutex_t local{};pthread_mutex_t*active=nullptr;bool pooled=false;
++ public:
++ MutexLease()=default;MutexLease(const MutexLease&)=delete;MutexLease&operator=(const MutexLease&)=delete;
++ int init(const pthread_mutexattr_t*attr){
++  if(active)return EBUSY;int saved=errno;
++  if(__atomic_load_n(&configuration().state,__ATOMIC_ACQUIRE)==2&&attr==configuration().mutex){active=mutex_pool().acquire();pooled=active!=nullptr;}
++  int result=0;if(!active){result=pthread_mutex_init(&local,attr);if(!result)active=&local;}
++  errno=saved;return result;
++ }
++ int destroy(){
++  if(!active)return EINVAL;int saved=errno;int result=0;
++  if(pooled){
++   // Do not return a locked native mutex to another owner.
++   result=pthread_mutex_trylock(active);
++   if(!result){result=pthread_mutex_unlock(active);if(!result&&!mutex_pool().release(active))result=EINVAL;}
++  }else result=pthread_mutex_destroy(active);
++  if(!result){active=nullptr;pooled=false;}errno=saved;return result;
++ }
++ pthread_mutex_t*get(){return active?active:&local;}
++ operator pthread_mutex_t*(){return get();}
++};
++class CondLease {
++ pthread_cond_t local{};pthread_cond_t*active=nullptr;unsigned kind=0;
++ public:
++ CondLease()=default;CondLease(const CondLease&)=delete;CondLease&operator=(const CondLease&)=delete;
++ int init(const pthread_condattr_t*attr){
++  if(active)return EBUSY;int saved=errno;
++  if(__atomic_load_n(&configuration().state,__ATOMIC_ACQUIRE)==2){
++   if(attr==configuration().relative){active=relative_pool().acquire();if(active)kind=1;}
++  }
++  int result=0;if(!active){result=pthread_cond_init(&local,attr);if(!result)active=&local;}
++  errno=saved;return result;
++ }
++ // Caller must ensure no waiter remains, as required for native cond_destroy.
++ int destroy(){
++  if(!active)return EINVAL;int saved=errno;
++  int result=kind==1?(relative_pool().release(active)?0:EINVAL):pthread_cond_destroy(active);
++  if(!result){active=nullptr;kind=0;}errno=saved;return result;
++ }
++ pthread_cond_t*get(){return active?active:&local;}
++ operator pthread_cond_t*(){return get();}
++};
++}
++#endif
++#endif
+--- a/src/hotspot/os/posix/os_posix.hpp
++++ b/src/hotspot/os/posix/os_posix.hpp
+@@ -238,0 +239,3 @@
++#ifdef __PROSPERO__
++  ps5_sync::MutexLease _mutex;
++#else
+@@ -239,0 +243 @@
++#endif
+@@ -242 +246,7 @@
+-  pthread_mutex_t* mutex() { return &_mutex; }
++  pthread_mutex_t* mutex() {
++#ifdef __PROSPERO__
++    return _mutex.get();
++#else
++    return &_mutex;
++#endif
++  }
+@@ -283,0 +294,3 @@
++#ifdef __PROSPERO__
++  ps5_sync::CondLease _cond;
++#else
+@@ -285 +298,8 @@
+-  pthread_cond_t* cond() { return &_cond; }
++#endif
++  pthread_cond_t* cond() {
++#ifdef __PROSPERO__
++    return _cond.get();
++#else
++    return &_cond;
++#endif
++  }
+--- a/src/hotspot/share/runtime/os.hpp
++++ b/src/hotspot/share/runtime/os.hpp
+@@ -31,0 +32,3 @@
++#ifdef __PROSPERO__
++#include "runtime/ps5Synchronization.hpp"
++#endif
+--- a/src/hotspot/os/posix/os_posix.cpp
++++ b/src/hotspot/os/posix/os_posix.cpp
+@@ -26,0 +27 @@
++#include "runtime/ps5LtsBootstrap.hpp"
+@@ -1413,0 +1415,5 @@
++#ifdef __PROSPERO__
++  const auto primed = ps5_sync::prime(_mutexAttr, _condAttr);
++  ps5_lts_trace_number("SYNC: early mutexes=", primed.mutexes);
++  ps5_lts_trace_number("SYNC: early conditions=", primed.relative);
++#endif
+@@ -1966,0 +1973,7 @@
++#ifdef __PROSPERO__
++  const int status = _mutex.init(_mutexAttr);
++  if (status != 0) {
++    ps5_lts_trace_number("SYNC: mutex_init refused=", status);
++    fatal("PS5 mutex_init failed (%d)", status);
++  }
++#else
+@@ -1968,0 +1982 @@
++#endif
+@@ -1971,0 +1986,7 @@
++#ifdef __PROSPERO__
++  const int status = _mutex.destroy();
++  if (status != 0) {
++    ps5_lts_trace_number("SYNC: mutex_destroy refused=", status);
++    fatal("PS5 mutex_destroy failed (%d)", status);
++  }
++#else
+@@ -1973,0 +1995 @@
++#endif
+@@ -1976,0 +1999,7 @@
++#ifdef __PROSPERO__
++  const int status = _cond.init(_condAttr);
++  if (status != 0) {
++    ps5_lts_trace_number("SYNC: cond_init refused=", status);
++    fatal("PS5 cond_init failed (%d)", status);
++  }
++#else
+@@ -1978,0 +2008 @@
++#endif
+@@ -1981,0 +2012,7 @@
++#ifdef __PROSPERO__
++  const int status = _cond.destroy();
++  if (status != 0) {
++    ps5_lts_trace_number("SYNC: cond_destroy refused=", status);
++    fatal("PS5 cond_destroy failed (%d)", status);
++  }
++#else
+@@ -1983,0 +2021 @@
++#endif

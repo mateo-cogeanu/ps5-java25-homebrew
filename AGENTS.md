@@ -567,3 +567,12 @@ creation/query domains, early initialization, checked acquisition/detach state,
 paired lease release and original native stack/create semantics. Exact abort
 cause remains unresolved. Target/patch and actual host pool refusal/concurrency/
 ownership checks pass. Consumer026 PS5 pending. See docs/java17-thread-attribute-leases.md.
+
+## Java17 checked platform synchronization —2026-11-11
+
+Consumer027 stack candidates resolve to pthread_mutex_lock from HotSpot
+class metadata allocation. Native init refusal is plausible but unconfirmed.
+Active17 PS5 PlatformMutex/Monitor use real early4096/4096 pooled native objects
+with checked init/destroy and native fallback. Original lock and wait operations
+remain. Host forced-refusal/exhaustion/reuse/concurrency and target evidence
+recorded. Consumer028 physical validation pending. See docs/java17-platform-synchronization.md.
