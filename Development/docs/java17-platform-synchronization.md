@@ -15,5 +15,7 @@ an uninitialized object can reach a lock or wait in a release build.
 
 The host sanitizer fixture passed forced late initialization refusal,
 pool exhaustion, locked-mutex release rejection, reuse and concurrent
-lease tests. Exact PS5 startup and the Minecraft title screen require
-consumer 028 validation.
+lease tests. On PS5, consumer 028 initialized all 4096 mutexes and
+4096 conditions before a native abort during Minecraft startup. The
+[hidden class metaspace lock change](java17-hidden-class-metaspace-locks.md)
+reduces demand on these pools in consumer 029.

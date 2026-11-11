@@ -33,6 +33,7 @@
         "src/hotspot/os/posix/os_posix.cpp": "4366a934a952b8a377041842919fcfbd73b5c8a7858023b43b8e43b952d83594",
         "src/hotspot/os_cpu/bsd_x86/os_bsd_x86.cpp": "80769d8b71804c3a6fb4764ac11749acf747fdcc8ecb35779cf6a1421dee295d",
         "src/hotspot/share/classfile/classLoader.cpp": "9a358c87481b8f52f7dcfbc226655d473ce8fb7232f527f76d4eb7cf14713851",
+        "src/hotspot/share/classfile/classLoaderData.cpp": "a20198910f608704dfd59441328d49837c7d9abc051b0f4587dc0a0ee0812b1e",
         "src/hotspot/share/prims/jni.cpp": "38571814b94c9fa8f0795e4071c16c19d02a8ea57864bc1f79d2b9ed1833cb7a",
         "src/hotspot/share/runtime/arguments.cpp": "e2e7c0e09cfa0bc24a1f37e025c380023be702fc18ee8cf0b3d455708b6a727f",
         "src/hotspot/share/runtime/ps5LtsBootstrap.hpp": "6fa5ae215865072f2df70eebbec3418cd1de0608181b9121de1f40716cc61b02",

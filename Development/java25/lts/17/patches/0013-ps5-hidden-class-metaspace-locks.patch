@@ -1,0 +1,46 @@
+--- a/src/hotspot/share/classfile/classLoaderData.cpp
++++ b/src/hotspot/share/classfile/classLoaderData.cpp
+@@ -83,0 +84,19 @@
++static Mutex* new_metaspace_lock() {
++  return new Mutex(Mutex::leaf+1, "Metaspace allocation lock", true,
++                   Mutex::_safepoint_check_never);
++}
++
++#ifdef __PROSPERO__
++// Short-lived hidden classes can each create a CLD. Bound their native
++// mutex demand while allowing unrelated classes to allocate in parallel.
++static const unsigned hidden_metaspace_lock_count = 32;
++static Mutex* hidden_metaspace_locks[hidden_metaspace_lock_count];
++
++static Mutex* hidden_metaspace_lock(const ClassLoaderData* cld) {
++  const uintptr_t address = reinterpret_cast<uintptr_t>(cld);
++  const unsigned index = ((address >> 4) ^ (address >> 12)) % hidden_metaspace_lock_count;
++  assert(hidden_metaspace_locks[index] != NULL, "shared metaspace locks not initialized");
++  return hidden_metaspace_locks[index];
++}
++#endif
++
+@@ -87,0 +107,5 @@
++#ifdef __PROSPERO__
++  for (unsigned index = 0; index < hidden_metaspace_lock_count; ++index) {
++    hidden_metaspace_locks[index] = new_metaspace_lock();
++  }
++#endif
+@@ -137,2 +161,5 @@
+-  _metaspace_lock(new Mutex(Mutex::leaf+1, "Metaspace allocation lock", true,
+-                            Mutex::_safepoint_check_never)),
++#ifdef __PROSPERO__
++  _metaspace_lock(has_class_mirror_holder ? hidden_metaspace_lock(this) : new_metaspace_lock()),
++#else
++  _metaspace_lock(new_metaspace_lock()),
++#endif
+@@ -715,2 +742,7 @@
+-  // Delete lock
+-  delete _metaspace_lock;
++  // Shared hidden-class locks live for the lifetime of HotSpot.
++#ifdef __PROSPERO__
++  if (!has_class_mirror_holder())
++#endif
++  {
++    delete _metaspace_lock;
++  }
