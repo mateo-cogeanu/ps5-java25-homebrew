@@ -1,0 +1,54 @@
+--- a/src/java.base/share/native/libzip/Inflater.c
++++ b/src/java.base/share/native/libzip/Inflater.c
+@@ -41,0 +42,27 @@
++#ifdef __PROSPERO__
++extern void *JVM_PS5AllocateNativeScratch(size_t size);
++extern void JVM_PS5ReleaseNativeScratch(void *buffer);
++
++static voidpf ps5_inflater_zalloc(voidpf opaque, uInt count, uInt size) {
++    (void)opaque;
++    if (size != 0 && (size_t)count > (size_t)-1 / size) {
++        return NULL;
++    }
++    size_t bytes = (size_t)count * size;
++    void *buffer = JVM_PS5AllocateNativeScratch(bytes);
++    if (buffer != NULL) {
++        memset(buffer, 0, bytes);
++    }
++    return buffer;
++}
++
++static void ps5_inflater_zfree(voidpf opaque, voidpf buffer) {
++    (void)opaque;
++    JVM_PS5ReleaseNativeScratch(buffer);
++}
++
++#define INFLATER_RELEASE(buffer) ps5_inflater_zfree(NULL, buffer)
++#else
++#define INFLATER_RELEASE(buffer) free(buffer)
++#endif
++
+@@ -59,0 +87,3 @@
++#ifdef __PROSPERO__
++    z_stream *strm = ps5_inflater_zalloc(NULL, 1, sizeof(z_stream));
++#else
+@@ -60,0 +91 @@
++#endif
+@@ -66,0 +98,4 @@
++#ifdef __PROSPERO__
++        strm->zalloc = ps5_inflater_zalloc;
++        strm->zfree = ps5_inflater_zfree;
++#endif
+@@ -72 +107 @@
+-            free(strm);
++            INFLATER_RELEASE(strm);
+@@ -83 +118 @@
+-            free(strm);
++            INFLATER_RELEASE(strm);
+@@ -303,3 +338,3 @@
+-        free(jlong_to_ptr(addr));
+-    }
+-}
++        INFLATER_RELEASE(jlong_to_ptr(addr));
++    }
++}

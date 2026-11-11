@@ -70,7 +70,8 @@
         "src/hotspot/os/posix/threadLocalStorage_posix.cpp": "0a4a171c63611a197ceb01b5d7fdeaf44865426b992e02134146cf2a4e8bc294",
         "src/hotspot/share/runtime/ps5ThreadLocal.hpp": "d58c5bfc4fdc102d2b4716630cc5f197c59e0579c093af6a8fe5ca73972d07f9",
         "src/java.base/unix/native/libnet/NetworkInterface.c": "cc223e406e1335ea6f66e9018e26ff3aea9039a46a0a6b0334bceacc3e197d65",
-        "src/java.base/unix/native/libnet/ps5Ifaddrs.h": "4927e017704d3a47dd62cb745378017bda0ebcb4b0726f0f6c814f2cf7655b3e"
+        "src/java.base/unix/native/libnet/ps5Ifaddrs.h": "4927e017704d3a47dd62cb745378017bda0ebcb4b0726f0f6c814f2cf7655b3e",
+        "src/java.base/share/native/libzip/Inflater.c": "c6e917a816593b06448388ee11b7fde1da345853984340d4e420ede4f9750623"
       }
     },
     "21": {
