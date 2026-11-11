@@ -1,0 +1,252 @@
+--- a/src/java.base/unix/native/libnet/NetworkInterface.c
++++ b/src/java.base/unix/native/libnet/NetworkInterface.c
+@@ -1693,0 +1694,11 @@
++#ifdef __PROSPERO__
++#include "ps5Ifaddrs.h"
++#define IFADDRS_STORAGE Ps5Ifaddrs ifaddrs_storage = {0}
++#define GETIFADDRS(list) ps5_getifaddrs(list, &ifaddrs_storage)
++#define FREEIFADDRS(list) ps5_freeifaddrs(list, &ifaddrs_storage)
++#else
++#define IFADDRS_STORAGE
++#define GETIFADDRS(list) getifaddrs(list)
++#define FREEIFADDRS(list) freeifaddrs(list)
++#endif
++
+@@ -1723,2 +1734,3 @@
+-
+-    if (getifaddrs(&origifa) != 0) {
++    IFADDRS_STORAGE;
++
++    if (GETIFADDRS(&origifa) != 0) {
+@@ -1751 +1763 @@
+-            freeifaddrs(origifa);
++            FREEIFADDRS(origifa);
+@@ -1758 +1770 @@
+-    freeifaddrs(origifa);
++    FREEIFADDRS(origifa);
+@@ -1767,2 +1779,3 @@
+-
+-    if (getifaddrs(&origifa) != 0) {
++    IFADDRS_STORAGE;
++
++    if (GETIFADDRS(&origifa) != 0) {
+@@ -1787 +1800 @@
+-            freeifaddrs(origifa);
++            FREEIFADDRS(origifa);
+@@ -1794 +1807 @@
+-    freeifaddrs(origifa);
++    FREEIFADDRS(origifa);
+@@ -1827,0 +1841 @@
++    IFADDRS_STORAGE;
+@@ -1832 +1846 @@
+-    if (!getifaddrs(&ifa0)) {
++    if (!GETIFADDRS(&ifa0)) {
+@@ -1843 +1857 @@
+-                        freeifaddrs(ifa0);
++                        FREEIFADDRS(ifa0);
+@@ -1849 +1863 @@
+-        freeifaddrs(ifa0);
++        FREEIFADDRS(ifa0);
+--- /dev/null
++++ b/src/java.base/unix/native/libnet/ps5Ifaddrs.h
+@@ -0,0 +1,183 @@
++/* SPDX-License-Identifier: GPL-2.0-only WITH Classpath-exception-2.0 */
++#ifndef PS5_IFADDRS_H
++#define PS5_IFADDRS_H
++#include <sys/sysctl.h>
++#include <sys/mman.h>
++#include <net/route.h>
++#include <stddef.h>
++#include <stdint.h>
++/* The resident getifaddrs can return ENOMEM after earlier successful calls.
++ * Retry supported resident failures using a fresh NET_RT_IFLIST query and owned mappings.
++ * No cached addresses, synthetic interfaces, libc allocator or global leases.
++ */
++/* Captured PS5 NET_RT_IFLIST records place link addresses at byte192,
++ * whereas the SDK's desktop if_msghdr is168 bytes. Only the stable prefix
++ * (bitmap/flags/index) is read; opaque kernel statistics are skipped. */
++#define PS5_IFINFO_HEADER_SIZE 192
++_Static_assert(offsetof(struct if_msghdr,ifm_addrs)==4, "route address bitmap ABI");
++_Static_assert(offsetof(struct if_msghdr,ifm_flags)==8, "route flags ABI");
++_Static_assert(offsetof(struct if_msghdr,ifm_index)==12, "route index ABI");
++_Static_assert(sizeof(struct ifa_msghdr)==20, "route address header ABI");
++_Static_assert(sizeof(long)==8, "route sockaddr alignment ABI");
++typedef struct {
++    struct ifaddrs address;
++    char name[IFNAMSIZ];
++    struct sockaddr_storage addr, mask, dst;
++} Ps5IfaddrNode;
++typedef struct { void *nodes; size_t bytes; } Ps5Ifaddrs;
++#ifndef PS5_IFADDRS_NOTE
++#define PS5_IFADDRS_NOTE(phase,value) ((void)0)
++#endif
++static int ps5_ifaddrs_addresses(const unsigned char *cursor, size_t length,
++                               unsigned bits, const struct sockaddr **addresses) {
++    for (unsigned i=0; i<RTAX_MAX; i++) {
++        addresses[i]=NULL;
++        if (!(bits & (1u<<i))) continue;
++        if (length<2) return -1;
++        size_t bytes=cursor[0];
++        size_t rounded=bytes ? (bytes+sizeof(long)-1)&~(sizeof(long)-1) : sizeof(long);
++        if (rounded>length || (bytes && bytes<2)) return -1;
++        addresses[i]=(const struct sockaddr *)(const void *)cursor;
++        cursor+=rounded; length-=rounded;
++    }
++    if (bits & ~((1u<<RTAX_MAX)-1)) return -1;
++    return 0;
++}
++static int ps5_ifaddrs_copy(struct sockaddr_storage *to, const struct sockaddr *from) {
++    if (!from) return 0;
++    if (from->sa_len>sizeof(*to)) return -1;
++    memset(to,0,sizeof(*to));
++    if (from->sa_len) memcpy(to,from,from->sa_len);
++    return 0;
++}
++/* Each input message contributes at most one node. Addresses are copied into
++ * zero-padded storage because route netmasks may use shortened sockaddr forms.
++ */
++static int ps5_ifaddrs_parse(const unsigned char *data,size_t size,
++                            Ps5IfaddrNode *nodes,size_t capacity,size_t *count) {
++    size_t used=0,offset=0; unsigned index=0;
++    char name[IFNAMSIZ]={0}; unsigned flags=0;
++    struct ifaddrs *last=NULL;
++    while (offset<size) {
++        const unsigned char *message=data+offset;
++        if (size-offset<4) goto invalid;
++        unsigned short length; memcpy(&length,message,2);
++        if (length<4 || length>size-offset || message[2]!=RTM_VERSION) goto invalid;
++        const struct sockaddr *addresses[RTAX_MAX];
++        struct if_msghdr info;
++        struct ifa_msghdr address;
++        const struct sockaddr *value=NULL,*mask=NULL,*dst=NULL;
++        if (message[3]==RTM_IFINFO) {
++            if (length<PS5_IFINFO_HEADER_SIZE) goto invalid;
++            memset(&info,0,sizeof(info));
++            memcpy(&info,message,offsetof(struct if_msghdr,ifm_index)+sizeof(info.ifm_index));
++            index=0; name[0]=0;
++            if (ps5_ifaddrs_addresses(message+PS5_IFINFO_HEADER_SIZE,length-PS5_IFINFO_HEADER_SIZE,
++                                     (unsigned)info.ifm_addrs,addresses)) goto invalid;
++            value=addresses[RTAX_IFP];
++            if (!value) {offset+=length;continue;}
++            if (value->sa_family!=AF_LINK || value->sa_len<offsetof(struct sockaddr_dl,sdl_data)) goto invalid;
++            struct sockaddr_dl link; memset(&link,0,sizeof(link));
++            memcpy(&link,value,offsetof(struct sockaddr_dl,sdl_data));
++            size_t namesize=link.sdl_nlen;
++            if (!namesize || namesize>=IFNAMSIZ ||
++                offsetof(struct sockaddr_dl,sdl_data)+namesize+link.sdl_alen+link.sdl_slen>value->sa_len) goto invalid;
++            memcpy(name,(const unsigned char *)value+offsetof(struct sockaddr_dl,sdl_data),namesize);name[namesize]=0;
++            index=info.ifm_index;flags=(unsigned)info.ifm_flags;
++        } else if (message[3]==RTM_NEWADDR) {
++            if (length<sizeof(address)) goto invalid;
++            memcpy(&address,message,sizeof(address));
++            if (!index || index!=address.ifam_index) goto invalid;
++            if (ps5_ifaddrs_addresses(message+sizeof(address),length-sizeof(address),
++                                     (unsigned)address.ifam_addrs,addresses)) goto invalid;
++            value=addresses[RTAX_IFA];mask=addresses[RTAX_NETMASK];dst=addresses[RTAX_BRD];
++            if (!value) {offset+=length;continue;}
++            if ((value->sa_family==AF_INET && value->sa_len<sizeof(struct sockaddr_in)) ||
++                (value->sa_family==AF_INET6 && value->sa_len<sizeof(struct sockaddr_in6))) goto invalid;
++        } else {offset+=length;continue;}
++        if (used>=capacity) goto invalid;
++        Ps5IfaddrNode *node=&nodes[used++];memset(node,0,sizeof(*node));
++        memcpy(node->name,name,sizeof(name));node->address.ifa_name=node->name;
++        node->address.ifa_flags=flags;
++        if (ps5_ifaddrs_copy(&node->addr,value) || ps5_ifaddrs_copy(&node->mask,mask) || ps5_ifaddrs_copy(&node->dst,dst)) goto invalid;
++        node->address.ifa_addr=(struct sockaddr *)&node->addr;
++        if (mask) node->address.ifa_netmask=(struct sockaddr *)&node->mask;
++        if (dst) node->address.ifa_dstaddr=(struct sockaddr *)&node->dst;
++        if (last) last->ifa_next=&node->address;
++        last=&node->address;offset+=length;
++    }
++    *count=used;return 0;
++invalid:
++    PS5_IFADDRS_NOTE("route parser rejected offset",offset);
++    errno=EINVAL;return -1;
++}
++static void ps5_freeifaddrs(struct ifaddrs *list,Ps5Ifaddrs *storage) {
++    int saved=errno;
++    if (storage->nodes) {munmap(storage->nodes,storage->bytes);storage->nodes=NULL;storage->bytes=0;}
++    else freeifaddrs(list);
++    errno=saved;
++}
++static int ps5_getifaddrs(struct ifaddrs **result,Ps5Ifaddrs *storage) {
++    int saved=errno;
++    *result=NULL;storage->nodes=NULL;storage->bytes=0;
++    /* A failed resident call may leave errno untouched. Clear stale errors
++     * from earlier ioctls; query the kernel independently on the observed
++     * ENOMEM/EACCES failures or an errno-less failure. */
++    errno=0;
++    if (getifaddrs(result)==0) {errno=saved;return 0;}
++    int resident_error=errno;
++    if (resident_error!=ENOMEM && resident_error!=EACCES && resident_error!=0) return -1;
++    *result=NULL;
++    PS5_IFADDRS_NOTE("resident failure; route fallback",resident_error);
++    int mib[6]={CTL_NET,PF_ROUTE,0,0,NET_RT_IFLIST,0};
++    for (unsigned attempt=0;attempt<5;attempt++) {
++        size_t size=0;
++        if (sysctl(mib,6,NULL,&size,NULL,0)<0) {PS5_IFADDRS_NOTE("route size query failed",errno);return -1;}
++        PS5_IFADDRS_NOTE("route requested bytes",size);
++        /* Bound temporary memory and parser work; oversized data is real failure. */
++        if (size>1024*1024) {errno=EOVERFLOW;return -1;}
++        if (!size) {errno=saved;return 0;}
++        unsigned char *raw=mmap(NULL,size,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
++        if (raw==MAP_FAILED) {PS5_IFADDRS_NOTE("route raw mapping failed",errno);return -1;}
++        size_t received=size;
++        if (sysctl(mib,6,raw,&received,NULL,0)<0) {
++            int error=errno;PS5_IFADDRS_NOTE("route data query failed",error);munmap(raw,size);errno=error;
++            if (error==ENOMEM) continue;
++            return -1;
++        }
++        PS5_IFADDRS_NOTE("route received bytes",received);
++        PS5_IFADDRS_NOTE("route SDK if_msghdr size",sizeof(struct if_msghdr));
++        PS5_IFADDRS_NOTE("route PS5 ifinfo header size",PS5_IFINFO_HEADER_SIZE);
++        PS5_IFADDRS_NOTE("route SDK ifa_msghdr size",sizeof(struct ifa_msghdr));
++        if (received>size) {munmap(raw,size);errno=EINVAL;return -1;}
++        /* Count messages with the same bounded framing before allocating nodes. */
++        size_t offset=0,capacity=0;
++        while (offset<received) {
++            if (received-offset<4) break;
++            unsigned short length;memcpy(&length,raw+offset,2);
++            if (length<4 || length>received-offset) break;
++            capacity++;offset+=length;
++        }
++        if (offset!=received || capacity>SIZE_MAX/sizeof(Ps5IfaddrNode)) {
++            PS5_IFADDRS_NOTE("route framing rejected offset",offset);
++            munmap(raw,size);errno=EINVAL;return -1;
++        }
++        size_t bytes=capacity*sizeof(Ps5IfaddrNode);
++        if (bytes>16*1024*1024) {munmap(raw,size);errno=EOVERFLOW;return -1;}
++        if (!bytes) {munmap(raw,size);errno=saved;return 0;}
++        Ps5IfaddrNode *nodes=mmap(NULL,bytes,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
++        if (nodes==MAP_FAILED) {int error=errno;PS5_IFADDRS_NOTE("route node mapping failed",error);munmap(raw,size);errno=error;return -1;}
++        size_t count=0;
++        int status=ps5_ifaddrs_parse(raw,received,nodes,capacity,&count);
++        int error=errno;
++        munmap(raw,size);
++        if (status<0) {munmap(nodes,bytes);errno=error;return -1;}
++        if (!count) {munmap(nodes,bytes);errno=saved;return 0;}
++        storage->nodes=nodes;storage->bytes=bytes;*result=&nodes[0].address;
++        PS5_IFADDRS_NOTE("route fallback complete",count);
++        errno=saved;return 0;
++    }
++    PS5_IFADDRS_NOTE("route query retries exhausted",5);
++    errno=ENOMEM;return -1;
++}
++#endif
+--- a/src/java.base/share/native/libjava/jni_util.c
++++ b/src/java.base/share/native/libjava/jni_util.c
+@@ -170 +170,7 @@
+-                char *str1 = (char *)malloc((messageextlen) * sizeof(char));
++#ifdef __PROSPERO__
++                char local_message[256];
++                char *str1 = messageextlen <= sizeof(local_message)
++                    ? local_message : (char *)malloc(messageextlen);
++#else
++                char *str1 = (char *)malloc(messageextlen);
++#endif
+@@ -176,0 +183,3 @@
++#ifdef __PROSPERO__
++                if (str1 != local_message) free(str1);
++#else
+@@ -177,0 +187 @@
++#endif

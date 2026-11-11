@@ -50,7 +50,7 @@
         "src/hotspot/share/services/nmtPreInit.cpp": "c4ef230a44c6ef24fa3a0a614e883626685e74fa03b78578a5727644af34186a",
         "src/hotspot/share/memory/metaspace/virtualSpaceList.cpp": "8cfc51d19c4f1c18508db42a4f597e8a93e8b27feccd9382e88898bb79b343b4",
         "src/hotspot/share/utilities/debug.cpp": "1805ca7408af8148929e4a03592aa52e47505ead57a0c2ee9e70f8decfce33b2",
-        "src/java.base/share/native/libjava/jni_util.c": "a18b2937573eba5793edb6a28d763378c8c6eab62a15581111ac131f6738643e",
+        "src/java.base/share/native/libjava/jni_util.c": "4599212274c6705315c3846c2130e313aa84f7b5272cc4c13f400886762dd28f",
         "src/hotspot/share/classfile/verifier.cpp": "e53a3305e6ff8a2b98edb0de67f67751467beaf7e17da883e5d691726ca40de5",
         "src/java.base/share/native/libverify/check_code.c": "f4ee3a88b7a8e916eaf76080e8f4375de8bcc2fb2f20dd83d859ea574a485692",
         "make/hotspot/lib/JvmMapfile.gmk": "10a03211c38de3cb1941dae7c983f446959cc5b7a582aa99af590481ec37b53f",
@@ -69,7 +69,8 @@
         "src/hotspot/share/runtime/thread.hpp": "972409810187257dcc670a5ea80f003d0b355eac0bdec11ad6fb4dd623e12e8b",
         "src/hotspot/os/posix/threadLocalStorage_posix.cpp": "0a4a171c63611a197ceb01b5d7fdeaf44865426b992e02134146cf2a4e8bc294",
         "src/hotspot/share/runtime/ps5ThreadLocal.hpp": "d58c5bfc4fdc102d2b4716630cc5f197c59e0579c093af6a8fe5ca73972d07f9",
-        "src/java.base/unix/native/libnet/NetworkInterface.c": "b6b300de60e3763bee7ba0ec04db585760950c08bc6f6699e3f7a182e407a645"
+        "src/java.base/unix/native/libnet/NetworkInterface.c": "cc223e406e1335ea6f66e9018e26ff3aea9039a46a0a6b0334bceacc3e197d65",
+        "src/java.base/unix/native/libnet/ps5Ifaddrs.h": "4927e017704d3a47dd62cb745378017bda0ebcb4b0726f0f6c814f2cf7655b3e"
       }
     },
     "21": {
