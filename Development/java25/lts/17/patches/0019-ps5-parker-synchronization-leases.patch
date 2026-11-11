@@ -1,0 +1,81 @@
+diff --git a/src/hotspot/share/runtime/ps5Synchronization.hpp b/src/hotspot/share/runtime/ps5Synchronization.hpp
+--- a/src/hotspot/share/runtime/ps5Synchronization.hpp
++++ b/src/hotspot/share/runtime/ps5Synchronization.hpp
+@@ -36,0 +37 @@
++inline Pool<pthread_cond_t,256>& absolute_pool(){static Pool<pthread_cond_t,256> p{};return p;}
+@@ -39 +40 @@
+-struct PrimeResult {size_t mutexes,relative;};
++struct PrimeResult {size_t mutexes,relative,absolute;};
+@@ -42 +43 @@
+- if(!__atomic_compare_exchange_n(&c.state,&expected,1u,false,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE))return {0,0};
++ if(!__atomic_compare_exchange_n(&c.state,&expected,1u,false,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE))return {0,0,0};
+@@ -44 +45,2 @@
+- PrimeResult result{mutex_pool().prime(pthread_mutex_init,ma),relative_pool().prime(pthread_cond_init,ca)};
++ PrimeResult result{mutex_pool().prime(pthread_mutex_init,ma),relative_pool().prime(pthread_cond_init,ca),
++                    absolute_pool().prime(pthread_cond_init,static_cast<pthread_condattr_t*>(nullptr))};
+@@ -73 +75 @@
+- int init(const pthread_condattr_t*attr){
++ int init(const pthread_condattr_t*attr,bool absolute=false){
+@@ -76 +78,2 @@
+-   if(attr==configuration().relative){active=relative_pool().acquire();if(active)kind=1;}
++   if(absolute&&!attr){active=absolute_pool().acquire();if(active)kind=2;}
++   else if(!absolute&&attr==configuration().relative){active=relative_pool().acquire();if(active)kind=1;}
+@@ -84 +87,4 @@
+-  int result=kind==1?(relative_pool().release(active)?0:EINVAL):pthread_cond_destroy(active);
++  int result;
++  if(kind==1)result=relative_pool().release(active)?0:EINVAL;
++  else if(kind==2)result=absolute_pool().release(active)?0:EINVAL;
++  else result=pthread_cond_destroy(active);
+diff --git a/src/hotspot/os/posix/os_posix.hpp b/src/hotspot/os/posix/os_posix.hpp
+--- a/src/hotspot/os/posix/os_posix.hpp
++++ b/src/hotspot/os/posix/os_posix.hpp
+@@ -187,0 +188,5 @@
++#ifdef __PROSPERO__
++  ps5_sync::MutexLease _mutex;
++  ps5_sync::CondLease _cond[2];
++  pthread_cond_t* parker_cond(int index) { return _cond[index].get(); }
++#else
+@@ -189,0 +195,2 @@
++  pthread_cond_t* parker_cond(int index) { return &_cond[index]; }
++#endif
+diff --git a/src/hotspot/os/posix/os_posix.cpp b/src/hotspot/os/posix/os_posix.cpp
+--- a/src/hotspot/os/posix/os_posix.cpp
++++ b/src/hotspot/os/posix/os_posix.cpp
+@@ -1418,0 +1419 @@
++  ps5_lts_trace_number("SYNC: early absolute conditions=", primed.absolute);
+@@ -1757 +1758,15 @@
+- os::PlatformParker::PlatformParker() : _counter(0), _cur_index(-1) {
++#ifdef __PROSPERO__
++static void check_ps5_parker_status(int status, const char* operation) {
++  if (status != 0) {
++    ps5_lts_trace_number(operation, status);
++    fatal("PS5 Parker synchronization failed (%d)", status);
++  }
++}
++#endif
++
++os::PlatformParker::PlatformParker() : _counter(0), _cur_index(-1) {
++#ifdef __PROSPERO__
++  check_ps5_parker_status(_cond[REL_INDEX].init(_condAttr), "SYNC: parker relative init refused=");
++  check_ps5_parker_status(_cond[ABS_INDEX].init(nullptr, true), "SYNC: parker absolute init refused=");
++  check_ps5_parker_status(_mutex.init(_mutexAttr), "SYNC: parker mutex init refused=");
++#else
+@@ -1763,0 +1779 @@
++#endif
+@@ -1766,0 +1783,5 @@
++#ifdef __PROSPERO__
++  check_ps5_parker_status(_cond[REL_INDEX].destroy(), "SYNC: parker relative destroy refused=");
++  check_ps5_parker_status(_cond[ABS_INDEX].destroy(), "SYNC: parker absolute destroy refused=");
++  check_ps5_parker_status(_mutex.destroy(), "SYNC: parker mutex destroy refused=");
++#else
+@@ -1772,0 +1794 @@
++#endif
+@@ -1839 +1861 @@
+-    status = pthread_cond_wait(&_cond[_cur_index], _mutex);
++    status = pthread_cond_wait(parker_cond(_cur_index), _mutex);
+@@ -1845 +1867 @@
+-    status = pthread_cond_timedwait(&_cond[_cur_index], _mutex, &absTime);
++    status = pthread_cond_timedwait(parker_cond(_cur_index), _mutex, &absTime);
+@@ -1879 +1901 @@
+-    status = pthread_cond_signal(&_cond[index]);
++    status = pthread_cond_signal(parker_cond(index));
