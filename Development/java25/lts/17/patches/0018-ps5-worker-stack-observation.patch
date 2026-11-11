@@ -1,0 +1,23 @@
+diff --git a/src/hotspot/os/bsd/os_bsd.cpp b/src/hotspot/os/bsd/os_bsd.cpp
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -639,0 +640,6 @@
++#ifdef __PROSPERO__
++// Optional, statically linked diagnostics for a consumer's signal recorder.
++extern "C" void ps5_lts_observe_worker_stack(const void* top, size_t size)
++    __attribute__((weak));
++#endif
++
+@@ -643,0 +650,6 @@
++#ifdef __PROSPERO__
++  const void* const diagnostic_stack_top = thread->stack_base();
++  if (ps5_lts_observe_worker_stack != NULL) {
++    ps5_lts_observe_worker_stack(diagnostic_stack_top, thread->stack_size());
++  }
++#endif
+@@ -695,0 +708,5 @@
++#ifdef __PROSPERO__
++  if (ps5_lts_observe_worker_stack != NULL) {
++    ps5_lts_observe_worker_stack(diagnostic_stack_top, 0);
++  }
++#endif
