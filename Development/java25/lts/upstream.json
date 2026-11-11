@@ -71,7 +71,10 @@
         "src/hotspot/share/runtime/ps5ThreadLocal.hpp": "d58c5bfc4fdc102d2b4716630cc5f197c59e0579c093af6a8fe5ca73972d07f9",
         "src/java.base/unix/native/libnet/NetworkInterface.c": "cc223e406e1335ea6f66e9018e26ff3aea9039a46a0a6b0334bceacc3e197d65",
         "src/java.base/unix/native/libnet/ps5Ifaddrs.h": "4927e017704d3a47dd62cb745378017bda0ebcb4b0726f0f6c814f2cf7655b3e",
-        "src/java.base/share/native/libzip/Inflater.c": "c6e917a816593b06448388ee11b7fde1da345853984340d4e420ede4f9750623"
+        "src/java.base/share/native/libzip/Inflater.c": "c6e917a816593b06448388ee11b7fde1da345853984340d4e420ede4f9750623",
+        "src/hotspot/share/memory/virtualspace.hpp": "dbb1fbe7b5ed5f5b98999ae726f9e1b760c9768ad1310e725b05575b32af75f5",
+        "src/hotspot/share/memory/virtualspace.cpp": "f81e6edac561b8f48cf42690dcdde9c05ca44da71bae63f54b5e58fd6e6d8d45",
+        "src/hotspot/share/memory/metaspace/virtualSpaceNode.cpp": "856e500ec679da423d8283fa742c89a7dd6f789c191ec33b475eae0efae308c6"
       }
     },
     "21": {

@@ -1,0 +1,60 @@
+diff --git a/src/hotspot/share/memory/virtualspace.hpp b/src/hotspot/share/memory/virtualspace.hpp
+--- a/src/hotspot/share/memory/virtualspace.hpp
++++ b/src/hotspot/share/memory/virtualspace.hpp
+@@ -81,0 +82,4 @@
++#ifdef __PROSPERO__
++  static ReservedSpace reserve_metaspace_node(size_t size, size_t alignment);
++#endif
++
+diff --git a/src/hotspot/share/memory/virtualspace.cpp b/src/hotspot/share/memory/virtualspace.cpp
+--- a/src/hotspot/share/memory/virtualspace.cpp
++++ b/src/hotspot/share/memory/virtualspace.cpp
+@@ -39,0 +40,6 @@
++#ifdef __PROSPERO__
++#include "runtime/ps5LtsBootstrap.hpp"
++#include <errno.h>
++#include <sys/mman.h>
++#endif
++
+@@ -80,0 +87,27 @@
++
++#ifdef __PROSPERO__
++ReservedSpace ReservedSpace::reserve_metaspace_node(size_t size, size_t alignment) {
++  const size_t page_size = os::vm_page_size();
++  assert(alignment > page_size && is_power_of_2(alignment), "invalid node alignment");
++  assert(size > 0 && is_aligned(size, alignment), "invalid node size");
++  // Request the final alignment without temporarily reserving size + alignment.
++  // The normal anonymous commit and release paths still own this reservation.
++  const int flags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_ALIGNED(exact_log2(alignment));
++  char* base = static_cast<char*>(::mmap(nullptr, size, PROT_NONE, flags, -1, 0));
++  if (base != MAP_FAILED) {
++    if (base != nullptr && is_aligned(base, alignment)) {
++      MemTracker::record_virtual_memory_reserve(base, size, CALLER_PC);
++      ps5_lts_trace_number("METASPACE: aligned node bytes=", size);
++      return ReservedSpace(base, size, alignment, page_size, false, false);
++    }
++    // Some implementations may ignore an alignment hint. Do not retain the mapping.
++    if (::munmap(base, size) != 0) {
++      fatal("PS5 metaspace alignment cleanup failed (%d)", errno);
++    }
++    ps5_lts_trace_number("METASPACE: alignment not honored bytes=", size);
++  } else {
++    ps5_lts_trace_number("METASPACE: aligned node mmap errno=", errno);
++  }
++  return ReservedSpace(size, alignment, page_size);
++}
++#endif
+diff --git a/src/hotspot/share/memory/metaspace/virtualSpaceNode.cpp b/src/hotspot/share/memory/metaspace/virtualSpaceNode.cpp
+--- a/src/hotspot/share/memory/metaspace/virtualSpaceNode.cpp
++++ b/src/hotspot/share/memory/metaspace/virtualSpaceNode.cpp
+@@ -245,3 +245,7 @@
+-  ReservedSpace rs(word_size * BytesPerWord,
+-                   Settings::virtual_space_node_reserve_alignment_words() * BytesPerWord,
+-                   os::vm_page_size());
++  const size_t size = word_size * BytesPerWord;
++  const size_t alignment = Settings::virtual_space_node_reserve_alignment_words() * BytesPerWord;
++#ifdef __PROSPERO__
++  ReservedSpace rs = ReservedSpace::reserve_metaspace_node(size, alignment);
++#else
++  ReservedSpace rs(size, alignment, os::vm_page_size());
++#endif
