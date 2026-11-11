@@ -1,0 +1,67 @@
+diff --git a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -731,0 +732,45 @@
++#ifdef __PROSPERO__
++/* PS5 may deny pathname metadata/access calls. Only accept an actual
++ * non-creating read of a regular file or directory as a fallback. */
++static int ps5_nio_read_descriptor(const char *path, struct stat64 *buf) {
++    int fd;
++    RESTARTABLE(open64(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC), fd);
++    if (fd < 0) {
++        return -1;
++    }
++    int result;
++    RESTARTABLE(fstat64(fd, buf), result);
++    int error = result == -1 ? errno : 0;
++    if (result == 0 && !S_ISREG(buf->st_mode) && !S_ISDIR(buf->st_mode)) {
++        result = -1;
++        error = EPERM;
++    }
++    if (close(fd) == -1 && result == 0) {
++        return -1;
++    }
++    if (result == -1) {
++        errno = error;
++    }
++    return result;
++}
++
++static int ps5_nio_stat_following(const char *path, struct stat64 *buf) {
++    int result;
++    RESTARTABLE(stat64(path, buf), result);
++    if (result == -1 && errno == EPERM) {
++        result = ps5_nio_read_descriptor(path, buf);
++    }
++    return result;
++}
++
++static int ps5_nio_access(const char *path, int mode) {
++    int result;
++    RESTARTABLE(access(path, mode), result);
++    if (result == -1 && errno == EPERM && mode == R_OK) {
++        struct stat64 buf;
++        result = ps5_nio_read_descriptor(path, &buf);
++    }
++    return result;
++}
++#endif
++
+@@ -757,0 +803,3 @@
++#ifdef __PROSPERO__
++    err = ps5_nio_stat_following(path, &buf);
++#else
+@@ -758,0 +807 @@
++#endif
+@@ -788,0 +838,3 @@
++#ifdef __PROSPERO__
++    err = ps5_nio_stat_following(path, &buf);
++#else
+@@ -789,0 +842 @@
++#endif
+@@ -1295,0 +1349,3 @@
++#ifdef __PROSPERO__
++    err = ps5_nio_access(path, (int)amode);
++#else
+@@ -1296,0 +1353 @@
++#endif
