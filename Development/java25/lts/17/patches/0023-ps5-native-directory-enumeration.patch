@@ -1,0 +1,209 @@
+diff --git a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -316,0 +317 @@
++#include "ps5LtsDirectory.h"
+@@ -1123,0 +1125,3 @@
++#ifdef __PROSPERO__
++    dir = (DIR*)ps5_directory_open(path);
++#else
+@@ -1124,0 +1129 @@
++#endif
+@@ -1140,0 +1146,3 @@
++#ifdef __PROSPERO__
++    dir = (DIR*)ps5_directory_open_fd(dfd);
++#else
+@@ -1141,0 +1150 @@
++#endif
+@@ -1152 +1161,6 @@
+-    if (closedir(dirp) == -1 && errno != EINTR) {
++#ifdef __PROSPERO__
++    int result = ps5_directory_close((Ps5Directory*)dirp);
++#else
++    int result = closedir(dirp);
++#endif
++    if (result == -1 && errno != EINTR) {
+@@ -1160,2 +1173,0 @@
+-    struct dirent* ptr;
+-
+@@ -1163,2 +1175,7 @@
+-    ptr = readdir(dirp);
+-    if (ptr == NULL) {
++#ifdef __PROSPERO__
++    const char* name = ps5_directory_read((Ps5Directory*)dirp);
++#else
++    struct dirent* ptr = readdir(dirp);
++    const char* name = ptr == NULL ? NULL : ptr->d_name;
++#endif
++    if (name == NULL) {
+@@ -1170 +1187 @@
+-        jsize len = strlen(ptr->d_name);
++        jsize len = strlen(name);
+@@ -1173 +1190 @@
+-            (*env)->SetByteArrayRegion(env, bytes, 0, len, (jbyte*)(ptr->d_name));
++            (*env)->SetByteArrayRegion(env, bytes, 0, len, (const jbyte*)name);
+diff --git a/src/java.base/unix/native/libnio/fs/ps5LtsDirectory.h b/src/java.base/unix/native/libnio/fs/ps5LtsDirectory.h
+new file mode 100644
+--- /dev/null
++++ b/src/java.base/unix/native/libnio/fs/ps5LtsDirectory.h
+@@ -0,0 +1,160 @@
++/* SPDX-License-Identifier: GPL-2.0-only WITH Classpath-exception-2.0 */
++#ifndef PS5_LTS_DIRECTORY_H
++#define PS5_LTS_DIRECTORY_H
++
++#include <errno.h>
++#include <fcntl.h>
++#include <stdint.h>
++#include <string.h>
++#include <sys/mman.h>
++#include <sys/stat.h>
++#include <unistd.h>
++
++extern int sceKernelGetdents(int fd, void *buffer, int size);
++extern int sceKernelGetdirentries(int fd, void *buffer, int size, long *position);
++
++enum { PS5_DIRECTORY_PAGE = 16384, PS5_DIRECTORY_BUFFER = 65536 };
++
++typedef struct {
++    int fd;
++    int failure;
++    int alternate;
++    int delivered;
++    long position;
++    size_t cursor;
++    size_t used;
++    char name[256];
++} Ps5Directory;
++
++_Static_assert(sizeof(Ps5Directory) <= PS5_DIRECTORY_PAGE, "PS5 directory state fits one page");
++
++static int ps5_directory_errno(int result) {
++    const uint32_t bits = (uint32_t)result;
++    if ((bits & 0xffff0000u) == 0x80020000u && (bits & 0xffffu) != 0) {
++        return bits & 0xffffu;
++    }
++    return result == -1 && errno ? errno : EIO;
++}
++
++/* Like fdopendir, this takes ownership of fd only on success. */
++static Ps5Directory *ps5_directory_open_fd(int fd) {
++    struct stat attributes;
++    int result;
++    do {
++        result = fstat(fd, &attributes);
++    } while (result == -1 && errno == EINTR);
++    if (result == -1) {
++        return NULL;
++    }
++    if (!S_ISDIR(attributes.st_mode)) {
++        errno = ENOTDIR;
++        return NULL;
++    }
++
++    // The next page is the aligned buffer passed to libkernel.
++    Ps5Directory *directory = mmap(NULL, PS5_DIRECTORY_PAGE + PS5_DIRECTORY_BUFFER,
++                                   PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++    if (directory == MAP_FAILED) {
++        return NULL;
++    }
++    directory->fd = fd;
++    return directory;
++}
++
++static Ps5Directory *ps5_directory_open(const char *path) {
++    int fd;
++    do {
++        fd = open(path, O_RDONLY | O_DIRECTORY | O_NONBLOCK | O_CLOEXEC);
++    } while (fd == -1 && errno == EINTR);
++    if (fd == -1) {
++        return NULL;
++    }
++    Ps5Directory *directory = ps5_directory_open_fd(fd);
++    if (directory == NULL) {
++        int error = errno;
++        (void)close(fd);
++        errno = error;
++    }
++    return directory;
++}
++
++static const char *ps5_directory_read(Ps5Directory *directory) {
++    if (directory->failure) {
++        errno = directory->failure;
++        return NULL;
++    }
++    unsigned char *data = (unsigned char*)directory + PS5_DIRECTORY_PAGE;
++    for (;;) {
++        if (directory->cursor == directory->used) {
++            int count;
++            int error;
++            do {
++                errno = 0;
++                count = directory->alternate
++                    ? sceKernelGetdirentries(directory->fd, data, PS5_DIRECTORY_BUFFER, &directory->position)
++                    : sceKernelGetdents(directory->fd, data, PS5_DIRECTORY_BUFFER);
++                error = count < 0 ? ps5_directory_errno(count) : 0;
++                // Retry the alternate ABI only before delivering any entry.
++                if (!directory->alternate && !directory->delivered &&
++                    (error == EINVAL || error == ENOSYS) &&
++                    lseek(directory->fd, 0, SEEK_SET) >= 0) {
++                    directory->alternate = 1;
++                    directory->position = 0;
++                    errno = 0;
++                    count = sceKernelGetdirentries(directory->fd, data, PS5_DIRECTORY_BUFFER, &directory->position);
++                    error = count < 0 ? ps5_directory_errno(count) : 0;
++                }
++            } while (error == EINTR);
++            if (count <= 0) {
++                directory->failure = error;
++                errno = error;
++                return NULL;
++            }
++            if (count > PS5_DIRECTORY_BUFFER) {
++                break;
++            }
++            directory->used = (size_t)count;
++            directory->cursor = 0;
++        }
++
++        const size_t remaining = directory->used - directory->cursor;
++        if (remaining < 8) {
++            break;
++        }
++        const unsigned char *entry = data + directory->cursor;
++        const unsigned record = entry[4] | ((unsigned)entry[5] << 8);
++        const unsigned length = entry[7];
++        if (record < 8 || record > remaining) {
++            break;
++        }
++        directory->cursor += record;
++        uint32_t inode;
++        memcpy(&inode, entry, sizeof(inode));
++        if (inode == 0) {
++            continue;
++        }
++        if (length == 0 || length + 8 >= record || entry[8 + length] != 0 ||
++            memchr(entry + 8, 0, length) != NULL) {
++            break;
++        }
++        memcpy(directory->name, entry + 8, length + 1);
++        directory->delivered = 1;
++        errno = 0;
++        return directory->name;
++    }
++    directory->failure = EIO;
++    errno = EIO;
++    return NULL;
++}
++
++static int ps5_directory_close(Ps5Directory *directory) {
++    const int result = close(directory->fd);
++    const int error = result == -1 ? errno : 0;
++    if (munmap(directory, PS5_DIRECTORY_PAGE + PS5_DIRECTORY_BUFFER) == -1 && result == 0) {
++        return -1;
++    }
++    errno = error;
++    return result;
++}
++
++#endif
