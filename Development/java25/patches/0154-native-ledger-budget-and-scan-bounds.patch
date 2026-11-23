@@ -1,0 +1,90 @@
+--- a/src/hotspot/share/runtime/ps5NativeDirectMemory.hpp
++++ b/src/hotspot/share/runtime/ps5NativeDirectMemory.hpp
+@@ -27,9 +27,10 @@
+ // The extended ledger must represent the entire extended native budget even
+ // when each owner holds only one PS5 page. Otherwise slots impose a hidden
+ // lower ceiling (4096 entries failed with only346MiB held in Cobblemon).
+-constexpr unsigned maximum_entry_count = (budget_bytes * 2) / page_bytes;
++constexpr size_t extended_budget_bytes = 3 * budget_bytes;
++constexpr unsigned maximum_entry_count = extended_budget_bytes / page_bytes;
+ struct Entry { void* address; int64_t physical; size_t bytes; bool occupied; bool metadata; bool stack; bool heap; };
+-struct State { unsigned mutex; size_t heap_held; size_t held, mappings, releases, failures, policy_rejections; int last_result; bool policy_frozen; bool extended; Entry entries[maximum_entry_count]; };
++struct State { unsigned mutex; unsigned occupied_end; unsigned first_free; size_t heap_held; size_t held, mappings, releases, failures, policy_rejections; int last_result; bool policy_frozen; bool extended; Entry entries[maximum_entry_count]; };
+ inline State& state() { static State value = {}; return value; }
+ inline void lock() {
+   while (__atomic_exchange_n(&state().mutex, 1u, __ATOMIC_ACQUIRE)) {
+@@ -50,7 +51,7 @@
+   unlock();
+   return 0;
+ }
+-inline size_t native_budget() { return state().extended ? budget_bytes * 2 : budget_bytes; }
++inline size_t native_budget() { return state().extended ? extended_budget_bytes : budget_bytes; }
+ inline unsigned capacity() { return state().extended ? maximum_entry_count : entry_count; }
+ inline void note(const char* label, size_t bytes, int result, size_t held) {
+   // Mapping can be requested under the raw allocator lock. Defer all trace IO
+@@ -62,6 +63,9 @@
+   if(state().entries[slot].heap)state().heap_held -= state().entries[slot].bytes;
+   state().held -= state().entries[slot].bytes;
+   state().entries[slot] = {};
++  if (slot < state().first_free) state().first_free = slot;
++  while (state().occupied_end && !state().entries[state().occupied_end - 1].occupied)
++    --state().occupied_end;
+ }
+ inline void* map(size_t bytes, size_t alignment = page_bytes, bool metadata = false, bool stack = false, bool heap = false) {
+   lock();
+@@ -79,12 +83,14 @@
+   const size_t purpose_held=heap ? state().heap_held : state().held-state().heap_held;
+   const size_t purpose_budget=heap ? heap_budget_bytes : selected_budget;
+   if (purpose_held <= purpose_budget && bytes <= purpose_budget-purpose_held) {
+-    for (unsigned i=0; i<selected_capacity; ++i) if (!state().entries[i].occupied) {slot=i;break;}
++    for (unsigned i=state().first_free; i<selected_capacity; ++i) if (!state().entries[i].occupied) {slot=i;break;}
+   }
+   if (slot == maximum_entry_count) {++state().policy_rejections;unlock();errno=ENOMEM;return MAP_FAILED;}
+   state().held += bytes;
+   if(heap)state().heap_held += bytes;
+   state().entries[slot] = {nullptr, -1, bytes, true, metadata, stack, heap};
++  state().first_free = slot + 1;
++  if (slot >= state().occupied_end) state().occupied_end = slot + 1;
+   unlock();
+   size_t pool = sceKernelGetDirectMemorySize();
+   int64_t physical = -1;
+@@ -130,10 +136,10 @@
+ inline bool unmap(void* address,size_t bytes,int* result) {
+   lock();
+   unsigned slot=maximum_entry_count;
+-  for(unsigned i=0;i<maximum_entry_count;++i)if(state().entries[i].occupied&&state().entries[i].address==address){slot=i;break;}
++  for(unsigned i=0;i<state().occupied_end;++i)if(state().entries[i].occupied&&state().entries[i].address==address){slot=i;break;}
+   if(slot==maximum_entry_count){
+     uintptr_t start=(uintptr_t)address;
+-    for(unsigned i=0;i<maximum_entry_count;++i){
++    for(unsigned i=0;i<state().occupied_end;++i){
+       const Entry& e=state().entries[i];uintptr_t base=(uintptr_t)e.address;
+       if(e.occupied && e.heap && e.address && start>=base && start-base<e.bytes){
+         unlock();*result=-1;errno=EINVAL;return true;
+@@ -161,7 +167,7 @@
+   uintptr_t start=(uintptr_t)address;
+   if (!bytes || start > UINTPTR_MAX-bytes) return false;
+   lock();bool found=false;
+-  for (unsigned i=0;i<maximum_entry_count;++i) {
++  for (unsigned i=0;i<state().occupied_end;++i) {
+     const Entry& e=state().entries[i];uintptr_t base=(uintptr_t)e.address;
+     if(e.occupied && e.metadata && e.address && start>=base &&
+        start-base<=e.bytes && bytes<=e.bytes-(start-base)) {found=true;break;}
+@@ -172,7 +178,7 @@
+   uintptr_t start=(uintptr_t)address;
+   if (!bytes || start > UINTPTR_MAX-bytes) return false;
+   lock();bool found=false;
+-  for (unsigned i=0;i<maximum_entry_count;++i) {
++  for (unsigned i=0;i<state().occupied_end;++i) {
+     const Entry& e=state().entries[i];uintptr_t base=(uintptr_t)e.address;
+     if(e.occupied && e.stack && e.address && start>=base &&
+        start-base<=e.bytes && bytes<=e.bytes-(start-base)) {found=true;break;}
+@@ -183,7 +189,7 @@
+   uintptr_t start=(uintptr_t)address;
+   if (!bytes || start > UINTPTR_MAX-bytes) return false;
+   lock();bool found=false;
+-  for (unsigned i=0;i<maximum_entry_count;++i) {
++  for (unsigned i=0;i<state().occupied_end;++i) {
+     const Entry& e=state().entries[i];uintptr_t base=(uintptr_t)e.address;
+     if(e.occupied && e.heap && e.address && start>=base &&
+        start-base<=e.bytes && bytes<=e.bytes-(start-base)) {found=true;break;}

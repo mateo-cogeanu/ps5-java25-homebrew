@@ -37,19 +37,19 @@ static bool fail_alloc=false,fail_map=false,fail_unmap=false,fail_release=false;
 static int mmap_error=ENOMEM;
 static std::mutex kernel_mutex;
 struct Physical {void* p;size_t bytes;bool mapped;};
-static Physical physical[32768]{};
+static Physical physical[49152]{};
 static size_t live_physical=0,live_mappings=0,alloc_calls=0,release_calls=0;
 extern "C" size_t sceKernelGetDirectMemorySize(){return 1024ULL*1024*1024;}
 extern "C" int sceKernelAllocateDirectMemory(int64_t start,int64_t end,size_t bytes,size_t alignment,int type,int64_t* offset){
  std::lock_guard<std::mutex> guard(kernel_mutex);++alloc_calls;
  assert(start==0&&end==1024LL*1024*1024&&alignment==16384&&bytes%16384==0&&type==12);
  if(fail_alloc)return -17;
- for(int i=0;i<32768;++i)if(!physical[i].p){void* p=nullptr;if(posix_memalign(&p,16384,bytes))return -18;physical[i]={p,bytes,false};*offset=i;++live_physical;return 0;}
+ for(int i=0;i<49152;++i)if(!physical[i].p){void* p=nullptr;if(posix_memalign(&p,16384,bytes))return -18;physical[i]={p,bytes,false};*offset=i;++live_physical;return 0;}
  return -19;
 }
 extern "C" int sceKernelMapDirectMemory(void** address,size_t bytes,int prot,int flags,int64_t offset,size_t alignment){
  std::lock_guard<std::mutex> guard(kernel_mutex);
- assert(prot==(PROT_READ|PROT_WRITE)&&flags==0&&alignment==16384&&offset>=0&&offset<32768);
+ assert(prot==(PROT_READ|PROT_WRITE)&&flags==0&&alignment==16384&&offset>=0&&offset<49152);
  assert((uintptr_t)*address==0x1000000000ULL&&physical[offset].p&&physical[offset].bytes==bytes&&!physical[offset].mapped);
  if(fail_map)return -20;
  *address=physical[offset].p;physical[offset].mapped=true;++live_mappings;return 0;
@@ -61,7 +61,7 @@ extern "C" int sceKernelMunmap(void* address,size_t bytes){
 }
 extern "C" int sceKernelReleaseDirectMemory(int64_t offset,size_t bytes){
  std::lock_guard<std::mutex> guard(kernel_mutex);++release_calls;
- assert(offset>=0&&offset<32768&&physical[offset].p&&physical[offset].bytes==bytes&&!physical[offset].mapped);
+ assert(offset>=0&&offset<49152&&physical[offset].p&&physical[offset].bytes==bytes&&!physical[offset].mapped);
  if(fail_release)return -22;
  std::free(physical[offset].p);physical[offset]={};--live_physical;return 0;
 }
@@ -90,11 +90,11 @@ int main(int argc,char**){
  if(extended)assert(direct::set_extended_budget(1)==0);
  const size_t selected_budget=direct::native_budget();
  const unsigned selected_capacity=direct::capacity();
- assert(selected_budget==(extended?512ULL:256ULL)*1024*1024);
- assert(selected_capacity==(extended?32768u:2048u));
+ assert(selected_budget==(extended?768ULL:256ULL)*1024*1024);
+ assert(selected_capacity==(extended?49152u:2048u));
  errno=EDOM;void* p=heap::allocate(100);assert(p&&errno==EDOM&&alloc_calls==0);heap::release(p);
  deny_heap=true;
- p=heap::allocate(32664);assert(p&&errno==EDOM&&direct::state().held>32768);memset(p,0x57,32664);assert(direct::set_extended_budget(0)==EBUSY);
+ p=heap::allocate(32664);assert(p&&errno==EDOM&&direct::state().held>49152);memset(p,0x57,32664);assert(direct::set_extended_budget(0)==EBUSY);
  p=heap::reallocate(p,65536);assert(p&&errno==EDOM);for(int i=0;i<32664;++i)assert(((unsigned char*)p)[i]==0x57);
  fail_alloc=true;void* old=p;assert(!heap::reallocate(p,131072)&&errno==ENOMEM);p=old;for(int i=0;i<32664;++i)assert(((unsigned char*)p)[i]==0x57);fail_alloc=false;
  errno=EDOM;heap::release(p);assert(errno==EDOM);empty();
@@ -133,7 +133,7 @@ int main(int argc,char**){
  fail_map=true;assert(!heap::allocate(65537)&&errno==ENOMEM);fail_map=false;empty();
  fail_map=true;fail_release=true;assert(!heap::allocate(65537)&&errno==ENOMEM);assert(live_physical==2&&live_mappings==0&&direct::state().held==163840);fail_map=false;fail_release=false;clean_retained_for_test();
  void* mapping=direct::map(16384);assert(mapping!=MAP_FAILED);memset(mapping,0x48,16384);
- int result=0;assert(direct::unmap(mapping,32768,&result)&&result==-1&&errno==EINVAL);assert(live_physical==1&&live_mappings==1);
+ int result=0;assert(direct::unmap(mapping,49152,&result)&&result==-1&&errno==EINVAL);assert(live_physical==1&&live_mappings==1);
  fail_unmap=true;before=release_calls;assert(direct::unmap(mapping,16384,&result)&&result==-1);assert(release_calls==before&&live_mappings==1&&((char*)mapping)[0]==0x48);fail_unmap=false;
  assert(direct::unmap(mapping,16384,&result)&&result==0);empty();
  mapping=direct::map(16384);fail_release=true;assert(direct::unmap(mapping,16384,&result)&&result==-1);assert(live_mappings==0&&live_physical==1);fail_release=false;clean_retained_for_test();
@@ -153,8 +153,8 @@ int main(int argc,char**){
  assert(direct::unmap(data,old_cap,&result)&&result==0);empty();
  mapping=direct::map(selected_budget);assert(mapping!=MAP_FAILED);before=alloc_calls;assert(direct::map(16384)==MAP_FAILED&&alloc_calls==before);assert(direct::unmap(mapping,selected_budget,&result)&&result==0);empty();
  // Extended mode crosses the observed4096-slot failure with budget remaining,
- // and supports one page per slot through the entire512MiB budget.
- static_assert(direct::maximum_entry_count*direct::page_bytes==2*direct::budget_bytes);
+ // and supports one page per slot through the entire768MiB budget.
+ static_assert(direct::maximum_entry_count*direct::page_bytes==3*direct::budget_bytes);
  std::vector<void*> slots;for(unsigned i=0;i<selected_capacity;++i){void* q=direct::map(16384);assert(q!=MAP_FAILED);slots.push_back(q);}before=alloc_calls;assert(direct::map(16384)==MAP_FAILED&&alloc_calls==before);for(void* q:slots)assert(direct::unmap(q,16384,&result)&&result==0);empty();
  parallel=true;std::vector<std::thread> threads;for(int t=0;t<4;++t)threads.emplace_back([t]{for(int i=0;i<1000;++i){size_t n=1+(i*137+t*17)%9000;void* q=heap::allocate(n);assert(q);memset(q,t+1,n);void* grown=heap::reallocate(q,n+500);assert(grown);for(size_t j=0;j<n;++j)assert(((unsigned char*)grown)[j]==t+1);heap::release(grown);}});for(auto& t:threads)t.join();parallel=false;empty();
  assert(direct::state().mappings==direct::state().releases+1); // One mapped-release fault was explicitly cleaned by the fixture.
