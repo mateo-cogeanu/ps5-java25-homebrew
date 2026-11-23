@@ -1,0 +1,14 @@
+--- a/src/hotspot/share/runtime/ps5NativeDirectMemory.hpp
++++ b/src/hotspot/share/runtime/ps5NativeDirectMemory.hpp
+@@ -24,7 +24,10 @@
+ constexpr size_t budget_bytes = 256 * 1024 * 1024;
+ constexpr size_t heap_budget_bytes = 1536 * 1024 * 1024;
+ constexpr unsigned entry_count = 2048;
+-constexpr unsigned maximum_entry_count = 4096;
++// The extended ledger must represent the entire extended native budget even
++// when each owner holds only one PS5 page. Otherwise slots impose a hidden
++// lower ceiling (4096 entries failed with only346MiB held in Cobblemon).
++constexpr unsigned maximum_entry_count = (budget_bytes * 2) / page_bytes;
+ struct Entry { void* address; int64_t physical; size_t bytes; bool occupied; bool metadata; bool stack; bool heap; };
+ struct State { unsigned mutex; size_t heap_held; size_t held, mappings, releases, failures, policy_rejections; int last_result; bool policy_frozen; bool extended; Entry entries[maximum_entry_count]; };
+ inline State& state() { static State value = {}; return value; }
