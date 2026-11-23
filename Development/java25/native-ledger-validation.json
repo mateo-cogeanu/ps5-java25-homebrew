@@ -1,7 +1,8 @@
 {
   "observed": "Build292 PS5 retained allocator trace shows Exact counters: mappings0x323d minus releases0x223d equals4096 occupied slots. Native held0x15a44000=363085824 bytes, under the512MiB budget. Zero kernel allocation failures, last_result0; policy rejections increased.",
   "fix": "Derive extended ledger capacity as 2*budget_bytes/page_bytes:32768 entries covers every16KiB page of the512MiB native budget. Keep default2048 slots/256MiB, existing purpose budgets, map/unmap ownership, cleanup retention and policy freeze. Extra static ledger storage is bounded to about1MiB.",
-  "checks": "ASan/UBSan actual allocator/direct ledger suite passes in both default and extended modes. Extended mode allocates32768 distinct16KiB mappings through the full512MiB budget, crosses the prior4096 failure, refuses overflow before OS calls, releases every mapping; existing realloc/cleanup fault and4000 concurrent lifetime checks pass. Target HotSpot rebuild passes.",
-  "object_sha256": "4c402c473879f6ffd663da0fe86a80573415cb8ebbdc072911f811f9c7e749a6",
-  "console": "Pending consumer293. No claim of complete Cobblemon support."
+  "checks": "ASan/UBSan actual allocator/direct ledger suite passes in both default and extended modes. Extended mode allocates32768 distinct16KiB mappings through the full512MiB budget, crosses the prior4096 failure, refuses overflow before OS calls, releases every mapping; existing realloc/cleanup fault and4000 concurrent lifetime checks pass. Target HotSpot object compilation and embedded merge pass.",
+  "object_sha256": "7a4e8ee8a7c0f59adbb170d98e386b4e42dd6819b88cf34b54f98cea6257e21c",
+  "console": "Pending consumer293. No claim of complete Cobblemon support.",
+  "native_configuration": "ps5-zgc, C1/C2 and ZGC retained; all baseline external VM definitions retained. Target object compilation and embedded static merge pass. The unused generic shared-libjvm link rejects shared/PIE flags; consumer signed-app linking is the applicable link check."
 }
