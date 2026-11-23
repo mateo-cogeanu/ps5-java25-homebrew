@@ -1,0 +1,11 @@
+{
+  "change": "Restore sun.misc.Unsafe.ensureClassInitialized(Class) as a direct delegate to jdk.internal.misc.Unsafe.ensureClassInitialized, retaining VM initialization semantics and access checks.",
+  "observed": "PS5 Cobblemon 1.8.4F on Minecraft 1.21.1 Fabric: Showdown thread fails with NoSuchMethodError for the legacy Unsafe method, after Java 25 version override passes.",
+  "host_validation": [
+    "Unpatched Java 25 fails a compiled legacy invocation; patched target-built jdk.unsupported class passes.",
+    "Concurrent initialization exactly once; repeated initialization, primitive/array classes, null and initialization errors retain expected behavior; Unsafe.getUnsafe still rejects untrusted caller.",
+    "Cobblemon 1.8.4F original bundled GraalJS 22.3.0, Truffle, Graal SDK, regex and ICU JARs evaluate JSON.parse JavaScript successfully with the target-built compatibility class."
+  ],
+  "patched_class_sha256": "6238ddd0b3f98ca8efc23e477df12647b90525dd02e4cb2e48054e40c6f6118d",
+  "console": "Pending consumer candidate 291 test. Native HotSpot and graphics unchanged."
+}

@@ -1,0 +1,18 @@
+--- a/src/jdk.unsupported/share/classes/sun/misc/Unsafe.java
++++ b/src/jdk.unsupported/share/classes/sun/misc/Unsafe.java
+@@ -118,6 +118,15 @@
+     // They will not work on elements of packed arrays.
+ 
+     /**
++     * Compatibility for libraries compiled against the pre-Java 22 Unsafe API.
++     * Delegates to the VM implementation, preserving initialization and errors.
++     */
++    @ForceInline
++    public void ensureClassInitialized(Class<?> c) {
++        theInternalUnsafe.ensureClassInitialized(c);
++    }
++
++    /**
+      * Fetches a value from a given Java variable.
+      * More specifically, fetches a field or array element within the given
+      * object {@code o} at the given offset, or (if {@code o} is null)
